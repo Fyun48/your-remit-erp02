@@ -11,6 +11,7 @@ import {
   FileText,
   CreditCard,
   Settings,
+  Receipt,
 } from 'lucide-react'
 
 const navigation = [
@@ -18,6 +19,7 @@ const navigation = [
   { name: '人事管理', href: '/dashboard/hr', icon: Users },
   { name: '出勤管理', href: '/dashboard/attendance', icon: Clock },
   { name: '請假管理', href: '/dashboard/leave', icon: Calendar },
+  { name: '費用報銷', href: '/dashboard/expense', icon: Receipt },
   { name: '審核中心', href: '/dashboard/approval', icon: FileText },
   { name: '財務會計', href: '/dashboard/finance', icon: CreditCard },
   { name: '系統設定', href: '/dashboard/settings', icon: Settings },
