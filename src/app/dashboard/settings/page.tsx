@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Clock, GitBranch, Shield, Users } from 'lucide-react'
+import { Clock, GitBranch, Receipt, Shield, Users } from 'lucide-react'
 
 export default function SettingsPage() {
   const settingsItems = [
@@ -21,6 +21,12 @@ export default function SettingsPage() {
       description: '設定各模組的審核流程與關卡',
       href: '/dashboard/settings/approval-flows',
       icon: GitBranch,
+    },
+    {
+      title: '費用類別',
+      description: '管理費用報銷的類別與規則',
+      href: '/dashboard/settings/expense-categories',
+      icon: Receipt,
     },
     {
       title: '員工管理',

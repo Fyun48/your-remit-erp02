@@ -43,6 +43,7 @@ model Company {
   attendanceRecords AttendanceRecord[]
   leaveTypes  LeaveType[]
   approvalFlows ApprovalFlow[]
+  expenseCategories ExpenseCategory[]
 
   @@map("companies")
 }
@@ -709,4 +710,124 @@ enum ActionType {
   RETURN
   DELEGATE
   CC
+}
+
+// ==================== 費用報銷 ====================
+
+// 費用類別
+model ExpenseCategory {
+  id           String   @id @default(cuid())
+  companyId    String?  // NULL = 集團通用
+  code         String   // TRAVEL, MEAL, TRANSPORT, SUPPLIES, etc.
+  name         String
+  description  String?
+
+  // 報銷規則
+  requiresReceipt      Boolean @default(true)  // 是否需要發票/收據
+  maxAmountPerItem     Float?                  // 單項最高金額限制
+  maxAmountPerMonth    Float?                  // 每月最高金額限制
+  requiresPreApproval  Boolean @default(false) // 是否需要事前核准
+
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company      Company?         @relation(fields: [companyId], references: [id])
+  items        ExpenseItem[]
+
+  @@unique([companyId, code])
+  @@map("expense_categories")
+}
+
+// 費用報銷申請
+model ExpenseRequest {
+  id           String   @id @default(cuid())
+  requestNo    String   @unique        // 申請單號
+  employeeId   String
+  companyId    String
+
+  // 報銷期間
+  periodStart  DateTime @db.Date       // 報銷起始日
+  periodEnd    DateTime @db.Date       // 報銷結束日
+
+  // 金額
+  totalAmount  Float    @default(0)    // 總金額
+  currency     String   @default("TWD")
+
+  // 說明
+  title        String                  // 報銷標題
+  description  String?                 // 說明
+
+  // 狀態
+  status       ExpenseStatus @default(DRAFT)
+  submittedAt  DateTime?
+  processedAt  DateTime?
+
+  // 審核資訊
+  currentApproverId String?
+  approvedById      String?
+  rejectedById      String?
+  approvalComment   String?
+
+  // 付款資訊
+  paymentStatus PaymentStatus @default(UNPAID)
+  paidAt        DateTime?
+  paymentRef    String?                // 付款參考號
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  items        ExpenseItem[]
+
+  @@index([employeeId, companyId])
+  @@index([status])
+  @@map("expense_requests")
+}
+
+enum ExpenseStatus {
+  DRAFT      // 草稿
+  PENDING    // 審核中
+  APPROVED   // 已核准
+  REJECTED   // 已拒絕
+  CANCELLED  // 已取消
+}
+
+enum PaymentStatus {
+  UNPAID     // 未付款
+  PROCESSING // 處理中
+  PAID       // 已付款
+}
+
+// 費用明細項目
+model ExpenseItem {
+  id           String   @id @default(cuid())
+  requestId    String
+  categoryId   String
+
+  // 費用資訊
+  date         DateTime @db.Date       // 消費日期
+  description  String                  // 費用說明
+  amount       Float                   // 金額
+  currency     String   @default("TWD")
+
+  // 發票/收據
+  receiptNo    String?                 // 發票號碼
+  receiptDate  DateTime?               // 發票日期
+  vendorName   String?                 // 廠商名稱
+  taxId        String?                 // 統一編號
+
+  // 附件
+  attachments  String?                 // JSON array of file URLs
+
+  // 備註
+  notes        String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  request      ExpenseRequest   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  category     ExpenseCategory  @relation(fields: [categoryId], references: [id])
+
+  @@map("expense_items")
 }
