@@ -309,23 +309,25 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 // ==================== 員工 ====================
 
 model Employee {
-  id              String   @id @default(cuid())
-  employeeNo      String   @unique // 員工編號
-  email           String   @unique
-  passwordHash    String
-  name            String
-  idNumber        String?  // 身分證字號
-  gender          Gender?
-  birthDate       DateTime?
-  phone           String?
-  address         String?
-  emergencyContact String?
-  emergencyPhone  String?
-  hireDate        DateTime
-  resignDate      DateTime?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  employeeNo          String   @unique // 員工編號
+  email               String   @unique
+  personalEmail       String?  // 個人 Email
+  passwordHash        String
+  name                String
+  idNumber            String?  // 身分證字號
+  gender              Gender?
+  birthDate           DateTime?
+  phone               String?
+  residentialAddress  String?  // 居住地地址
+  householdAddress    String?  // 戶籍地址
+  emergencyContact    String?
+  emergencyPhone      String?
+  hireDate            DateTime
+  resignDate          DateTime?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   assignments     EmployeeAssignment[]
   permissions     EmployeePermission[]
