@@ -319,6 +319,116 @@ async function main() {
   })
   console.log('✅ 班別指派完成')
 
+  // 11. 建立法定假別（集團共用，companyId = null）
+  const leaveTypes = [
+    {
+      code: 'ANNUAL',
+      name: '特別休假',
+      category: 'STATUTORY' as const,
+      requiresReason: false,
+      minUnit: 'HOUR' as const,
+      quotaType: 'SENIORITY' as const,
+      canCarryOver: true,
+      carryOverLimitDays: 10,
+      canCashOut: true,
+      sortOrder: 1,
+    },
+    {
+      code: 'PERSONAL',
+      name: '事假',
+      category: 'STATUTORY' as const,
+      requiresReason: true,
+      minUnit: 'HOUR' as const,
+      quotaType: 'FIXED' as const,
+      annualQuotaDays: 14,
+      sortOrder: 2,
+    },
+    {
+      code: 'SICK',
+      name: '病假',
+      category: 'STATUTORY' as const,
+      requiresReason: true,
+      requiresAttachment: true,
+      attachmentAfterDays: 3,
+      minUnit: 'HOUR' as const,
+      quotaType: 'FIXED' as const,
+      annualQuotaDays: 30,
+      sortOrder: 3,
+    },
+    {
+      code: 'MENSTRUAL',
+      name: '生理假',
+      category: 'STATUTORY' as const,
+      requiresReason: false,
+      minUnit: 'DAY' as const,
+      quotaType: 'FIXED' as const,
+      annualQuotaDays: 12,
+      genderRestriction: 'FEMALE' as const,
+      sortOrder: 4,
+    },
+    {
+      code: 'MARRIAGE',
+      name: '婚假',
+      category: 'STATUTORY' as const,
+      requiresReason: true,
+      requiresAttachment: true,
+      minUnit: 'DAY' as const,
+      quotaType: 'FIXED' as const,
+      annualQuotaDays: 8,
+      sortOrder: 5,
+    },
+    {
+      code: 'FUNERAL',
+      name: '喪假',
+      category: 'STATUTORY' as const,
+      requiresReason: true,
+      requiresAttachment: true,
+      minUnit: 'DAY' as const,
+      quotaType: 'FIXED' as const,
+      annualQuotaDays: 8,
+      sortOrder: 6,
+    },
+    {
+      code: 'MATERNITY',
+      name: '產假',
+      category: 'STATUTORY' as const,
+      requiresReason: true,
+      requiresAttachment: true,
+      minUnit: 'DAY' as const,
+      quotaType: 'FIXED' as const,
+      annualQuotaDays: 56,
+      genderRestriction: 'FEMALE' as const,
+      sortOrder: 7,
+    },
+    {
+      code: 'PATERNITY',
+      name: '陪產假',
+      category: 'STATUTORY' as const,
+      requiresReason: true,
+      requiresAttachment: true,
+      minUnit: 'DAY' as const,
+      quotaType: 'FIXED' as const,
+      annualQuotaDays: 7,
+      genderRestriction: 'MALE' as const,
+      sortOrder: 8,
+    },
+  ]
+
+  // Delete existing group-level leave types and recreate
+  await prisma.leaveType.deleteMany({
+    where: { companyId: null },
+  })
+
+  for (const lt of leaveTypes) {
+    await prisma.leaveType.create({
+      data: {
+        ...lt,
+        companyId: null,
+      },
+    })
+  }
+  console.log('✅ 法定假別已建立')
+
   console.log('')
   console.log('🎉 種子資料建立完成！')
   console.log('')
