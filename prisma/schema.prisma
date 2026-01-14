@@ -42,6 +42,7 @@ model Company {
   shiftAssignments ShiftAssignment[]
   attendanceRecords AttendanceRecord[]
   leaveTypes  LeaveType[]
+  approvalFlows ApprovalFlow[]
 
   @@map("companies")
 }
@@ -532,4 +533,180 @@ model LeaveBalance {
 
   @@unique([employeeId, companyId, leaveTypeId, year])
   @@map("leave_balances")
+}
+
+// ==================== 審核流程引擎 ====================
+
+// 審核流程模板
+model ApprovalFlow {
+  id          String   @id @default(cuid())
+  companyId   String?  // NULL = 集團通用
+  code        String   // LEAVE, EXPENSE, OVERTIME, etc.
+  name        String
+  description String?
+  module      String   // leave, expense, overtime, etc.
+
+  // 條件觸發（JSON 格式）
+  conditions  String?
+
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company   Company?       @relation(fields: [companyId], references: [id])
+  steps     ApprovalStep[]
+  instances ApprovalInstance[]
+
+  @@unique([companyId, code])
+  @@map("approval_flows")
+}
+
+// 審核關卡
+model ApprovalStep {
+  id         String   @id @default(cuid())
+  flowId     String
+  stepOrder  Int
+  name       String
+
+  approverType   ApproverType
+  approverValue  String?
+
+  approvalMode   ApprovalMode @default(ANY)
+
+  canSkip        Boolean  @default(false)
+  skipCondition  String?
+
+  ccType         ApproverType?
+  ccValue        String?
+
+  timeoutHours   Int      @default(0)
+  timeoutAction  TimeoutAction @default(NONE)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  flow           ApprovalFlow       @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  stepInstances  ApprovalStepInstance[]
+
+  @@unique([flowId, stepOrder])
+  @@map("approval_steps")
+}
+
+enum ApproverType {
+  SUPERVISOR
+  DEPARTMENT_HEAD
+  POSITION_LEVEL
+  SPECIFIC_POSITION
+  SPECIFIC_EMPLOYEE
+  ROLE
+}
+
+enum ApprovalMode {
+  ANY
+  ALL
+  MAJORITY
+}
+
+enum TimeoutAction {
+  NONE
+  REMIND
+  ESCALATE
+  AUTO_APPROVE
+  AUTO_REJECT
+}
+
+// 審核流程實例
+model ApprovalInstance {
+  id           String   @id @default(cuid())
+  flowId       String
+
+  module       String
+  referenceId  String
+
+  applicantId  String
+  companyId    String
+
+  status       ApprovalInstanceStatus @default(IN_PROGRESS)
+  currentStep  Int      @default(1)
+
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  flow         ApprovalFlow          @relation(fields: [flowId], references: [id])
+  stepInstances ApprovalStepInstance[]
+
+  @@unique([module, referenceId])
+  @@index([applicantId, companyId])
+  @@index([status])
+  @@map("approval_instances")
+}
+
+enum ApprovalInstanceStatus {
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// 審核關卡實例
+model ApprovalStepInstance {
+  id           String   @id @default(cuid())
+  instanceId   String
+  stepId       String
+  stepOrder    Int
+
+  assignedTo   String   // JSON array of employeeIds
+
+  status       StepInstanceStatus @default(PENDING)
+
+  assignedAt   DateTime @default(now())
+  dueAt        DateTime?
+  completedAt  DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  instance     ApprovalInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  step         ApprovalStep     @relation(fields: [stepId], references: [id])
+  actions      ApprovalAction[]
+
+  @@unique([instanceId, stepOrder])
+  @@map("approval_step_instances")
+}
+
+enum StepInstanceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+// 審核動作記錄
+model ApprovalAction {
+  id              String   @id @default(cuid())
+  stepInstanceId  String
+
+  actorId         String
+
+  action          ActionType
+  comment         String?
+
+  actedAt         DateTime @default(now())
+
+  stepInstance    ApprovalStepInstance @relation(fields: [stepInstanceId], references: [id], onDelete: Cascade)
+
+  @@map("approval_actions")
+}
+
+enum ActionType {
+  APPROVE
+  REJECT
+  RETURN
+  DELEGATE
+  CC
 }

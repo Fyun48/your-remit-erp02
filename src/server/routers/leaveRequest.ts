@@ -117,6 +117,7 @@ export const leaveRequestRouter = router({
     .mutation(async ({ ctx, input }) => {
       const request = await ctx.prisma.leaveRequest.findUnique({
         where: { id: input.id },
+        include: { leaveType: true },
       })
 
       if (!request) {
@@ -127,13 +128,112 @@ export const leaveRequestRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: '只有草稿可以送出' })
       }
 
-      return ctx.prisma.leaveRequest.update({
+      // 計算請假天數
+      const totalDays = request.totalHours / 8
+
+      // 匹配適用的審核流程
+      const flows = await ctx.prisma.approvalFlow.findMany({
+        where: {
+          module: 'leave',
+          isActive: true,
+          OR: [
+            { companyId: null },
+            { companyId: request.companyId },
+          ],
+        },
+        include: {
+          steps: { orderBy: { stepOrder: 'asc' } },
+        },
+        orderBy: [{ companyId: 'desc' }, { sortOrder: 'asc' }],
+      })
+
+      // 找到匹配的流程
+      let matchedFlow = null
+      for (const flow of flows) {
+        if (!flow.conditions) {
+          if (flow.isDefault) {
+            matchedFlow = flow
+            break
+          }
+          continue
+        }
+
+        try {
+          const conditions = JSON.parse(flow.conditions)
+          let match = true
+
+          if (conditions.minDays && totalDays < conditions.minDays) match = false
+          if (conditions.maxDays && totalDays > conditions.maxDays) match = false
+          if (conditions.leaveTypes && !conditions.leaveTypes.includes(request.leaveType.code)) match = false
+
+          if (match) {
+            matchedFlow = flow
+            break
+          }
+        } catch {
+          continue
+        }
+      }
+
+      if (!matchedFlow) {
+        matchedFlow = flows.find(f => f.isDefault) || flows[0]
+      }
+
+      // 更新請假申請狀態
+      const updatedRequest = await ctx.prisma.leaveRequest.update({
         where: { id: input.id },
         data: {
           status: 'PENDING',
           submittedAt: new Date(),
         },
       })
+
+      // 如果有審核流程，建立審核實例
+      if (matchedFlow && matchedFlow.steps.length > 0) {
+        const firstStep = matchedFlow.steps[0]
+
+        // 解析第一關審核者
+        const assignment = await ctx.prisma.employeeAssignment.findFirst({
+          where: { employeeId: request.employeeId, companyId: request.companyId, status: 'ACTIVE' },
+        })
+
+        let approvers: string[] = []
+        if (firstStep.approverType === 'SUPERVISOR' && assignment?.supervisorId) {
+          approvers = [assignment.supervisorId]
+        }
+
+        // 建立審核實例
+        const instance = await ctx.prisma.approvalInstance.create({
+          data: {
+            flowId: matchedFlow.id,
+            module: 'leave',
+            referenceId: request.id,
+            applicantId: request.employeeId,
+            companyId: request.companyId,
+            status: 'IN_PROGRESS',
+            currentStep: 1,
+          },
+        })
+
+        // 建立第一個關卡實例
+        await ctx.prisma.approvalStepInstance.create({
+          data: {
+            instanceId: instance.id,
+            stepId: firstStep.id,
+            stepOrder: 1,
+            assignedTo: JSON.stringify(approvers),
+            status: 'PENDING',
+          },
+        })
+
+        // 更新請假申請的當前審核者
+        await ctx.prisma.leaveRequest.update({
+          where: { id: input.id },
+          data: { currentApproverId: approvers[0] || null },
+        })
+      }
+
+      return updatedRequest
     }),
 
   // 審核（核准/拒絕）
@@ -158,44 +258,152 @@ export const leaveRequestRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: '此申請單無法審核' })
       }
 
-      const newStatus = input.action === 'APPROVE' ? 'APPROVED' : 'REJECTED'
+      // 查找審核實例
+      const instance = await ctx.prisma.approvalInstance.findUnique({
+        where: {
+          module_referenceId: {
+            module: 'leave',
+            referenceId: input.id,
+          },
+        },
+        include: {
+          flow: {
+            include: {
+              steps: { orderBy: { stepOrder: 'asc' } },
+            },
+          },
+          stepInstances: {
+            where: { status: 'PENDING' },
+            include: { step: true },
+            orderBy: { stepOrder: 'asc' },
+          },
+        },
+      })
 
-      // 更新請假申請
+      if (instance && instance.stepInstances.length > 0) {
+        const currentStepInstance = instance.stepInstances[0]
+
+        // 記錄審核動作
+        await ctx.prisma.approvalAction.create({
+          data: {
+            stepInstanceId: currentStepInstance.id,
+            actorId: input.approverId,
+            action: input.action,
+            comment: input.comment,
+          },
+        })
+
+        if (input.action === 'REJECT') {
+          // 拒絕：結束審核流程
+          await ctx.prisma.approvalStepInstance.update({
+            where: { id: currentStepInstance.id },
+            data: { status: 'REJECTED', completedAt: new Date() },
+          })
+
+          await ctx.prisma.approvalInstance.update({
+            where: { id: instance.id },
+            data: { status: 'REJECTED', completedAt: new Date() },
+          })
+
+          return ctx.prisma.leaveRequest.update({
+            where: { id: input.id },
+            data: {
+              status: 'REJECTED',
+              processedAt: new Date(),
+              rejectedById: input.approverId,
+              approvalComment: input.comment,
+            },
+          })
+        }
+
+        // 核准當前關卡
+        await ctx.prisma.approvalStepInstance.update({
+          where: { id: currentStepInstance.id },
+          data: { status: 'APPROVED', completedAt: new Date() },
+        })
+
+        // 檢查是否有下一關
+        const nextStep = instance.flow.steps.find(s => s.stepOrder === instance.currentStep + 1)
+
+        if (nextStep) {
+          // 有下一關，建立下一關卡實例
+          const assignment = await ctx.prisma.employeeAssignment.findFirst({
+            where: { employeeId: request.employeeId, companyId: request.companyId, status: 'ACTIVE' },
+          })
+
+          let nextApprovers: string[] = []
+          if (nextStep.approverType === 'SUPERVISOR' && assignment?.supervisorId) {
+            // 找上一層主管
+            const supervisor = await ctx.prisma.employeeAssignment.findUnique({
+              where: { id: assignment.supervisorId },
+            })
+            if (supervisor?.supervisorId) {
+              nextApprovers = [supervisor.supervisorId]
+            }
+          }
+
+          await ctx.prisma.approvalStepInstance.create({
+            data: {
+              instanceId: instance.id,
+              stepId: nextStep.id,
+              stepOrder: nextStep.stepOrder,
+              assignedTo: JSON.stringify(nextApprovers),
+              status: 'PENDING',
+            },
+          })
+
+          await ctx.prisma.approvalInstance.update({
+            where: { id: instance.id },
+            data: { currentStep: nextStep.stepOrder },
+          })
+
+          // 更新請假申請的當前審核者
+          return ctx.prisma.leaveRequest.update({
+            where: { id: input.id },
+            data: { currentApproverId: nextApprovers[0] || null },
+          })
+        }
+
+        // 無下一關，流程完成
+        await ctx.prisma.approvalInstance.update({
+          where: { id: instance.id },
+          data: { status: 'APPROVED', completedAt: new Date() },
+        })
+      }
+
+      // 更新請假申請為已核准
       const updated = await ctx.prisma.leaveRequest.update({
         where: { id: input.id },
         data: {
-          status: newStatus,
+          status: 'APPROVED',
           processedAt: new Date(),
-          approvedById: input.action === 'APPROVE' ? input.approverId : undefined,
-          rejectedById: input.action === 'REJECT' ? input.approverId : undefined,
+          approvedById: input.approverId,
           approvalComment: input.comment,
         },
       })
 
-      // 如果核准，更新假別餘額
-      if (input.action === 'APPROVE') {
-        const year = new Date().getFullYear()
-        await ctx.prisma.leaveBalance.upsert({
-          where: {
-            employeeId_companyId_leaveTypeId_year: {
-              employeeId: request.employeeId,
-              companyId: request.companyId,
-              leaveTypeId: request.leaveTypeId,
-              year,
-            },
-          },
-          update: {
-            usedHours: { increment: request.totalHours },
-          },
-          create: {
+      // 更新假別餘額
+      const year = new Date().getFullYear()
+      await ctx.prisma.leaveBalance.upsert({
+        where: {
+          employeeId_companyId_leaveTypeId_year: {
             employeeId: request.employeeId,
             companyId: request.companyId,
             leaveTypeId: request.leaveTypeId,
             year,
-            usedHours: request.totalHours,
           },
-        })
-      }
+        },
+        update: {
+          usedHours: { increment: request.totalHours },
+        },
+        create: {
+          employeeId: request.employeeId,
+          companyId: request.companyId,
+          leaveTypeId: request.leaveTypeId,
+          year,
+          usedHours: request.totalHours,
+        },
+      })
 
       return updated
     }),

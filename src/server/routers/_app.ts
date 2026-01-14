@@ -5,6 +5,8 @@ import { attendanceRouter } from './attendance'
 import { leaveTypeRouter } from './leaveType'
 import { leaveRequestRouter } from './leaveRequest'
 import { leaveBalanceRouter } from './leaveBalance'
+import { approvalFlowRouter } from './approvalFlow'
+import { approvalInstanceRouter } from './approvalInstance'
 
 export const appRouter = router({
   health: healthRouter,
@@ -13,6 +15,8 @@ export const appRouter = router({
   leaveType: leaveTypeRouter,
   leaveRequest: leaveRequestRouter,
   leaveBalance: leaveBalanceRouter,
+  approvalFlow: approvalFlowRouter,
+  approvalInstance: approvalInstanceRouter,
 })
 
 export type AppRouter = typeof appRouter

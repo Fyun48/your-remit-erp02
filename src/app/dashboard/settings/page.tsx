@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Clock, Shield, Users } from 'lucide-react'
+import { Clock, GitBranch, Shield, Users } from 'lucide-react'
 
 export default function SettingsPage() {
   const settingsItems = [
@@ -15,6 +15,12 @@ export default function SettingsPage() {
       description: '管理系統角色與權限設定',
       href: '/dashboard/settings/roles',
       icon: Shield,
+    },
+    {
+      title: '審核流程',
+      description: '設定各模組的審核流程與關卡',
+      href: '/dashboard/settings/approval-flows',
+      icon: GitBranch,
     },
     {
       title: '員工管理',
