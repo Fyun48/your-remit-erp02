@@ -429,6 +429,87 @@ async function main() {
   }
   console.log('✅ 法定假別已建立')
 
+  // 12. 建立預設審核流程
+  // 刪除現有的審核流程相關資料
+  await prisma.approvalAction.deleteMany({})
+  await prisma.approvalStepInstance.deleteMany({})
+  await prisma.approvalInstance.deleteMany({})
+  await prisma.approvalStep.deleteMany({})
+  await prisma.approvalFlow.deleteMany({})
+
+  // 請假審核流程 - 一般（3天以內，單關卡）
+  await prisma.approvalFlow.create({
+    data: {
+      code: 'LEAVE_SHORT',
+      name: '請假審核（3天以內）',
+      module: 'leave',
+      conditions: JSON.stringify({ maxDays: 3 }),
+      isDefault: false,
+      sortOrder: 1,
+      steps: {
+        create: [
+          {
+            stepOrder: 1,
+            name: '直屬主管',
+            approverType: 'SUPERVISOR',
+            approvalMode: 'ANY',
+          },
+        ],
+      },
+    },
+  })
+
+  // 請假審核流程 - 長假（超過3天，多關卡）
+  await prisma.approvalFlow.create({
+    data: {
+      code: 'LEAVE_LONG',
+      name: '請假審核（超過3天）',
+      module: 'leave',
+      conditions: JSON.stringify({ minDays: 4 }),
+      isDefault: false,
+      sortOrder: 2,
+      steps: {
+        create: [
+          {
+            stepOrder: 1,
+            name: '直屬主管',
+            approverType: 'SUPERVISOR',
+            approvalMode: 'ANY',
+          },
+          {
+            stepOrder: 2,
+            name: '部門主管',
+            approverType: 'DEPARTMENT_HEAD',
+            approvalMode: 'ANY',
+          },
+        ],
+      },
+    },
+  })
+
+  // 請假審核流程 - 預設
+  await prisma.approvalFlow.create({
+    data: {
+      code: 'LEAVE_DEFAULT',
+      name: '請假審核（預設）',
+      module: 'leave',
+      isDefault: true,
+      sortOrder: 99,
+      steps: {
+        create: [
+          {
+            stepOrder: 1,
+            name: '直屬主管',
+            approverType: 'SUPERVISOR',
+            approvalMode: 'ANY',
+          },
+        ],
+      },
+    },
+  })
+
+  console.log('✅ 預設審核流程已建立')
+
   console.log('')
   console.log('🎉 種子資料建立完成！')
   console.log('')
