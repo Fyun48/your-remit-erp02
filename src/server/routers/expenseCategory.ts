@@ -78,6 +78,14 @@ export const expenseCategoryRouter = router({
       sortOrder: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.expenseCategory.findUnique({
+        where: { id: input.id },
+      })
+
+      if (!existing) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '費用類別不存在' })
+      }
+
       const { id, ...data } = input
       return ctx.prisma.expenseCategory.update({
         where: { id },
@@ -89,6 +97,14 @@ export const expenseCategoryRouter = router({
   delete: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.expenseCategory.findUnique({
+        where: { id: input.id },
+      })
+
+      if (!existing) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '費用類別不存在' })
+      }
+
       return ctx.prisma.expenseCategory.update({
         where: { id: input.id },
         data: { isActive: false },
