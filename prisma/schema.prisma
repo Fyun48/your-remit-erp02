@@ -38,6 +38,9 @@ model Company {
   departments Department[]
   positions   Position[]
   employees   EmployeeAssignment[]
+  workShifts  WorkShift[]
+  shiftAssignments ShiftAssignment[]
+  attendanceRecords AttendanceRecord[]
 
   @@map("companies")
 }
@@ -255,4 +258,139 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+// ==================== 出勤管理 ====================
+
+enum ShiftType {
+  FIXED    // 固定班
+  FLEXIBLE // 彈性班
+}
+
+enum ClockMethod {
+  WEB    // 網頁打卡
+  APP    // APP打卡
+  GPS    // GPS定位打卡
+  IP     // IP限制打卡
+  FACE   // 人臉辨識
+  MANUAL // 人工補登
+}
+
+enum AttendanceStatus {
+  PENDING     // 待確認
+  NORMAL      // 正常
+  LATE        // 遲到
+  EARLY_LEAVE // 早退
+  ABSENT      // 曠職
+  LEAVE       // 請假
+  EXEMPT      // 免打卡
+}
+
+model WorkShift {
+  id                    String    @id @default(cuid())
+  companyId             String
+  name                  String    // 班別名稱
+  code                  String    // 班別代碼
+  shiftType             ShiftType @default(FIXED)
+
+  // 固定班時間
+  workStartTime         String?   // 上班時間 "HH:mm"
+  workEndTime           String?   // 下班時間 "HH:mm"
+
+  // 彈性班設定
+  coreStartTime         String?   // 核心時間開始 "HH:mm"
+  coreEndTime           String?   // 核心時間結束 "HH:mm"
+  flexStartRange        String?   // 彈性上班範圍 "HH:mm-HH:mm"
+  flexEndRange          String?   // 彈性下班範圍 "HH:mm-HH:mm"
+  requiredHours         Float?    // 每日應工作時數
+
+  // 容許設定
+  lateGraceMinutes      Int       @default(0)  // 遲到寬限分鐘
+  earlyLeaveGraceMinutes Int      @default(0)  // 早退寬限分鐘
+  overtimeThreshold     Int       @default(30) // 加班起算分鐘數
+
+  // 工作日設定
+  workDays              String    @default("1,2,3,4,5") // 工作日（週一=1）
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  company               Company         @relation(fields: [companyId], references: [id])
+  breaks                ShiftBreak[]
+  assignments           ShiftAssignment[]
+
+  @@unique([companyId, code])
+  @@map("work_shifts")
+}
+
+model ShiftBreak {
+  id         String   @id @default(cuid())
+  shiftId    String
+  name       String   // 休息名稱（如：午休、下午茶）
+  startTime  String   // 開始時間 "HH:mm"
+  endTime    String   // 結束時間 "HH:mm"
+  isPaid     Boolean  @default(false) // 是否為有薪休息
+  isRequired Boolean  @default(true)  // 是否為必要休息
+  sortOrder  Int      @default(0)
+
+  shift      WorkShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@map("shift_breaks")
+}
+
+model ShiftAssignment {
+  id            String    @id @default(cuid())
+  employeeId    String
+  companyId     String
+  shiftId       String
+  effectiveDate DateTime  @db.Date // 生效日期
+  endDate       DateTime? @db.Date // 結束日期
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company       Company   @relation(fields: [companyId], references: [id])
+  shift         WorkShift @relation(fields: [shiftId], references: [id])
+
+  @@unique([employeeId, companyId, effectiveDate])
+  @@map("shift_assignments")
+}
+
+model AttendanceRecord {
+  id               String           @id @default(cuid())
+  employeeId       String
+  companyId        String
+  date             DateTime         @db.Date // 出勤日期
+
+  // 上班打卡
+  clockInTime      DateTime?
+  clockInMethod    ClockMethod?
+  clockInLocation  String?          // GPS座標或地點描述
+  clockInIp        String?
+
+  // 下班打卡
+  clockOutTime     DateTime?
+  clockOutMethod   ClockMethod?
+  clockOutLocation String?
+  clockOutIp       String?
+
+  // 出勤狀態
+  status           AttendanceStatus @default(PENDING)
+  lateMinutes      Int              @default(0) // 遲到分鐘數
+  earlyLeaveMinutes Int             @default(0) // 早退分鐘數
+  overtimeMinutes  Int              @default(0) // 加班分鐘數
+  workHours        Float?           // 實際工作時數
+
+  // 補登資訊
+  isAmended        Boolean          @default(false) // 是否為補登
+  amendReason      String?          // 補登原因
+  approvedById     String?          // 審核人
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  company          Company          @relation(fields: [companyId], references: [id])
+
+  @@unique([employeeId, companyId, date])
+  @@map("attendance_records")
 }
