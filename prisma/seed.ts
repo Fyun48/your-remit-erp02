@@ -182,11 +182,11 @@ async function main() {
   const passwordHash = await bcrypt.hash('admin123', 10)
 
   const adminEmployee = await prisma.employee.upsert({
-    where: { email: 'admin@yourremit.com' },
+    where: { email: 'admin@your-remit.com' },
     update: {},
     create: {
       employeeNo: 'EMP001',
-      email: 'admin@yourremit.com',
+      email: 'admin@your-remit.com',
       passwordHash,
       name: '系統管理員',
       hireDate: new Date('2020-01-01'),
@@ -194,11 +194,11 @@ async function main() {
   })
 
   const managerEmployee = await prisma.employee.upsert({
-    where: { email: 'manager@yourremit.com' },
+    where: { email: 'manager@your-remit.com' },
     update: {},
     create: {
       employeeNo: 'EMP002',
-      email: 'manager@yourremit.com',
+      email: 'manager@your-remit.com',
       passwordHash,
       name: '王經理',
       gender: 'MALE',
@@ -207,11 +207,11 @@ async function main() {
   })
 
   const staffEmployee = await prisma.employee.upsert({
-    where: { email: 'staff@yourremit.com' },
+    where: { email: 'staff@your-remit.com' },
     update: {},
     create: {
       employeeNo: 'EMP003',
-      email: 'staff@yourremit.com',
+      email: 'staff@your-remit.com',
       passwordHash,
       name: '李小明',
       gender: 'MALE',
@@ -273,9 +273,9 @@ async function main() {
   console.log('🎉 種子資料建立完成！')
   console.log('')
   console.log('測試帳號：')
-  console.log('  管理員: admin@yourremit.com / admin123')
-  console.log('  經理: manager@yourremit.com / admin123')
-  console.log('  員工: staff@yourremit.com / admin123')
+  console.log('  管理員: admin@your-remit.com / admin123')
+  console.log('  經理: manager@your-remit.com / admin123')
+  console.log('  員工: staff@your-remit.com / admin123')
 }
 
 main()
