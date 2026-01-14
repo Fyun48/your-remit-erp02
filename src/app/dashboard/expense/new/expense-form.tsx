@@ -57,7 +57,7 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
   ])
 
   // 取得費用類別
-  const { data: categories } = trpc.expenseCategory.list.useQuery({ companyId })
+  const { data: categories, isLoading: isCategoriesLoading } = trpc.expenseCategory.list.useQuery({ companyId })
 
   // tRPC mutations
   const createMutation = trpc.expenseRequest.create.useMutation()
@@ -322,14 +322,21 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
                     className="w-full border rounded-md p-2"
                     value={item.categoryId}
                     onChange={(e) => updateItem(item.id, 'categoryId', e.target.value)}
+                    disabled={isCategoriesLoading}
                     required
                   >
-                    <option value="">請選擇類別</option>
-                    {categories?.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
+                    {isCategoriesLoading ? (
+                      <option value="">載入中...</option>
+                    ) : (
+                      <>
+                        <option value="">請選擇類別</option>
+                        {categories?.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </>
+                    )}
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -359,7 +366,7 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
                   <Input
                     type="number"
                     min="0"
-                    step="1"
+                    step="0.01"
                     placeholder="0"
                     value={item.amount}
                     onChange={(e) => updateItem(item.id, 'amount', e.target.value)}
