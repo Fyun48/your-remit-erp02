@@ -510,6 +510,145 @@ async function main() {
 
   console.log('✅ 預設審核流程已建立')
 
+  // 13. 建立預設費用類別
+  await prisma.expenseItem.deleteMany({})
+  await prisma.expenseRequest.deleteMany({})
+  await prisma.expenseCategory.deleteMany({})
+
+  const expenseCategories = await Promise.all([
+    prisma.expenseCategory.create({
+      data: {
+        code: 'TRAVEL',
+        name: '差旅費',
+        description: '出差交通、住宿費用',
+        requiresReceipt: true,
+        sortOrder: 1,
+      },
+    }),
+    prisma.expenseCategory.create({
+      data: {
+        code: 'TRANSPORT',
+        name: '交通費',
+        description: '計程車、高鐵、捷運等',
+        requiresReceipt: true,
+        sortOrder: 2,
+      },
+    }),
+    prisma.expenseCategory.create({
+      data: {
+        code: 'MEAL',
+        name: '餐費',
+        description: '業務餐費、加班餐費',
+        requiresReceipt: true,
+        maxAmountPerItem: 1000,
+        sortOrder: 3,
+      },
+    }),
+    prisma.expenseCategory.create({
+      data: {
+        code: 'SUPPLIES',
+        name: '文具用品',
+        description: '辦公文具、耗材',
+        requiresReceipt: true,
+        sortOrder: 4,
+      },
+    }),
+    prisma.expenseCategory.create({
+      data: {
+        code: 'COMMUNICATION',
+        name: '通訊費',
+        description: '電話費、網路費',
+        requiresReceipt: true,
+        sortOrder: 5,
+      },
+    }),
+    prisma.expenseCategory.create({
+      data: {
+        code: 'OTHER',
+        name: '其他',
+        description: '其他雜項支出',
+        requiresReceipt: true,
+        sortOrder: 99,
+      },
+    }),
+  ])
+
+  console.log('✅ 預設費用類別已建立')
+
+  // 14. 建立費用報銷審核流程
+  // 費用審核流程 - 小額（5000以內，單關卡）
+  await prisma.approvalFlow.create({
+    data: {
+      code: 'EXPENSE_SMALL',
+      name: '費用報銷（5000以內）',
+      module: 'expense',
+      conditions: JSON.stringify({ maxAmount: 5000 }),
+      isDefault: false,
+      sortOrder: 1,
+      steps: {
+        create: [
+          {
+            stepOrder: 1,
+            name: '直屬主管',
+            approverType: 'SUPERVISOR',
+            approvalMode: 'ANY',
+          },
+        ],
+      },
+    },
+  })
+
+  // 費用審核流程 - 中額（5000-20000，兩關卡）
+  await prisma.approvalFlow.create({
+    data: {
+      code: 'EXPENSE_MEDIUM',
+      name: '費用報銷（5000-20000）',
+      module: 'expense',
+      conditions: JSON.stringify({ minAmount: 5001, maxAmount: 20000 }),
+      isDefault: false,
+      sortOrder: 2,
+      steps: {
+        create: [
+          {
+            stepOrder: 1,
+            name: '直屬主管',
+            approverType: 'SUPERVISOR',
+            approvalMode: 'ANY',
+          },
+          {
+            stepOrder: 2,
+            name: '部門主管',
+            approverType: 'DEPARTMENT_HEAD',
+            approvalMode: 'ANY',
+          },
+        ],
+      },
+    },
+  })
+
+  // 費用審核流程 - 預設
+  await prisma.approvalFlow.create({
+    data: {
+      code: 'EXPENSE_DEFAULT',
+      name: '費用報銷（預設）',
+      module: 'expense',
+      isDefault: true,
+      sortOrder: 99,
+      steps: {
+        create: [
+          {
+            stepOrder: 1,
+            name: '直屬主管',
+            approverType: 'SUPERVISOR',
+            approvalMode: 'ANY',
+          },
+        ],
+      },
+    },
+  })
+
+  console.log('✅ 費用報銷審核流程已建立')
+
   console.log('')
   console.log('🎉 種子資料建立完成！')
   console.log('')
