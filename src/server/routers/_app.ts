@@ -8,6 +8,7 @@ import { leaveBalanceRouter } from './leaveBalance'
 import { approvalFlowRouter } from './approvalFlow'
 import { approvalInstanceRouter } from './approvalInstance'
 import { expenseCategoryRouter } from './expenseCategory'
+import { expenseRequestRouter } from './expenseRequest'
 
 export const appRouter = router({
   health: healthRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   approvalFlow: approvalFlowRouter,
   approvalInstance: approvalInstanceRouter,
   expenseCategory: expenseCategoryRouter,
+  expenseRequest: expenseRequestRouter,
 })
 
 export type AppRouter = typeof appRouter
