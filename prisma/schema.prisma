@@ -41,6 +41,7 @@ model Company {
   workShifts  WorkShift[]
   shiftAssignments ShiftAssignment[]
   attendanceRecords AttendanceRecord[]
+  leaveTypes  LeaveType[]
 
   @@map("companies")
 }
@@ -393,4 +394,142 @@ model AttendanceRecord {
 
   @@unique([employeeId, companyId, date])
   @@map("attendance_records")
+}
+
+// ==================== 請假管理 ====================
+
+model LeaveType {
+  id        String       @id @default(cuid())
+  companyId String?      // NULL = 集團共用法定假別
+  code      String       // ANNUAL, SICK, PERSONAL, etc.
+  name      String
+  category  LeaveCategory @default(STATUTORY)
+
+  // 請假規則
+  requiresReason       Boolean @default(true)
+  requiresAttachment   Boolean @default(false)
+  attachmentAfterDays  Int     @default(0)
+  minUnit              LeaveUnit @default(HOUR)
+
+  // 額度規則
+  quotaType          QuotaType @default(FIXED)
+  annualQuotaDays    Float     @default(0)
+  canCarryOver       Boolean   @default(false)
+  carryOverLimitDays Float     @default(0)
+  canCashOut         Boolean   @default(false)
+  cashOutRate        Float     @default(1.0)
+
+  // 使用限制
+  advanceDaysRequired Int      @default(0)
+  maxConsecutiveDays  Int      @default(0)
+  genderRestriction   Gender?
+  applicableAfterDays Int      @default(0)
+
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company?       @relation(fields: [companyId], references: [id])
+  requests LeaveRequest[]
+  balances LeaveBalance[]
+
+  @@unique([companyId, code])
+  @@map("leave_types")
+}
+
+enum LeaveCategory {
+  STATUTORY
+  COMPANY
+}
+
+enum LeaveUnit {
+  HOUR
+  HALF_DAY
+  DAY
+}
+
+enum QuotaType {
+  FIXED
+  SENIORITY
+  UNLIMITED
+}
+
+model LeaveRequest {
+  id          String   @id @default(cuid())
+  requestNo   String   @unique
+  employeeId  String
+  companyId   String
+  leaveTypeId String
+
+  startDate   DateTime
+  startPeriod LeavePeriod @default(FULL_DAY)
+  endDate     DateTime
+  endPeriod   LeavePeriod @default(FULL_DAY)
+  totalHours  Float
+
+  reason      String?
+  attachments String?
+  proxyEmployeeId String?
+
+  status      LeaveStatus @default(DRAFT)
+  submittedAt DateTime?
+  processedAt DateTime?
+
+  currentApproverId String?
+  approvedById      String?
+  rejectedById      String?
+  approvalComment   String?
+
+  actualEndDate    DateTime?
+  cancelledHours   Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+
+  @@index([employeeId, companyId])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+enum LeavePeriod {
+  FULL_DAY
+  AM
+  PM
+}
+
+enum LeaveStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model LeaveBalance {
+  id          String @id @default(cuid())
+  employeeId  String
+  companyId   String
+  leaveTypeId String
+  year        Int
+
+  entitledHours Float @default(0)
+  carriedHours  Float @default(0)
+  adjustedHours Float @default(0)
+
+  usedHours    Float @default(0)
+  pendingHours Float @default(0)
+
+  cashedOutHours  Float @default(0)
+  cashOutAmount   Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+
+  @@unique([employeeId, companyId, leaveTypeId, year])
+  @@map("leave_balances")
 }
