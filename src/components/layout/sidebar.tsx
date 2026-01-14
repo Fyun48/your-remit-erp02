@@ -1,0 +1,61 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import {
+  LayoutDashboard,
+  Users,
+  Clock,
+  Calendar,
+  FileText,
+  CreditCard,
+  Settings,
+} from 'lucide-react'
+
+const navigation = [
+  { name: '儀表板', href: '/dashboard', icon: LayoutDashboard },
+  { name: '人事管理', href: '/dashboard/hr', icon: Users },
+  { name: '出勤管理', href: '/dashboard/attendance', icon: Clock },
+  { name: '請假管理', href: '/dashboard/leave', icon: Calendar },
+  { name: '審核中心', href: '/dashboard/approval', icon: FileText },
+  { name: '財務會計', href: '/dashboard/finance', icon: CreditCard },
+  { name: '系統設定', href: '/dashboard/settings', icon: Settings },
+]
+
+export function Sidebar() {
+  const pathname = usePathname()
+
+  return (
+    <div className="flex h-full w-64 flex-col bg-gray-900">
+      <div className="flex h-16 items-center justify-center border-b border-gray-800">
+        <h1 className="text-xl font-bold text-white">集團 ERP</h1>
+      </div>
+      <nav className="flex-1 space-y-1 px-2 py-4">
+        {navigation.map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={cn(
+                'group flex items-center rounded-md px-2 py-2 text-sm font-medium',
+                isActive
+                  ? 'bg-gray-800 text-white'
+                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+              )}
+            >
+              <item.icon
+                className={cn(
+                  'mr-3 h-5 w-5 flex-shrink-0',
+                  isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
+                )}
+              />
+              {item.name}
+            </Link>
+          )
+        })}
+      </nav>
+    </div>
+  )
+}
