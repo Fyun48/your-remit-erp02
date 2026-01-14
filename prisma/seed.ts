@@ -269,6 +269,56 @@ async function main() {
   })
   console.log('✅ 任職關係已建立')
 
+  // 9. 建立預設班別
+  const normalShift = await prisma.workShift.upsert({
+    where: { companyId_code: { companyId: company1.id, code: 'NORMAL' } },
+    update: {},
+    create: {
+      companyId: company1.id,
+      name: '正常班',
+      code: 'NORMAL',
+      shiftType: 'FIXED',
+      workStartTime: '09:00',
+      workEndTime: '18:00',
+      lateGraceMinutes: 5,
+      earlyLeaveGraceMinutes: 5,
+      overtimeThreshold: 30,
+      workDays: '1,2,3,4,5',
+      breaks: {
+        create: [
+          {
+            name: '午休',
+            startTime: '12:00',
+            endTime: '13:00',
+            isPaid: false,
+            isRequired: true,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  })
+  console.log('✅ 班別已建立:', normalShift.name)
+
+  // 10. 指派班別給員工
+  await prisma.shiftAssignment.upsert({
+    where: {
+      employeeId_companyId_effectiveDate: {
+        employeeId: staffEmployee.id,
+        companyId: company1.id,
+        effectiveDate: new Date('2023-06-01'),
+      },
+    },
+    update: {},
+    create: {
+      employeeId: staffEmployee.id,
+      companyId: company1.id,
+      shiftId: normalShift.id,
+      effectiveDate: new Date('2023-06-01'),
+    },
+  })
+  console.log('✅ 班別指派完成')
+
   console.log('')
   console.log('🎉 種子資料建立完成！')
   console.log('')
