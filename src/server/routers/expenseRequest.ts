@@ -214,11 +214,10 @@ export const expenseRequestRouter = router({
         },
       })
 
-      // 更新總金額
-      const newTotal = request.totalAmount + input.item.amount
+      // 更新總金額（使用原子操作避免競態條件）
       return ctx.prisma.expenseRequest.update({
         where: { id: input.requestId },
-        data: { totalAmount: newTotal },
+        data: { totalAmount: { increment: input.item.amount } },
         include: { items: { include: { category: true } } },
       })
     }),
@@ -253,11 +252,10 @@ export const expenseRequestRouter = router({
         where: { id: input.itemId },
       })
 
-      // 更新總金額
-      const newTotal = request.totalAmount - item.amount
+      // 更新總金額（使用原子操作避免競態條件）
       return ctx.prisma.expenseRequest.update({
         where: { id: input.requestId },
-        data: { totalAmount: newTotal },
+        data: { totalAmount: { decrement: item.amount } },
         include: { items: { include: { category: true } } },
       })
     }),
