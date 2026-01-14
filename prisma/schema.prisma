@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 組織架構 ====================
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companies Company[]
+
+  @@map("groups")
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  groupId   String
+  name      String
+  code      String   @unique
+  taxId     String? // 統一編號
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group       Group                @relation(fields: [groupId], references: [id])
+  departments Department[]
+  positions   Position[]
+  employees   EmployeeAssignment[]
+
+  @@map("companies")
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  companyId String
+  parentId  String?
+  name      String
+  code      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company              @relation(fields: [companyId], references: [id])
+  parent    Department?          @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children  Department[]         @relation("DepartmentHierarchy")
+  employees EmployeeAssignment[]
+
+  @@unique([companyId, code])
+  @@map("departments")
+}
+
+model Position {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  code      String
+  level     Int      @default(0) // 職級，用於審核流程
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company              @relation(fields: [companyId], references: [id])
+  employees EmployeeAssignment[]
+
+  @@unique([companyId, code])
+  @@map("positions")
+}
+
+// ==================== 員工 ====================
+
+model Employee {
+  id                 String    @id @default(cuid())
+  employeeNo         String    @unique // 員工編號
+  email              String    @unique
+  personalEmail      String? // 個人 Email
+  passwordHash       String
+  name               String
+  idNumber           String? // 身分證字號
+  gender             Gender?
+  birthDate          DateTime?
+  phone              String?
+  residentialAddress String? // 居住地地址
+  householdAddress   String? // 戶籍地址
+  emergencyContact   String?
+  emergencyPhone     String?
+  hireDate           DateTime
+  resignDate         DateTime?
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  assignments EmployeeAssignment[]
+  permissions EmployeePermission[]
+  sessions    Session[]
+  accounts    Account[]
+
+  @@map("employees")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model EmployeeAssignment {
+  id           String           @id @default(cuid())
+  employeeId   String
+  companyId    String
+  departmentId String
+  positionId   String
+  roleId       String?
+  supervisorId String? // 直屬主管
+  isPrimary    Boolean          @default(false) // 是否為主要任職公司
+  startDate    DateTime
+  endDate      DateTime?
+  status       AssignmentStatus @default(ACTIVE)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  employee     Employee             @relation(fields: [employeeId], references: [id])
+  company      Company              @relation(fields: [companyId], references: [id])
+  department   Department           @relation(fields: [departmentId], references: [id])
+  position     Position             @relation(fields: [positionId], references: [id])
+  role         Role?                @relation(fields: [roleId], references: [id])
+  supervisor   EmployeeAssignment?  @relation("Supervision", fields: [supervisorId], references: [id])
+  subordinates EmployeeAssignment[] @relation("Supervision")
+
+  @@unique([employeeId, companyId])
+  @@map("employee_assignments")
+}
+
+enum AssignmentStatus {
+  ACTIVE // 在職
+  ON_LEAVE // 留停
+  RESIGNED // 離職
+}
+
+// ==================== 權限 ====================
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false) // 系統角色不可刪除
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RolePermission[]
+  employees   EmployeeAssignment[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique // e.g., "attendance.clock", "leave.apply"
+  name        String
+  module      String // e.g., "attendance", "leave", "expense"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roles     RolePermission[]
+  employees EmployeePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model EmployeePermission {
+  id           String    @id @default(cuid())
+  employeeId   String
+  companyId    String
+  permissionId String
+  grantType    GrantType
+  grantedById  String? // 誰授權的
+  grantedAt    DateTime  @default(now())
+  expiresAt    DateTime? // 權限過期時間（可選）
+
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, companyId, permissionId])
+  @@map("employee_permissions")
+}
+
+enum GrantType {
+  GRANT // 授予
+  REVOKE // 移除
+}
+
+// ==================== NextAuth.js ====================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("employee_id")
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user Employee @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String   @map("employee_id")
+  expires      DateTime
+
+  user Employee @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
