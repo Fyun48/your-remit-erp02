@@ -10,6 +10,7 @@ import { approvalInstanceRouter } from './approvalInstance'
 import { expenseCategoryRouter } from './expenseCategory'
 import { expenseRequestRouter } from './expenseRequest'
 import { dashboardRouter } from './dashboard'
+import { reportRouter } from './report'
 
 export const appRouter = router({
   health: healthRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
   expenseCategory: expenseCategoryRouter,
   expenseRequest: expenseRequestRouter,
   dashboard: dashboardRouter,
+  report: reportRouter,
 })
 
 export type AppRouter = typeof appRouter
