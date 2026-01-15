@@ -11,6 +11,7 @@ import { expenseCategoryRouter } from './expenseCategory'
 import { expenseRequestRouter } from './expenseRequest'
 import { dashboardRouter } from './dashboard'
 import { reportRouter } from './report'
+import { accountChartRouter } from './accountChart'
 
 export const appRouter = router({
   health: healthRouter,
@@ -25,6 +26,7 @@ export const appRouter = router({
   expenseRequest: expenseRequestRouter,
   dashboard: dashboardRouter,
   report: reportRouter,
+  accountChart: accountChartRouter,
 })
 
 export type AppRouter = typeof appRouter
