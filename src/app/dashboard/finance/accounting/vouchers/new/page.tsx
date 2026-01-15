@@ -11,11 +11,9 @@ export default async function NewVoucherPage() {
     redirect('/login')
   }
 
-  const employeeId = session.user.id
-
   const assignment = await prisma.employeeAssignment.findFirst({
     where: {
-      employeeId,
+      employeeId: session.user.id,
       isPrimary: true,
       status: 'ACTIVE',
     },
@@ -37,7 +35,6 @@ export default async function NewVoucherPage() {
 
   return (
     <VoucherForm
-      employeeId={employeeId}
       companyId={assignment.companyId}
       companyName={assignment.company.name}
     />

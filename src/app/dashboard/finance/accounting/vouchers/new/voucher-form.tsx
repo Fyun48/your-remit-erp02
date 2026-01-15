@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,11 +37,9 @@ const voucherTypeLabels: Record<string, string> = {
 interface VoucherFormProps {
   companyId: string
   companyName: string
-  employeeId: string
 }
 
-export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormProps) {
-  const router = useRouter()
+export function VoucherForm({ companyId, companyName }: VoucherFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [voucherType, setVoucherType] = useState<string>('')
   const [voucherDate, setVoucherDate] = useState(
