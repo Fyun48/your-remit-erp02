@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +17,7 @@ import {
 import { AccountSelect } from '@/components/ui/account-select'
 import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react'
 import Link from 'next/link'
+import { trpc } from '@/lib/trpc'
 
 interface VoucherLine {
   id: string
@@ -37,10 +39,22 @@ const voucherTypeLabels: Record<string, string> = {
 interface VoucherFormProps {
   companyId: string
   companyName: string
+  employeeId: string
 }
 
-export function VoucherForm({ companyId, companyName }: VoucherFormProps) {
+export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormProps) {
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const createVoucher = trpc.voucher.create.useMutation({
+    onSuccess: () => {
+      router.push('/dashboard/finance/accounting/vouchers')
+    },
+    onError: (error) => {
+      alert(error.message)
+      setIsSubmitting(false)
+    },
+  })
   const [voucherType, setVoucherType] = useState<string>('')
   const [voucherDate, setVoucherDate] = useState(
     new Date().toISOString().split('T')[0]
@@ -123,9 +137,19 @@ export function VoucherForm({ companyId, companyName }: VoucherFormProps) {
 
     setIsSubmitting(true)
 
-    // TODO: Call tRPC mutation to create voucher
-    alert('傳票建立功能開發中...')
-    setIsSubmitting(false)
+    createVoucher.mutate({
+      companyId,
+      voucherDate: new Date(voucherDate),
+      voucherType: voucherType as 'RECEIPT' | 'PAYMENT' | 'TRANSFER',
+      description: description || undefined,
+      createdById: employeeId,
+      lines: validLines.map((line) => ({
+        accountId: line.accountId,
+        debitAmount: line.debitAmount,
+        creditAmount: line.creditAmount,
+        description: line.description || undefined,
+      })),
+    })
   }
 
   return (
