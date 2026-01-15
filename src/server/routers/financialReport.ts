@@ -176,9 +176,6 @@ export const financialReportRouter = router({
 
       lines.forEach(line => {
         const cat = line.account.category
-        const amount = line.account.accountType === 'CREDIT'
-          ? Number(line.creditAmount) - Number(line.debitAmount)
-          : Number(line.debitAmount) - Number(line.creditAmount)
 
         if (cat === 'REVENUE') {
           totalRevenue += Number(line.creditAmount) - Number(line.debitAmount)

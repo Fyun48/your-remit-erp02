@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Clock, Calendar, FileText, Receipt, TrendingUp } from 'lucide-react'
+import { Users, Clock, Calendar, FileText, Receipt } from 'lucide-react'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
