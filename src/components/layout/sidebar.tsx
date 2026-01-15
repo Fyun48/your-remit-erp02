@@ -9,7 +9,6 @@ import {
   Clock,
   Calendar,
   FileText,
-  CreditCard,
   Settings,
   Receipt,
   BarChart3,
@@ -23,8 +22,7 @@ const navigation = [
   { name: '請假管理', href: '/dashboard/leave', icon: Calendar },
   { name: '費用報銷', href: '/dashboard/expense', icon: Receipt },
   { name: '審核中心', href: '/dashboard/approval', icon: FileText },
-  { name: '財務會計', href: '/dashboard/finance', icon: CreditCard },
-  { name: '會計管理', href: '/dashboard/finance/accounting', icon: BookOpen },
+  { name: '財務會計', href: '/dashboard/finance', icon: BookOpen },
   { name: '報表中心', href: '/dashboard/reports', icon: BarChart3 },
   { name: '系統設定', href: '/dashboard/settings', icon: Settings },
 ]
