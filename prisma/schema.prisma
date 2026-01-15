@@ -45,6 +45,15 @@ model Company {
   approvalFlows ApprovalFlow[]
   expenseCategories ExpenseCategory[]
 
+  // 財務會計關聯
+  accountCharts     AccountChart[]
+  accountingPeriods AccountingPeriod[]
+  customers         Customer[]
+  vendors           Vendor[]
+  vouchers          Voucher[]
+  receivables       AccountReceivable[]
+  payables          AccountPayable[]
+
   @@map("companies")
 }
 
@@ -63,6 +72,9 @@ model Department {
   parent    Department?          @relation("DepartmentHierarchy", fields: [parentId], references: [id])
   children  Department[]         @relation("DepartmentHierarchy")
   employees EmployeeAssignment[]
+
+  // 財務會計關聯
+  voucherLines VoucherLine[]
 
   @@unique([companyId, code])
   @@map("departments")
@@ -112,6 +124,11 @@ model Employee {
   permissions EmployeePermission[]
   sessions    Session[]
   accounts    Account[]
+
+  // 財務會計關聯
+  vouchersCreated   Voucher[] @relation("VoucherCreator")
+  vouchersApproved  Voucher[] @relation("VoucherApprover")
+  vouchersPosted    Voucher[] @relation("VoucherPoster")
 
   @@map("employees")
 }
@@ -799,6 +816,61 @@ enum PaymentStatus {
   PAID       // 已付款
 }
 
+// ==================== 財務會計 Enums ====================
+
+// 會計科目類別
+enum AccountCategory {
+  ASSET       // 資產
+  LIABILITY   // 負債
+  EQUITY      // 權益
+  REVENUE     // 收入
+  EXPENSE     // 費用
+}
+
+// 科目性質
+enum AccountType {
+  DEBIT       // 借方科目
+  CREDIT      // 貸方科目
+}
+
+// 傳票類型
+enum VoucherType {
+  RECEIPT     // 收款傳票
+  PAYMENT     // 付款傳票
+  TRANSFER    // 轉帳傳票
+}
+
+// 傳票來源
+enum VoucherSource {
+  MANUAL      // 人工輸入
+  EXPENSE     // 費用報支
+  AR          // 應收帳款
+  AP          // 應付帳款
+}
+
+// 傳票狀態
+enum VoucherStatus {
+  DRAFT       // 草稿
+  PENDING     // 待審核
+  POSTED      // 已過帳
+  VOID        // 作廢
+}
+
+// 會計期間狀態
+enum PeriodStatus {
+  OPEN        // 開放
+  CLOSED      // 已結帳
+  LOCKED      // 已鎖定
+}
+
+// 應收應付狀態
+enum ARAPStatus {
+  OPEN        // 未收付
+  PARTIAL     // 部分收付
+  PAID        // 已收付
+  VOID        // 作廢
+}
+
 // 費用明細項目
 model ExpenseItem {
   id           String   @id @default(cuid())
@@ -830,4 +902,256 @@ model ExpenseItem {
   category     ExpenseCategory  @relation(fields: [categoryId], references: [id])
 
   @@map("expense_items")
+}
+
+// ==================== 財務會計 ====================
+
+// 會計科目表
+model AccountChart {
+  id          String          @id @default(cuid())
+  companyId   String
+  company     Company         @relation(fields: [companyId], references: [id])
+
+  code        String
+  name        String
+  category    AccountCategory
+  accountType AccountType
+  level       Int
+
+  parentId    String?
+  parent      AccountChart?   @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children    AccountChart[]  @relation("AccountHierarchy")
+
+  isDetail    Boolean         @default(true)
+  isActive    Boolean         @default(true)
+  isSystem    Boolean         @default(false)
+  requiresAux Boolean         @default(false)
+
+  openingBalance Decimal      @default(0) @db.Decimal(15, 2)
+
+  voucherLines VoucherLine[]
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId, category])
+  @@map("account_charts")
+}
+
+// 會計期間
+model AccountingPeriod {
+  id          String        @id @default(cuid())
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id])
+
+  year        Int
+  period      Int
+  startDate   DateTime
+  endDate     DateTime
+
+  status      PeriodStatus  @default(OPEN)
+  closedAt    DateTime?
+  closedBy    String?
+
+  vouchers    Voucher[]
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([companyId, year, period])
+  @@map("accounting_periods")
+}
+
+// 客戶
+model Customer {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+
+  code          String
+  name          String
+  taxId         String?
+  contactName   String?
+  contactPhone  String?
+  contactEmail  String?
+  address       String?
+  paymentTerms  Int       @default(30)
+  creditLimit   Decimal?  @db.Decimal(15, 2)
+
+  isActive      Boolean   @default(true)
+
+  receivables   AccountReceivable[]
+  voucherLines  VoucherLine[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([companyId, code])
+  @@map("customers")
+}
+
+// 供應商
+model Vendor {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+
+  code          String
+  name          String
+  taxId         String?
+  contactName   String?
+  contactPhone  String?
+  contactEmail  String?
+  address       String?
+  paymentTerms  Int       @default(30)
+  bankName      String?
+  bankAccount   String?
+
+  isActive      Boolean   @default(true)
+
+  payables      AccountPayable[]
+  voucherLines  VoucherLine[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([companyId, code])
+  @@map("vendors")
+}
+
+// 傳票
+model Voucher {
+  id            String          @id @default(cuid())
+  companyId     String
+  company       Company         @relation(fields: [companyId], references: [id])
+
+  voucherNo     String
+  voucherDate   DateTime
+  voucherType   VoucherType
+  sourceType    VoucherSource   @default(MANUAL)
+  sourceId      String?
+
+  periodId      String
+  period        AccountingPeriod @relation(fields: [periodId], references: [id])
+
+  description   String?
+  totalDebit    Decimal         @db.Decimal(15, 2)
+  totalCredit   Decimal         @db.Decimal(15, 2)
+
+  status        VoucherStatus   @default(DRAFT)
+  postedAt      DateTime?
+
+  createdById   String
+  createdBy     Employee        @relation("VoucherCreator", fields: [createdById], references: [id])
+  approvedById  String?
+  approvedBy    Employee?       @relation("VoucherApprover", fields: [approvedById], references: [id])
+  postedById    String?
+  postedBy      Employee?       @relation("VoucherPoster", fields: [postedById], references: [id])
+
+  lines         VoucherLine[]
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([companyId, voucherNo])
+  @@index([companyId, voucherDate])
+  @@index([companyId, status])
+  @@map("vouchers")
+}
+
+// 傳票分錄
+model VoucherLine {
+  id            String        @id @default(cuid())
+  voucherId     String
+  voucher       Voucher       @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  lineNo        Int
+  accountId     String
+  account       AccountChart  @relation(fields: [accountId], references: [id])
+
+  debitAmount   Decimal       @default(0) @db.Decimal(15, 2)
+  creditAmount  Decimal       @default(0) @db.Decimal(15, 2)
+  description   String?
+
+  customerId    String?
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  vendorId      String?
+  vendor        Vendor?       @relation(fields: [vendorId], references: [id])
+  departmentId  String?
+  department    Department?   @relation(fields: [departmentId], references: [id])
+
+  createdAt     DateTime      @default(now())
+
+  @@index([voucherId])
+  @@map("voucher_lines")
+}
+
+// 應收帳款
+model AccountReceivable {
+  id            String      @id @default(cuid())
+  companyId     String
+  company       Company     @relation(fields: [companyId], references: [id])
+
+  arNo          String
+  arDate        DateTime
+  dueDate       DateTime
+
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id])
+
+  amount        Decimal     @db.Decimal(15, 2)
+  paidAmount    Decimal     @default(0) @db.Decimal(15, 2)
+  balance       Decimal     @db.Decimal(15, 2)
+
+  invoiceNo     String?
+  invoiceDate   DateTime?
+  description   String?
+
+  status        ARAPStatus  @default(OPEN)
+
+  voucherId     String?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([companyId, arNo])
+  @@index([companyId, customerId])
+  @@index([companyId, status])
+  @@map("account_receivables")
+}
+
+// 應付帳款
+model AccountPayable {
+  id            String      @id @default(cuid())
+  companyId     String
+  company       Company     @relation(fields: [companyId], references: [id])
+
+  apNo          String
+  apDate        DateTime
+  dueDate       DateTime
+
+  vendorId      String
+  vendor        Vendor      @relation(fields: [vendorId], references: [id])
+
+  amount        Decimal     @db.Decimal(15, 2)
+  paidAmount    Decimal     @default(0) @db.Decimal(15, 2)
+  balance       Decimal     @db.Decimal(15, 2)
+
+  invoiceNo     String?
+  invoiceDate   DateTime?
+  description   String?
+
+  status        ARAPStatus  @default(OPEN)
+
+  voucherId     String?
+  expenseRequestId String?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([companyId, apNo])
+  @@index([companyId, vendorId])
+  @@index([companyId, status])
+  @@map("account_payables")
 }
