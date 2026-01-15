@@ -17,6 +17,12 @@ import { accountingPeriodRouter } from './accountingPeriod'
 import { customerRouter } from './customer'
 import { vendorRouter } from './vendor'
 import { financialReportRouter } from './financialReport'
+import { departmentRouter } from './department'
+import { positionRouter } from './position'
+import { hrRouter } from './hr'
+import { companyRouter } from './company'
+import { groupPermissionRouter } from './groupPermission'
+import { auditLogRouter } from './auditLog'
 
 export const appRouter = router({
   health: healthRouter,
@@ -37,6 +43,12 @@ export const appRouter = router({
   customer: customerRouter,
   vendor: vendorRouter,
   financialReport: financialReportRouter,
+  department: departmentRouter,
+  position: positionRouter,
+  hr: hrRouter,
+  company: companyRouter,
+  groupPermission: groupPermissionRouter,
+  auditLog: auditLogRouter,
 })
 
 export type AppRouter = typeof appRouter

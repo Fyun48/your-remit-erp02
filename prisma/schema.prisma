@@ -7,6 +7,58 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==================== 稽核日誌 ====================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  entityType  String   // Employee, Department, Voucher, SealRequest...
+  entityId    String   // 資料主鍵
+  action      String   // CREATE, UPDATE, DELETE
+  path        String?  // 修改欄位路徑 (如: employee.name)
+  oldValue    Json?    // 修改前的值
+  newValue    Json?    // 修改後的值
+  operatorId  String
+  operator    Employee @relation("AuditOperator", fields: [operatorId], references: [id])
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id])
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([operatorId])
+  @@index([companyId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ==================== 集團級權限 ====================
+
+model GroupPermission {
+  id          String              @id @default(cuid())
+  employeeId  String
+  employee    Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  permission  GroupPermissionType
+  grantedById String              // 授權人 ID
+  grantedBy   Employee            @relation("GroupPermissionGranter", fields: [grantedById], references: [id])
+  grantedAt   DateTime            @default(now())
+  expiresAt   DateTime?           // 權限到期時間
+  isActive    Boolean             @default(true)
+  note        String?
+
+  @@unique([employeeId, permission])
+  @@index([employeeId])
+  @@map("group_permissions")
+}
+
+enum GroupPermissionType {
+  GROUP_ADMIN           // 集團超級管理員
+  CROSS_COMPANY_VIEW    // 跨公司檢視
+  CROSS_COMPANY_EDIT    // 跨公司編輯
+  AUDIT_LOG_VIEW        // 稽核日誌檢視
+  COMPANY_MANAGEMENT    // 公司管理 (創建/停用)
+}
+
 // ==================== 組織架構 ====================
 
 model Group {
@@ -53,6 +105,9 @@ model Company {
   vouchers          Voucher[]
   receivables       AccountReceivable[]
   payables          AccountPayable[]
+
+  // 稽核日誌
+  auditLogs         AuditLog[]
 
   @@map("companies")
 }
@@ -129,6 +184,11 @@ model Employee {
   vouchersCreated   Voucher[] @relation("VoucherCreator")
   vouchersApproved  Voucher[] @relation("VoucherApprover")
   vouchersPosted    Voucher[] @relation("VoucherPoster")
+
+  // 稽核與集團權限
+  auditLogs             AuditLog[]        @relation("AuditOperator")
+  groupPermissions      GroupPermission[]
+  groupPermissionsGranted GroupPermission[] @relation("GroupPermissionGranter")
 
   @@map("employees")
 }
