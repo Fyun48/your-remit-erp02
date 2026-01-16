@@ -96,6 +96,8 @@ export function CardRequestForm({
     },
   })
 
+  const startWorkflow = trpc.workflow.startInstance.useMutation()
+
   const validate = () => {
     const newErrors: Record<string, string> = {}
 
@@ -160,8 +162,26 @@ export function CardRequestForm({
         note: formData.note || undefined,
       },
       {
-        onSuccess: (data) => {
-          submit.mutate({ id: data.id })
+        onSuccess: async (data) => {
+          // 嘗試啟動工作流程
+          try {
+            await startWorkflow.mutateAsync({
+              requestType: 'CARD',
+              requestId: data.id,
+              applicantId,
+              companyId: formData.companyId,
+              requestData: {
+                quantity: formData.quantity,
+                name: formData.name,
+                title: formData.title,
+              },
+            })
+            router.push('/dashboard/admin/card')
+          } catch {
+            // 無工作流程定義，使用傳統審批
+            console.log('No workflow defined, using traditional approval')
+            submit.mutate({ id: data.id })
+          }
         },
       }
     )
