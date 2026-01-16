@@ -24,16 +24,29 @@ interface ExpenseFormProps {
   employeeId: string
   companyId: string
   companyName: string
+  canSelectCompany: boolean
 }
 
 function generateTempId() {
   return `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 }
 
-export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormProps) {
+export function ExpenseForm({ employeeId, companyId, companyName, canSelectCompany }: ExpenseFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 選擇的公司 ID (預設為傳入的 companyId)
+  const [selectedCompanyId, setSelectedCompanyId] = useState(companyId)
+
+  // 取得可選擇的公司列表
+  const { data: selectableCompanies } = trpc.company.getSelectableForExpense.useQuery(
+    { userId: employeeId },
+    { enabled: canSelectCompany }
+  )
+
+  // 取得選擇的公司名稱
+  const selectedCompanyName = selectableCompanies?.find(c => c.id === selectedCompanyId)?.name || companyName
 
   // 表單資料
   const [formData, setFormData] = useState({
@@ -56,8 +69,11 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
     },
   ])
 
-  // 取得費用類別
-  const { data: categories, isLoading: isCategoriesLoading } = trpc.expenseCategory.list.useQuery({ companyId })
+  // 取得費用類別 (依據選擇的公司)
+  const { data: categories, isLoading: isCategoriesLoading } = trpc.expenseCategory.list.useQuery(
+    { companyId: selectedCompanyId },
+    { enabled: !!selectedCompanyId }
+  )
 
   // tRPC mutations
   const createMutation = trpc.expenseRequest.create.useMutation()
@@ -147,7 +163,7 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
     try {
       await createMutation.mutateAsync({
         employeeId,
-        companyId,
+        companyId: selectedCompanyId,
         title: formData.title,
         description: formData.description || undefined,
         periodStart: new Date(formData.periodStart),
@@ -182,7 +198,7 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
       // 先建立申請單
       const request = await createMutation.mutateAsync({
         employeeId,
-        companyId,
+        companyId: selectedCompanyId,
         title: formData.title,
         description: formData.description || undefined,
         periodStart: new Date(formData.periodStart),
@@ -203,7 +219,7 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
           requestType: 'EXPENSE',
           requestId: request.id,
           applicantId: employeeId,
-          companyId,
+          companyId: selectedCompanyId,
           requestData: {
             totalAmount,
             title: formData.title,
@@ -235,7 +251,7 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
         </Link>
         <div>
           <h1 className="text-2xl font-bold">新增費用報銷</h1>
-          <p className="text-sm text-muted-foreground">{companyName}</p>
+          <p className="text-sm text-muted-foreground">{selectedCompanyName}</p>
         </div>
       </div>
 
@@ -254,6 +270,28 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* 報銷公司選擇 */}
+          {canSelectCompany && selectableCompanies && selectableCompanies.length > 1 && (
+            <div className="space-y-2">
+              <Label htmlFor="company">報銷公司 *</Label>
+              <select
+                id="company"
+                className="w-full border rounded-md p-2"
+                value={selectedCompanyId}
+                onChange={(e) => setSelectedCompanyId(e.target.value)}
+              >
+                {selectableCompanies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.group?.name ? `${company.group.name} - ` : ''}{company.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                選擇要報銷的公司，簽核流程將依據此公司的設定執行
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="title">報銷標題 *</Label>
             <Input
