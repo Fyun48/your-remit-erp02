@@ -11,22 +11,43 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
-  const expense = await prisma.expenseRequest.findUnique({
+  const expenseRequest = await prisma.expenseRequest.findUnique({
     where: { id: params.id },
     include: {
-      employee: { select: { id: true, name: true, employeeNo: true } },
-      company: { select: { id: true, name: true } },
       items: {
         include: {
           category: { select: { id: true, name: true } },
         },
-        orderBy: { expenseDate: 'asc' },
+        orderBy: { date: 'asc' },
       },
     },
   })
 
-  if (!expense) {
+  if (!expenseRequest) {
     notFound()
+  }
+
+  // Fetch employee and company separately since relations are not defined
+  const [employee, company] = await Promise.all([
+    prisma.employee.findUnique({
+      where: { id: expenseRequest.employeeId },
+      select: { id: true, name: true, employeeNo: true },
+    }),
+    prisma.company.findUnique({
+      where: { id: expenseRequest.companyId },
+      select: { id: true, name: true },
+    }),
+  ])
+
+  if (!employee || !company) {
+    notFound()
+  }
+
+  // Combine the data
+  const expense = {
+    ...expenseRequest,
+    employee,
+    company,
   }
 
   return (

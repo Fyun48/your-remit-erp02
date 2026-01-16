@@ -15,7 +15,7 @@ export const companyRouter = router({
       const groupPermission = await ctx.prisma.groupPermission.findFirst({
         where: {
           employeeId: userId,
-          permissionType: 'GROUP_ADMIN',
+          permission: 'GROUP_ADMIN',
         },
       })
 
@@ -44,7 +44,7 @@ export const companyRouter = router({
         },
       })
 
-      const companyIds = [...new Set(assignments.map(a => a.companyId))]
+      const companyIds = Array.from(new Set(assignments.map(a => a.companyId)))
 
       if (companyIds.length === 0) {
         return []

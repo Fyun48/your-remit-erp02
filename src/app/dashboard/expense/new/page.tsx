@@ -40,7 +40,7 @@ export default async function NewExpensePage() {
     prisma.groupPermission.findFirst({
       where: {
         employeeId,
-        permissionType: 'GROUP_ADMIN',
+        permission: 'GROUP_ADMIN',
       },
     }),
     prisma.employeeAssignment.findMany({
@@ -52,7 +52,7 @@ export default async function NewExpensePage() {
     }),
   ])
 
-  const uniqueCompanyIds = [...new Set(allAssignments.map(a => a.companyId))]
+  const uniqueCompanyIds = Array.from(new Set(allAssignments.map(a => a.companyId)))
   const canSelectCompany = !!groupPermission || uniqueCompanyIds.length > 1
 
   return (

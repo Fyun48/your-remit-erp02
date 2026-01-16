@@ -10,7 +10,7 @@ import { format } from 'date-fns'
 
 interface ExpenseItem {
   id: string
-  expenseDate: Date
+  date: Date
   description: string
   amount: number
   vendorName: string | null
@@ -130,7 +130,7 @@ export function ExpenseDetail({ expense }: ExpenseDetailProps) {
                       </div>
                       <p className="font-medium">{item.description}</p>
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(item.expenseDate), 'yyyy/MM/dd')}
+                        {format(new Date(item.date), 'yyyy/MM/dd')}
                         {item.vendorName && ` | ${item.vendorName}`}
                         {item.receiptNo && ` | 發票：${item.receiptNo}`}
                       </p>
