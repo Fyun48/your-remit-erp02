@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent } from '@/components/ui/card'
 import { PendingList } from '@/components/approval/pending-list'
+import { WorkflowApprovalList } from '@/components/approval/workflow-approval-list'
+import { getCurrentCompany } from '@/lib/use-current-company'
 
 export default async function ApprovalPage() {
   const session = await auth()
@@ -12,6 +14,7 @@ export default async function ApprovalPage() {
   }
 
   const employeeId = session.user.id
+  const currentCompany = await getCurrentCompany(employeeId)
 
   // 檢查是否有下屬（是否為主管）
   const assignment = await prisma.employeeAssignment.findFirst({
@@ -33,17 +36,18 @@ export default async function ApprovalPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">審核中心</h1>
+      <div>
+        <h1 className="text-2xl font-bold">審核中心</h1>
+        {currentCompany && (
+          <p className="text-muted-foreground">{currentCompany.name}</p>
+        )}
+      </div>
 
-      {!isManager ? (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground text-center">
-              您目前沒有待審核的項目
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
+      {/* 工作流程待簽核 */}
+      <WorkflowApprovalList userId={employeeId} />
+
+      {/* 傳統待審核（主管審批） */}
+      {isManager && (
         <>
           <div className="text-sm text-muted-foreground">
             您有 {subordinates.length} 位下屬：
