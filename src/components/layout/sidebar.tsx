@@ -15,11 +15,13 @@ import {
   BookOpen,
   Building2,
   Stamp,
+  Network,
 } from 'lucide-react'
 
 const navigation = [
   { name: '儀表板', href: '/dashboard', icon: LayoutDashboard },
   { name: '人事管理', href: '/dashboard/hr', icon: Users },
+  { name: '組織圖', href: '/dashboard/organization', icon: Network },
   { name: '出勤管理', href: '/dashboard/attendance', icon: Clock },
   { name: '請假管理', href: '/dashboard/leave', icon: Calendar },
   { name: '費用報銷', href: '/dashboard/expense', icon: Receipt },
@@ -31,13 +33,17 @@ const navigation = [
   { name: '系統設定', href: '/dashboard/settings', icon: Settings },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  groupName?: string
+}
+
+export function Sidebar({ groupName = '集團' }: SidebarProps) {
   const pathname = usePathname()
 
   return (
     <div className="flex h-full w-64 flex-col bg-gray-900">
       <div className="flex h-16 items-center justify-center border-b border-gray-800">
-        <h1 className="text-xl font-bold text-white">集團 ERP</h1>
+        <h1 className="text-xl font-bold text-white">{groupName} ERP</h1>
       </div>
       <nav className="flex-1 space-y-1 px-2 py-4">
         {navigation.map((item) => {
