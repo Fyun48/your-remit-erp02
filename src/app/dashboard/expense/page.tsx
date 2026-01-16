@@ -158,6 +158,7 @@ export default async function ExpensePage() {
                     <th className="text-left py-3 px-2 font-medium">報銷期間</th>
                     <th className="text-right py-3 px-2 font-medium">金額</th>
                     <th className="text-left py-3 px-2 font-medium">狀態</th>
+                    <th className="text-center py-3 px-2 font-medium">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -182,6 +183,13 @@ export default async function ExpensePage() {
                             <StatusIcon className="h-3 w-3" />
                             {config.label}
                           </span>
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          <Link href={`/dashboard/expense/${req.id}`}>
+                            <Button variant="outline" size="sm">
+                              查看
+                            </Button>
+                          </Link>
                         </td>
                       </tr>
                     )
