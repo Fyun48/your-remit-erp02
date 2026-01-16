@@ -35,11 +35,32 @@ export default async function NewExpensePage() {
     )
   }
 
+  // 檢查是否可選擇公司 (集團管理員或多公司任職)
+  const [groupPermission, allAssignments] = await Promise.all([
+    prisma.groupPermission.findFirst({
+      where: {
+        employeeId,
+        permissionType: 'GROUP_ADMIN',
+      },
+    }),
+    prisma.employeeAssignment.findMany({
+      where: {
+        employeeId,
+        status: 'ACTIVE',
+      },
+      select: { companyId: true },
+    }),
+  ])
+
+  const uniqueCompanyIds = [...new Set(allAssignments.map(a => a.companyId))]
+  const canSelectCompany = !!groupPermission || uniqueCompanyIds.length > 1
+
   return (
     <ExpenseForm
       employeeId={employeeId}
       companyId={assignment.companyId}
       companyName={assignment.company.name}
+      canSelectCompany={canSelectCompany}
     />
   )
 }
