@@ -1,8 +1,10 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { FileText, Eye } from 'lucide-react'
 import { LeaveForm } from '@/components/leave/leave-form'
 import { LeaveBalanceCard } from '@/components/leave/leave-balance-card'
 
@@ -95,6 +97,7 @@ export default async function LeavePage() {
                     <th className="text-left py-3 px-2 font-medium">期間</th>
                     <th className="text-left py-3 px-2 font-medium">時數</th>
                     <th className="text-left py-3 px-2 font-medium">狀態</th>
+                    <th className="text-left py-3 px-2 font-medium">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -115,6 +118,13 @@ export default async function LeavePage() {
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.className}`}>
                             {config.label}
                           </span>
+                        </td>
+                        <td className="py-3 px-2">
+                          <Link href={`/dashboard/leave/${req.id}`}>
+                            <Button variant="ghost" size="sm">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
                         </td>
                       </tr>
                     )
