@@ -41,10 +41,11 @@ export function EmployeePathsList({
     isActive: undefined,
   })
 
-  // 取得公司員工列表（用於選擇）
-  const { data: employees } = trpc.hr.listEmployees.useQuery({
+  // 取得可管理的員工列表（根據權限）
+  // 集團管理員：所有員工，部門主管：只有部屬
+  const { data: manageableData } = trpc.hr.getManageableEmployees.useQuery({
+    userId: currentUserId,
     companyId,
-    status: 'ACTIVE',
   })
 
   const createMutation = trpc.workflow.create.useMutation({
@@ -92,7 +93,8 @@ export function EmployeePathsList({
     }
   }
 
-  const selectedEmployee = employees?.find(e => e.employee.id === selectedEmployeeId)
+  const selectedEmployee = manageableData?.employees.find(e => e.id === selectedEmployeeId)
+  const canManageEmployees = manageableData && manageableData.employees.length > 0
 
   return (
     <>
@@ -103,7 +105,7 @@ export function EmployeePathsList({
             返回流程列表
           </Button>
         </Link>
-        <Button onClick={() => setIsDialogOpen(true)}>
+        <Button onClick={() => setIsDialogOpen(true)} disabled={!canManageEmployees}>
           <Plus className="h-4 w-4 mr-2" />
           新增員工特殊路徑
         </Button>
@@ -199,15 +201,26 @@ export function EmployeePathsList({
                 onChange={(e) => setSelectedEmployeeId(e.target.value)}
               >
                 <option value="">請選擇員工</option>
-                {employees?.map((emp) => (
-                  <option key={emp.employee.id} value={emp.employee.id}>
-                    {emp.employee.name} ({emp.employee.employeeNo})
+                {manageableData?.employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.name} ({emp.employeeNo})
+                    {emp.department && ` - ${emp.department.name}`}
                   </option>
                 ))}
               </select>
+              {!manageableData?.isGroupAdmin && manageableData?.employees.length === 0 && (
+                <p className="text-xs text-red-500">
+                  您目前沒有部屬，無法設定員工特殊路徑
+                </p>
+              )}
               {selectedEmployee && (
                 <p className="text-xs text-muted-foreground">
                   此員工的所有申請將優先使用這個特殊流程
+                </p>
+              )}
+              {manageableData?.isGroupAdmin && (
+                <p className="text-xs text-blue-600">
+                  您是集團管理員，可為任何員工設定特殊路徑
                 </p>
               )}
             </div>

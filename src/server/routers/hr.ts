@@ -572,4 +572,84 @@ export const hrRouter = router({
 
       return { success: true }
     }),
+
+  // 取得可管理的員工（用於員工特殊路徑設定）
+  // 集團管理員：所有公司員工
+  // 部門主管：只有其部屬
+  getManageableEmployees: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      companyId: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      // 檢查是否為集團管理員
+      const groupPermission = await ctx.prisma.groupPermission.findFirst({
+        where: {
+          employeeId: input.userId,
+          permission: 'GROUP_ADMIN',
+        },
+      })
+
+      if (groupPermission) {
+        // 集團管理員：返回公司所有員工
+        const assignments = await ctx.prisma.employeeAssignment.findMany({
+          where: {
+            companyId: input.companyId,
+            status: 'ACTIVE',
+          },
+          include: {
+            employee: { select: { id: true, name: true, employeeNo: true, email: true } },
+            department: { select: { id: true, name: true } },
+            position: { select: { id: true, name: true } },
+          },
+          orderBy: { employee: { employeeNo: 'asc' } },
+        })
+
+        return {
+          isGroupAdmin: true,
+          employees: assignments.map(a => ({
+            ...a.employee,
+            department: a.department,
+            position: a.position,
+          })),
+        }
+      }
+
+      // 部門主管：只返回部屬
+      // 先找到用戶在此公司的任職 ID
+      const userAssignment = await ctx.prisma.employeeAssignment.findFirst({
+        where: {
+          employeeId: input.userId,
+          companyId: input.companyId,
+          status: 'ACTIVE',
+        },
+      })
+
+      if (!userAssignment) {
+        return { isGroupAdmin: false, employees: [] }
+      }
+
+      // 查詢直接部屬
+      const subordinates = await ctx.prisma.employeeAssignment.findMany({
+        where: {
+          supervisorId: userAssignment.id,
+          status: 'ACTIVE',
+        },
+        include: {
+          employee: { select: { id: true, name: true, employeeNo: true, email: true } },
+          department: { select: { id: true, name: true } },
+          position: { select: { id: true, name: true } },
+        },
+        orderBy: { employee: { employeeNo: 'asc' } },
+      })
+
+      return {
+        isGroupAdmin: false,
+        employees: subordinates.map(a => ({
+          ...a.employee,
+          department: a.department,
+          position: a.position,
+        })),
+      }
+    }),
 })
