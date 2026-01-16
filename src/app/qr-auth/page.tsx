@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +10,7 @@ import { Loader2, CheckCircle2, XCircle, Smartphone } from 'lucide-react'
 
 type Status = 'loading' | 'ready' | 'authenticating' | 'success' | 'error' | 'invalid' | 'expired'
 
-export default function QrAuthPage() {
+function QrAuthContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
 
@@ -80,6 +80,112 @@ export default function QrAuthPage() {
   }
 
   return (
+    <CardContent>
+      {status === 'loading' && (
+        <div className="flex flex-col items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground mt-4">驗證中...</p>
+        </div>
+      )}
+
+      {status === 'invalid' && (
+        <div className="flex flex-col items-center py-8">
+          <XCircle className="h-12 w-12 text-destructive" />
+          <p className="text-destructive mt-4">無效的 QR Code</p>
+          <p className="text-muted-foreground text-sm mt-2">
+            請重新掃描有效的 QR Code
+          </p>
+        </div>
+      )}
+
+      {status === 'expired' && (
+        <div className="flex flex-col items-center py-8">
+          <XCircle className="h-12 w-12 text-destructive" />
+          <p className="text-destructive mt-4">QR Code 已過期</p>
+          <p className="text-muted-foreground text-sm mt-2">
+            請在電腦上重新產生 QR Code
+          </p>
+        </div>
+      )}
+
+      {status === 'success' && (
+        <div className="flex flex-col items-center py-8">
+          <CheckCircle2 className="h-12 w-12 text-green-600" />
+          <p className="text-green-600 font-medium mt-4">驗證成功</p>
+          <p className="text-muted-foreground text-sm mt-2">
+            電腦端將自動完成登入，您可以關閉此頁面
+          </p>
+        </div>
+      )}
+
+      {(status === 'ready' || status === 'authenticating') && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={status === 'authenticating'}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">密碼</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={status === 'authenticating'}
+            />
+          </div>
+          {error && (
+            <div className="text-red-500 text-sm text-center">{error}</div>
+          )}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={status === 'authenticating'}
+          >
+            {status === 'authenticating' ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                驗證中...
+              </>
+            ) : (
+              '確認登入'
+            )}
+          </Button>
+        </form>
+      )}
+
+      {status === 'error' && (
+        <div className="flex flex-col items-center py-8">
+          <XCircle className="h-12 w-12 text-destructive" />
+          <p className="text-destructive mt-4">{error || '發生錯誤'}</p>
+        </div>
+      )}
+    </CardContent>
+  )
+}
+
+function QrAuthLoading() {
+  return (
+    <CardContent>
+      <div className="flex flex-col items-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-muted-foreground mt-4">載入中...</p>
+      </div>
+    </CardContent>
+  )
+}
+
+export default function QrAuthPage() {
+  return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
@@ -93,96 +199,9 @@ export default function QrAuthPage() {
             驗證您的身份以完成登入
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {status === 'loading' && (
-            <div className="flex flex-col items-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <p className="text-muted-foreground mt-4">驗證中...</p>
-            </div>
-          )}
-
-          {status === 'invalid' && (
-            <div className="flex flex-col items-center py-8">
-              <XCircle className="h-12 w-12 text-destructive" />
-              <p className="text-destructive mt-4">無效的 QR Code</p>
-              <p className="text-muted-foreground text-sm mt-2">
-                請重新掃描有效的 QR Code
-              </p>
-            </div>
-          )}
-
-          {status === 'expired' && (
-            <div className="flex flex-col items-center py-8">
-              <XCircle className="h-12 w-12 text-destructive" />
-              <p className="text-destructive mt-4">QR Code 已過期</p>
-              <p className="text-muted-foreground text-sm mt-2">
-                請在電腦上重新產生 QR Code
-              </p>
-            </div>
-          )}
-
-          {status === 'success' && (
-            <div className="flex flex-col items-center py-8">
-              <CheckCircle2 className="h-12 w-12 text-green-600" />
-              <p className="text-green-600 font-medium mt-4">驗證成功</p>
-              <p className="text-muted-foreground text-sm mt-2">
-                電腦端將自動完成登入，您可以關閉此頁面
-              </p>
-            </div>
-          )}
-
-          {(status === 'ready' || status === 'authenticating') && (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={status === 'authenticating'}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">密碼</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={status === 'authenticating'}
-                />
-              </div>
-              {error && (
-                <div className="text-red-500 text-sm text-center">{error}</div>
-              )}
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={status === 'authenticating'}
-              >
-                {status === 'authenticating' ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    驗證中...
-                  </>
-                ) : (
-                  '確認登入'
-                )}
-              </Button>
-            </form>
-          )}
-
-          {status === 'error' && (
-            <div className="flex flex-col items-center py-8">
-              <XCircle className="h-12 w-12 text-destructive" />
-              <p className="text-destructive mt-4">{error || '發生錯誤'}</p>
-            </div>
-          )}
-        </CardContent>
+        <Suspense fallback={<QrAuthLoading />}>
+          <QrAuthContent />
+        </Suspense>
       </Card>
     </div>
   )

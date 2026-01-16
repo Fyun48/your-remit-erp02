@@ -599,7 +599,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete customer "{deletingCustomer?.name}"? This action cannot be undone.
+              Are you sure you want to delete customer &quot;{deletingCustomer?.name}&quot;? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

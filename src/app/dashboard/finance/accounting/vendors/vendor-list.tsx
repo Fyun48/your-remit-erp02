@@ -622,7 +622,7 @@ export function VendorDashboard({ companyId, companyName }: VendorDashboardProps
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete vendor "{deletingVendor?.name}"? This action cannot be undone.
+              Are you sure you want to delete vendor &quot;{deletingVendor?.name}&quot;? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
