@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
+import {
+  startWorkflow,
+  processApproval,
+  getPendingApprovals,
+  getApplicableDefinition,
+} from '@/lib/workflow-engine'
 
 // Zod schemas for complex inputs
 const workflowNodeSchema = z.object({
@@ -362,5 +368,117 @@ export const workflowRouter = router({
       }
 
       return null
+    }),
+
+  // ==================== 流程實例操作 ====================
+
+  // 啟動流程實例
+  startInstance: publicProcedure
+    .input(z.object({
+      definitionId: z.string().optional(),
+      requestType: z.string(),
+      requestId: z.string(),
+      applicantId: z.string(),
+      companyId: z.string(),
+      requestData: z.record(z.unknown()).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      let definitionId = input.definitionId
+
+      // 如果沒有指定定義，自動尋找適用的流程
+      if (!definitionId) {
+        const definition = await getApplicableDefinition(
+          input.applicantId,
+          input.companyId,
+          input.requestType
+        )
+        if (!definition) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: '找不到適用的流程定義' })
+        }
+        definitionId = definition.id
+      }
+
+      return startWorkflow({
+        definitionId,
+        requestType: input.requestType,
+        requestId: input.requestId,
+        applicantId: input.applicantId,
+        companyId: input.companyId,
+        requestData: input.requestData,
+      })
+    }),
+
+  // 處理簽核
+  processApproval: publicProcedure
+    .input(z.object({
+      instanceId: z.string(),
+      recordId: z.string(),
+      action: z.enum(['APPROVE', 'REJECT', 'RETURN']),
+      comment: z.string().optional(),
+      signerId: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      return processApproval(input)
+    }),
+
+  // 取得待簽核項目
+  getPendingApprovals: publicProcedure
+    .input(z.object({
+      approverId: z.string(),
+    }))
+    .query(async ({ input }) => {
+      return getPendingApprovals(input.approverId)
+    }),
+
+  // 取得流程實例詳情
+  getInstance: publicProcedure
+    .input(z.object({
+      instanceId: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.workflowInstance.findUnique({
+        where: { id: input.instanceId },
+        include: {
+          definition: { select: { id: true, name: true } },
+          applicant: { select: { id: true, name: true, employeeNo: true } },
+          company: { select: { id: true, name: true } },
+          approvalRecords: {
+            include: {
+              node: { select: { id: true, name: true, nodeType: true } },
+              approver: { select: { id: true, name: true, employeeNo: true } },
+              actualSigner: { select: { id: true, name: true, employeeNo: true } },
+            },
+            orderBy: { assignedAt: 'asc' },
+          },
+        },
+      })
+    }),
+
+  // 取得申請單的流程狀態
+  getInstanceByRequest: publicProcedure
+    .input(z.object({
+      requestType: z.string(),
+      requestId: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.workflowInstance.findUnique({
+        where: {
+          requestType_requestId: {
+            requestType: input.requestType,
+            requestId: input.requestId,
+          },
+        },
+        include: {
+          definition: { select: { id: true, name: true } },
+          approvalRecords: {
+            include: {
+              node: { select: { id: true, name: true, nodeType: true } },
+              approver: { select: { id: true, name: true } },
+              actualSigner: { select: { id: true, name: true } },
+            },
+            orderBy: { assignedAt: 'asc' },
+          },
+        },
+      })
     }),
 })
