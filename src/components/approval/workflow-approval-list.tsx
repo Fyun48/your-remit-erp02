@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { trpc } from '@/lib/trpc'
-import { CheckCircle, XCircle, Clock, FileText, User, Workflow } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, FileText, User, Workflow, UserCheck } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 
@@ -101,13 +101,21 @@ export function WorkflowApprovalList({ userId }: WorkflowApprovalListProps) {
                 <div key={record.id} className="p-4 border rounded-lg hover:shadow-sm transition-shadow">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-blue-100">
-                        <FileText className="h-5 w-5 text-blue-600" />
+                      <div className={`p-2 rounded-lg ${record.isDelegated ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                        <FileText className={`h-5 w-5 ${record.isDelegated ? 'text-purple-600' : 'text-blue-600'}`} />
                       </div>
                       <div>
-                        <p className="font-medium">
-                          {requestTypeLabels[record.instance.requestType] || record.instance.requestType}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">
+                            {requestTypeLabels[record.instance.requestType] || record.instance.requestType}
+                          </p>
+                          {record.isDelegated && (
+                            <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                              <UserCheck className="h-3 w-3 mr-1" />
+                              代理
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           {record.instance.definition.name}
                         </p>
@@ -118,11 +126,17 @@ export function WorkflowApprovalList({ userId }: WorkflowApprovalListProps) {
                     </Badge>
                   </div>
 
-                  <div className="flex items-center gap-4 text-sm mb-3">
+                  <div className="flex items-center gap-4 text-sm mb-3 flex-wrap">
                     <div className="flex items-center gap-1">
                       <User className="h-4 w-4 text-muted-foreground" />
                       <span>申請人：{record.instance.applicant.name}</span>
                     </div>
+                    {record.isDelegated && record.originalApprover && (
+                      <div className="flex items-center gap-1 text-purple-600">
+                        <UserCheck className="h-4 w-4" />
+                        <span>代理：{record.originalApprover.name}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <Clock className="h-4 w-4" />
                       <span>

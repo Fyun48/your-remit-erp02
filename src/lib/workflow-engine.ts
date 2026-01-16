@@ -300,6 +300,43 @@ function evaluateCondition(
   }
 }
 
+// 檢查是否為有效的代理人
+async function isValidDelegate(
+  principalId: string,
+  delegateId: string,
+  requestType?: string,
+  companyId?: string
+): Promise<boolean> {
+  const now = new Date()
+
+  const delegate = await prisma.workflowApprovalDelegate.findFirst({
+    where: {
+      principalId,
+      delegateId,
+      isActive: true,
+      startDate: { lte: now },
+      endDate: { gte: now },
+    },
+  })
+
+  if (!delegate) return false
+
+  // 檢查代理範圍
+  if (requestType && delegate.requestTypes.length > 0) {
+    if (!delegate.requestTypes.includes(requestType)) {
+      return false
+    }
+  }
+
+  if (companyId && delegate.companyIds.length > 0) {
+    if (!delegate.companyIds.includes(companyId)) {
+      return false
+    }
+  }
+
+  return true
+}
+
 // 處理簽核
 export async function processApproval(input: ProcessApprovalInput) {
   const { instanceId, recordId, action, comment, signerId } = input
@@ -321,6 +358,19 @@ export async function processApproval(input: ProcessApprovalInput) {
 
   if (record.status !== 'PENDING') {
     throw new TRPCError({ code: 'BAD_REQUEST', message: '此簽核紀錄已處理' })
+  }
+
+  // 驗證簽核權限：原審批人或有效代理人
+  const isOriginalApprover = record.approverId === signerId
+  const isDelegate = await isValidDelegate(
+    record.approverId,
+    signerId,
+    record.instance.requestType,
+    record.instance.companyId
+  )
+
+  if (!isOriginalApprover && !isDelegate) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: '您沒有權限簽核此項目' })
   }
 
   // 更新簽核紀錄
@@ -349,12 +399,31 @@ export async function processApproval(input: ProcessApprovalInput) {
   return { success: true }
 }
 
-// 取得待簽核項目
+// 取得待簽核項目（包含代理）
 export async function getPendingApprovals(approverId: string) {
-  return prisma.workflowApprovalRecord.findMany({
+  const now = new Date()
+
+  // 找出我正在代理的人
+  const activeDelegates = await prisma.workflowApprovalDelegate.findMany({
     where: {
-      approverId,
+      delegateId: approverId,
+      isActive: true,
+      startDate: { lte: now },
+      endDate: { gte: now },
+    },
+  })
+
+  // 建立代理人 ID 列表
+  const principalIds = activeDelegates.map(d => d.principalId)
+
+  // 查詢待簽核項目：我的 + 我代理的
+  const records = await prisma.workflowApprovalRecord.findMany({
+    where: {
       status: 'PENDING',
+      OR: [
+        { approverId },
+        { approverId: { in: principalIds } },
+      ],
     },
     include: {
       instance: {
@@ -365,7 +434,43 @@ export async function getPendingApprovals(approverId: string) {
         },
       },
       node: { select: { id: true, name: true, nodeType: true } },
+      approver: { select: { id: true, name: true, employeeNo: true } },
     },
     orderBy: { assignedAt: 'asc' },
   })
+
+  // 過濾代理項目：確認代理範圍
+  const filteredRecords = records.filter(record => {
+    // 如果是我自己的，直接保留
+    if (record.approverId === approverId) {
+      return true
+    }
+
+    // 找到對應的代理設定
+    const delegate = activeDelegates.find(d => d.principalId === record.approverId)
+    if (!delegate) return false
+
+    // 檢查申請類型是否在代理範圍內
+    if (delegate.requestTypes.length > 0) {
+      if (!delegate.requestTypes.includes(record.instance.requestType)) {
+        return false
+      }
+    }
+
+    // 檢查公司是否在代理範圍內
+    if (delegate.companyIds.length > 0) {
+      if (!delegate.companyIds.includes(record.instance.companyId)) {
+        return false
+      }
+    }
+
+    return true
+  })
+
+  // 標記是否為代理項目
+  return filteredRecords.map(record => ({
+    ...record,
+    isDelegated: record.approverId !== approverId,
+    originalApprover: record.approverId !== approverId ? record.approver : null,
+  }))
 }

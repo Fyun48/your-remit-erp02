@@ -481,4 +481,167 @@ export const workflowRouter = router({
         },
       })
     }),
+
+  // ==================== 職務代理管理 ====================
+
+  // 取得我的職務代理設定（我設定的代理人 + 代理我的人）
+  listDelegates: publicProcedure
+    .input(z.object({
+      employeeId: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const [myDelegates, delegatedToMe] = await Promise.all([
+        // 我設定的代理人
+        ctx.prisma.workflowApprovalDelegate.findMany({
+          where: { principalId: input.employeeId },
+          include: {
+            delegate: { select: { id: true, name: true, employeeNo: true } },
+          },
+          orderBy: { startDate: 'desc' },
+        }),
+        // 代理我的人（別人設定我為代理人）
+        ctx.prisma.workflowApprovalDelegate.findMany({
+          where: { delegateId: input.employeeId },
+          include: {
+            principal: { select: { id: true, name: true, employeeNo: true } },
+          },
+          orderBy: { startDate: 'desc' },
+        }),
+      ])
+
+      return { myDelegates, delegatedToMe }
+    }),
+
+  // 取得有效的代理人（用於簽核時檢查）
+  getActiveDelegate: publicProcedure
+    .input(z.object({
+      principalId: z.string(),
+      requestType: z.string().optional(),
+      companyId: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const now = new Date()
+
+      const delegate = await ctx.prisma.workflowApprovalDelegate.findFirst({
+        where: {
+          principalId: input.principalId,
+          isActive: true,
+          startDate: { lte: now },
+          endDate: { gte: now },
+          // 檢查代理範圍
+          ...(input.requestType && {
+            OR: [
+              { requestTypes: { isEmpty: true } },
+              { requestTypes: { has: input.requestType } },
+            ],
+          }),
+          ...(input.companyId && {
+            OR: [
+              { companyIds: { isEmpty: true } },
+              { companyIds: { has: input.companyId } },
+            ],
+          }),
+        },
+        include: {
+          delegate: { select: { id: true, name: true, employeeNo: true } },
+        },
+      })
+
+      return delegate
+    }),
+
+  // 建立職務代理
+  createDelegate: publicProcedure
+    .input(z.object({
+      principalId: z.string(),
+      delegateId: z.string(),
+      startDate: z.date(),
+      endDate: z.date(),
+      requestTypes: z.array(z.string()).default([]),
+      companyIds: z.array(z.string()).default([]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // 驗證日期範圍
+      if (input.startDate >= input.endDate) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: '結束日期必須大於開始日期',
+        })
+      }
+
+      // 不能代理給自己
+      if (input.principalId === input.delegateId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: '不能設定自己為代理人',
+        })
+      }
+
+      // 檢查是否有重疊的代理設定
+      const overlapping = await ctx.prisma.workflowApprovalDelegate.findFirst({
+        where: {
+          principalId: input.principalId,
+          isActive: true,
+          OR: [
+            {
+              startDate: { lte: input.endDate },
+              endDate: { gte: input.startDate },
+            },
+          ],
+        },
+      })
+
+      if (overlapping) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: '此期間已有其他代理設定，請先停用或刪除',
+        })
+      }
+
+      return ctx.prisma.workflowApprovalDelegate.create({
+        data: input,
+        include: {
+          delegate: { select: { id: true, name: true, employeeNo: true } },
+        },
+      })
+    }),
+
+  // 更新職務代理
+  updateDelegate: publicProcedure
+    .input(z.object({
+      id: z.string(),
+      startDate: z.date().optional(),
+      endDate: z.date().optional(),
+      requestTypes: z.array(z.string()).optional(),
+      companyIds: z.array(z.string()).optional(),
+      isActive: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input
+
+      // 驗證日期範圍
+      if (data.startDate && data.endDate && data.startDate >= data.endDate) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: '結束日期必須大於開始日期',
+        })
+      }
+
+      return ctx.prisma.workflowApprovalDelegate.update({
+        where: { id },
+        data,
+        include: {
+          delegate: { select: { id: true, name: true, employeeNo: true } },
+        },
+      })
+    }),
+
+  // 刪除職務代理
+  deleteDelegate: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.workflowApprovalDelegate.delete({
+        where: { id: input.id },
+      })
+    }),
 })

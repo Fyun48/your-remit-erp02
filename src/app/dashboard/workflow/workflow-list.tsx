@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Workflow, Plus, Pencil, Eye, GitBranch, Users, Copy, Trash2, UserCog } from 'lucide-react'
+import { Workflow, Plus, Pencil, Eye, GitBranch, Users, Copy, Trash2, UserCog, UserCheck } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 
 interface WorkflowDef {
@@ -135,6 +135,12 @@ export function WorkflowList({ companyId, companyName, userId, workflows }: Work
           <p className="text-muted-foreground">{companyName}</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/dashboard/workflow/delegates">
+            <Button variant="outline">
+              <UserCheck className="h-4 w-4 mr-2" />
+              職務代理
+            </Button>
+          </Link>
           <Link href="/dashboard/workflow/employee-paths">
             <Button variant="outline">
               <UserCog className="h-4 w-4 mr-2" />
