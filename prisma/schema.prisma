@@ -10,20 +10,20 @@ datasource db {
 // ==================== 稽核日誌 ====================
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  entityType  String   // Employee, Department, Voucher, SealRequest...
-  entityId    String   // 資料主鍵
-  action      String   // CREATE, UPDATE, DELETE
-  path        String?  // 修改欄位路徑 (如: employee.name)
-  oldValue    Json?    // 修改前的值
-  newValue    Json?    // 修改後的值
-  operatorId  String
-  operator    Employee @relation("AuditOperator", fields: [operatorId], references: [id])
-  companyId   String?
-  company     Company? @relation(fields: [companyId], references: [id])
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  entityType String // Employee, Department, Voucher, SealRequest...
+  entityId   String // 資料主鍵
+  action     String // CREATE, UPDATE, DELETE
+  path       String? // 修改欄位路徑 (如: employee.name)
+  oldValue   Json? // 修改前的值
+  newValue   Json? // 修改後的值
+  operatorId String
+  operator   Employee @relation("AuditOperator", fields: [operatorId], references: [id])
+  companyId  String?
+  company    Company? @relation(fields: [companyId], references: [id])
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
   @@index([entityType, entityId])
   @@index([operatorId])
@@ -39,10 +39,10 @@ model GroupPermission {
   employeeId  String
   employee    Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   permission  GroupPermissionType
-  grantedById String              // 授權人 ID
+  grantedById String // 授權人 ID
   grantedBy   Employee            @relation("GroupPermissionGranter", fields: [grantedById], references: [id])
   grantedAt   DateTime            @default(now())
-  expiresAt   DateTime?           // 權限到期時間
+  expiresAt   DateTime? // 權限到期時間
   isActive    Boolean             @default(true)
   note        String?
 
@@ -52,11 +52,11 @@ model GroupPermission {
 }
 
 enum GroupPermissionType {
-  GROUP_ADMIN           // 集團超級管理員
-  CROSS_COMPANY_VIEW    // 跨公司檢視
-  CROSS_COMPANY_EDIT    // 跨公司編輯
-  AUDIT_LOG_VIEW        // 稽核日誌檢視
-  COMPANY_MANAGEMENT    // 公司管理 (創建/停用)
+  GROUP_ADMIN // 集團超級管理員
+  CROSS_COMPANY_VIEW // 跨公司檢視
+  CROSS_COMPANY_EDIT // 跨公司編輯
+  AUDIT_LOG_VIEW // 稽核日誌檢視
+  COMPANY_MANAGEMENT // 公司管理 (創建/停用)
 }
 
 // ==================== 組織架構 ====================
@@ -69,7 +69,9 @@ model Group {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  companies Company[]
+  companies           Company[]
+  orgCharts           OrgChart[]
+  workflowDefinitions WorkflowDefinition[]
 
   @@map("groups")
 }
@@ -86,15 +88,15 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  group       Group                @relation(fields: [groupId], references: [id])
-  departments Department[]
-  positions   Position[]
-  employees   EmployeeAssignment[]
-  workShifts  WorkShift[]
-  shiftAssignments ShiftAssignment[]
+  group             Group                @relation(fields: [groupId], references: [id])
+  departments       Department[]
+  positions         Position[]
+  employees         EmployeeAssignment[]
+  workShifts        WorkShift[]
+  shiftAssignments  ShiftAssignment[]
   attendanceRecords AttendanceRecord[]
-  leaveTypes  LeaveType[]
-  approvalFlows ApprovalFlow[]
+  leaveTypes        LeaveType[]
+  approvalFlows     ApprovalFlow[]
   expenseCategories ExpenseCategory[]
 
   // 財務會計關聯
@@ -107,17 +109,24 @@ model Company {
   payables          AccountPayable[]
 
   // 稽核日誌
-  auditLogs         AuditLog[]
+  auditLogs AuditLog[]
 
   // 用印申請
-  sealRequests      SealRequest[]
+  sealRequests SealRequest[]
 
   // 名片申請
   businessCardRequests BusinessCardRequest[]
 
   // 文具管理
-  stationeryItems      StationeryItem[]
-  stationeryRequests   StationeryRequest[]
+  stationeryItems    StationeryItem[]
+  stationeryRequests StationeryRequest[]
+
+  // 組織圖
+  orgCharts OrgChart[] @relation("CompanyOrgCharts")
+
+  // 工作流程
+  workflowDefinitions WorkflowDefinition[] @relation("CompanyWorkflows")
+  workflowInstances   WorkflowInstance[]
 
   @@map("companies")
 }
@@ -192,18 +201,18 @@ model Employee {
   accounts    Account[]
 
   // 財務會計關聯
-  vouchersCreated   Voucher[] @relation("VoucherCreator")
-  vouchersApproved  Voucher[] @relation("VoucherApprover")
-  vouchersPosted    Voucher[] @relation("VoucherPoster")
+  vouchersCreated  Voucher[] @relation("VoucherCreator")
+  vouchersApproved Voucher[] @relation("VoucherApprover")
+  vouchersPosted   Voucher[] @relation("VoucherPoster")
 
   // 稽核與集團權限
-  auditLogs             AuditLog[]        @relation("AuditOperator")
-  groupPermissions      GroupPermission[]
+  auditLogs               AuditLog[]        @relation("AuditOperator")
+  groupPermissions        GroupPermission[]
   groupPermissionsGranted GroupPermission[] @relation("GroupPermissionGranter")
 
   // 用印申請
-  sealRequestsApplied   SealRequest[]     @relation("SealApplicant")
-  sealRequestsProcessed SealRequest[]     @relation("SealProcessor")
+  sealRequestsApplied   SealRequest[] @relation("SealApplicant")
+  sealRequestsProcessed SealRequest[] @relation("SealProcessor")
 
   // 名片申請
   businessCardRequestsApplied  BusinessCardRequest[] @relation("CardApplicant")
@@ -216,6 +225,15 @@ model Employee {
 
   // QR Code 登入
   qrLoginTokens QrLoginToken[]
+
+  // 工作流程
+  workflowDefinitions        WorkflowDefinition[]       @relation("EmployeeWorkflows")
+  workflowDefinitionsCreated WorkflowDefinition[]       @relation("WorkflowCreator")
+  workflowInstances          WorkflowInstance[]
+  approvalRecordsAsApprover  WorkflowApprovalRecord[]   @relation("WorkflowApprover")
+  approvalRecordsAsSigner    WorkflowApprovalRecord[]   @relation("WorkflowActualSigner")
+  delegatesAsPrincipal       WorkflowApprovalDelegate[] @relation("DelegatePrincipal")
+  delegatesAsDelegate        WorkflowApprovalDelegate[] @relation("DelegateDelegate")
 
   @@map("employees")
 }
@@ -369,16 +387,16 @@ model VerificationToken {
 
 // QR Code 登入 Token
 model QrLoginToken {
-  id          String         @id @default(cuid())
-  token       String         @unique // QR Code 包含的 token
-  status      QrLoginStatus  @default(PENDING)
-  employeeId  String?        // 驗證後的員工 ID
-  employee    Employee?      @relation(fields: [employeeId], references: [id])
-  ipAddress   String?        // 產生 QR 的用戶端 IP
-  userAgent   String?        // 產生 QR 的用戶端 UA
-  createdAt   DateTime       @default(now())
-  expiresAt   DateTime       // 過期時間 (通常 5 分鐘)
-  authenticatedAt DateTime?  // 驗證時間
+  id              String        @id @default(cuid())
+  token           String        @unique // QR Code 包含的 token
+  status          QrLoginStatus @default(PENDING)
+  employeeId      String? // 驗證後的員工 ID
+  employee        Employee?     @relation(fields: [employeeId], references: [id])
+  ipAddress       String? // 產生 QR 的用戶端 IP
+  userAgent       String? // 產生 QR 的用戶端 UA
+  createdAt       DateTime      @default(now())
+  expiresAt       DateTime // 過期時間 (通常 5 分鐘)
+  authenticatedAt DateTime? // 驗證時間
 
   @@index([token])
   @@index([status])
@@ -386,87 +404,87 @@ model QrLoginToken {
 }
 
 enum QrLoginStatus {
-  PENDING       // 等待掃描
+  PENDING // 等待掃描
   AUTHENTICATED // 已掃描驗證
-  USED          // 已使用完成登入
-  EXPIRED       // 已過期
+  USED // 已使用完成登入
+  EXPIRED // 已過期
 }
 
 // ==================== 出勤管理 ====================
 
 enum ShiftType {
-  FIXED    // 固定班
+  FIXED // 固定班
   FLEXIBLE // 彈性班
 }
 
 enum ClockMethod {
-  WEB    // 網頁打卡
-  APP    // APP打卡
-  GPS    // GPS定位打卡
-  IP     // IP限制打卡
-  FACE   // 人臉辨識
+  WEB // 網頁打卡
+  APP // APP打卡
+  GPS // GPS定位打卡
+  IP // IP限制打卡
+  FACE // 人臉辨識
   MANUAL // 人工補登
 }
 
 enum AttendanceStatus {
-  PENDING     // 待確認
-  NORMAL      // 正常
-  LATE        // 遲到
+  PENDING // 待確認
+  NORMAL // 正常
+  LATE // 遲到
   EARLY_LEAVE // 早退
-  ABSENT      // 曠職
-  LEAVE       // 請假
-  EXEMPT      // 免打卡
+  ABSENT // 曠職
+  LEAVE // 請假
+  EXEMPT // 免打卡
 }
 
 model WorkShift {
-  id                    String    @id @default(cuid())
-  companyId             String
-  name                  String    // 班別名稱
-  code                  String    // 班別代碼
-  shiftType             ShiftType @default(FIXED)
+  id        String    @id @default(cuid())
+  companyId String
+  name      String // 班別名稱
+  code      String // 班別代碼
+  shiftType ShiftType @default(FIXED)
 
   // 固定班時間
-  workStartTime         String?   // 上班時間 "HH:mm"
-  workEndTime           String?   // 下班時間 "HH:mm"
+  workStartTime String? // 上班時間 "HH:mm"
+  workEndTime   String? // 下班時間 "HH:mm"
 
   // 彈性班設定
-  coreStartTime         String?   // 核心時間開始 "HH:mm"
-  coreEndTime           String?   // 核心時間結束 "HH:mm"
-  flexStartRange        String?   // 彈性上班範圍 "HH:mm-HH:mm"
-  flexEndRange          String?   // 彈性下班範圍 "HH:mm-HH:mm"
-  requiredHours         Float?    // 每日應工作時數
+  coreStartTime  String? // 核心時間開始 "HH:mm"
+  coreEndTime    String? // 核心時間結束 "HH:mm"
+  flexStartRange String? // 彈性上班範圍 "HH:mm-HH:mm"
+  flexEndRange   String? // 彈性下班範圍 "HH:mm-HH:mm"
+  requiredHours  Float? // 每日應工作時數
 
   // 容許設定
-  lateGraceMinutes      Int       @default(0)  // 遲到寬限分鐘
-  earlyLeaveGraceMinutes Int      @default(0)  // 早退寬限分鐘
-  overtimeThreshold     Int       @default(30) // 加班起算分鐘數
+  lateGraceMinutes       Int @default(0) // 遲到寬限分鐘
+  earlyLeaveGraceMinutes Int @default(0) // 早退寬限分鐘
+  overtimeThreshold      Int @default(30) // 加班起算分鐘數
 
   // 工作日設定
-  workDays              String    @default("1,2,3,4,5") // 工作日（週一=1）
+  workDays String @default("1,2,3,4,5") // 工作日（週一=1）
 
-  isActive              Boolean   @default(true)
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  company               Company         @relation(fields: [companyId], references: [id])
-  breaks                ShiftBreak[]
-  assignments           ShiftAssignment[]
+  company     Company           @relation(fields: [companyId], references: [id])
+  breaks      ShiftBreak[]
+  assignments ShiftAssignment[]
 
   @@unique([companyId, code])
   @@map("work_shifts")
 }
 
 model ShiftBreak {
-  id         String   @id @default(cuid())
+  id         String  @id @default(cuid())
   shiftId    String
-  name       String   // 休息名稱（如：午休、下午茶）
-  startTime  String   // 開始時間 "HH:mm"
-  endTime    String   // 結束時間 "HH:mm"
-  isPaid     Boolean  @default(false) // 是否為有薪休息
-  isRequired Boolean  @default(true)  // 是否為必要休息
-  sortOrder  Int      @default(0)
+  name       String // 休息名稱（如：午休、下午茶）
+  startTime  String // 開始時間 "HH:mm"
+  endTime    String // 結束時間 "HH:mm"
+  isPaid     Boolean @default(false) // 是否為有薪休息
+  isRequired Boolean @default(true) // 是否為必要休息
+  sortOrder  Int     @default(0)
 
-  shift      WorkShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  shift WorkShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
 
   @@map("shift_breaks")
 }
@@ -481,24 +499,24 @@ model ShiftAssignment {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  company       Company   @relation(fields: [companyId], references: [id])
-  shift         WorkShift @relation(fields: [shiftId], references: [id])
+  company Company   @relation(fields: [companyId], references: [id])
+  shift   WorkShift @relation(fields: [shiftId], references: [id])
 
   @@unique([employeeId, companyId, effectiveDate])
   @@map("shift_assignments")
 }
 
 model AttendanceRecord {
-  id               String           @id @default(cuid())
-  employeeId       String
-  companyId        String
-  date             DateTime         @db.Date // 出勤日期
+  id         String   @id @default(cuid())
+  employeeId String
+  companyId  String
+  date       DateTime @db.Date // 出勤日期
 
   // 上班打卡
-  clockInTime      DateTime?
-  clockInMethod    ClockMethod?
-  clockInLocation  String?          // GPS座標或地點描述
-  clockInIp        String?
+  clockInTime     DateTime?
+  clockInMethod   ClockMethod?
+  clockInLocation String? // GPS座標或地點描述
+  clockInIp       String?
 
   // 下班打卡
   clockOutTime     DateTime?
@@ -507,21 +525,21 @@ model AttendanceRecord {
   clockOutIp       String?
 
   // 出勤狀態
-  status           AttendanceStatus @default(PENDING)
-  lateMinutes      Int              @default(0) // 遲到分鐘數
-  earlyLeaveMinutes Int             @default(0) // 早退分鐘數
-  overtimeMinutes  Int              @default(0) // 加班分鐘數
-  workHours        Float?           // 實際工作時數
+  status            AttendanceStatus @default(PENDING)
+  lateMinutes       Int              @default(0) // 遲到分鐘數
+  earlyLeaveMinutes Int              @default(0) // 早退分鐘數
+  overtimeMinutes   Int              @default(0) // 加班分鐘數
+  workHours         Float? // 實際工作時數
 
   // 補登資訊
-  isAmended        Boolean          @default(false) // 是否為補登
-  amendReason      String?          // 補登原因
-  approvedById     String?          // 審核人
+  isAmended    Boolean @default(false) // 是否為補登
+  amendReason  String? // 補登原因
+  approvedById String? // 審核人
 
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  company          Company          @relation(fields: [companyId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
 
   @@unique([employeeId, companyId, date])
   @@map("attendance_records")
@@ -530,17 +548,17 @@ model AttendanceRecord {
 // ==================== 請假管理 ====================
 
 model LeaveType {
-  id        String       @id @default(cuid())
-  companyId String?      // NULL = 集團共用法定假別
-  code      String       // ANNUAL, SICK, PERSONAL, etc.
+  id        String        @id @default(cuid())
+  companyId String? // NULL = 集團共用法定假別
+  code      String // ANNUAL, SICK, PERSONAL, etc.
   name      String
   category  LeaveCategory @default(STATUTORY)
 
   // 請假規則
-  requiresReason       Boolean @default(true)
-  requiresAttachment   Boolean @default(false)
-  attachmentAfterDays  Int     @default(0)
-  minUnit              LeaveUnit @default(HOUR)
+  requiresReason      Boolean   @default(true)
+  requiresAttachment  Boolean   @default(false)
+  attachmentAfterDays Int       @default(0)
+  minUnit             LeaveUnit @default(HOUR)
 
   // 額度規則
   quotaType          QuotaType @default(FIXED)
@@ -551,10 +569,10 @@ model LeaveType {
   cashOutRate        Float     @default(1.0)
 
   // 使用限制
-  advanceDaysRequired Int      @default(0)
-  maxConsecutiveDays  Int      @default(0)
+  advanceDaysRequired Int     @default(0)
+  maxConsecutiveDays  Int     @default(0)
   genderRestriction   Gender?
-  applicableAfterDays Int      @default(0)
+  applicableAfterDays Int     @default(0)
 
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
@@ -587,8 +605,8 @@ enum QuotaType {
 }
 
 model LeaveRequest {
-  id          String   @id @default(cuid())
-  requestNo   String   @unique
+  id          String @id @default(cuid())
+  requestNo   String @unique
   employeeId  String
   companyId   String
   leaveTypeId String
@@ -599,8 +617,8 @@ model LeaveRequest {
   endPeriod   LeavePeriod @default(FULL_DAY)
   totalHours  Float
 
-  reason      String?
-  attachments String?
+  reason          String?
+  attachments     String?
   proxyEmployeeId String?
 
   status      LeaveStatus @default(DRAFT)
@@ -612,8 +630,8 @@ model LeaveRequest {
   rejectedById      String?
   approvalComment   String?
 
-  actualEndDate    DateTime?
-  cancelledHours   Float?
+  actualEndDate  DateTime?
+  cancelledHours Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -653,8 +671,8 @@ model LeaveBalance {
   usedHours    Float @default(0)
   pendingHours Float @default(0)
 
-  cashedOutHours  Float @default(0)
-  cashOutAmount   Float @default(0)
+  cashedOutHours Float @default(0)
+  cashOutAmount  Float @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -665,27 +683,417 @@ model LeaveBalance {
   @@map("leave_balances")
 }
 
+// ==================== 組織圖 ====================
+
+// 組織圖類型
+enum OrgChartType {
+  GROUP // 集團組織圖
+  COMPANY // 公司組織圖
+}
+
+// 組織節點類型
+enum OrgNodeType {
+  DEPARTMENT // 部門
+  POSITION // 職位
+  EMPLOYEE // 員工
+}
+
+// 組織關係類型
+enum OrgRelationType {
+  SOLID // 實線（正式彙報）
+  DOTTED // 虛線（功能性彙報）
+  MATRIX // 矩陣（多重隸屬）
+}
+
+// 組織圖
+model OrgChart {
+  id          String       @id @default(cuid())
+  type        OrgChartType
+  groupId     String?
+  group       Group?       @relation(fields: [groupId], references: [id])
+  companyId   String?
+  company     Company?     @relation("CompanyOrgCharts", fields: [companyId], references: [id])
+  name        String
+  description String?
+  isActive    Boolean      @default(true)
+
+  nodes     OrgNode[]
+  relations OrgRelation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([groupId])
+  @@index([companyId])
+  @@map("org_charts")
+}
+
+// 組織節點
+model OrgNode {
+  id      String   @id @default(cuid())
+  chartId String
+  chart   OrgChart @relation(fields: [chartId], references: [id], onDelete: Cascade)
+
+  nodeType    OrgNodeType
+  referenceId String? // 關聯的 departmentId/positionId/employeeId
+
+  // 視覺化位置
+  posX Float @default(0)
+  posY Float @default(0)
+
+  // 自訂顯示
+  label String?
+
+  fromRelations OrgRelation[] @relation("FromOrgNode")
+  toRelations   OrgRelation[] @relation("ToOrgNode")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chartId])
+  @@index([referenceId])
+  @@map("org_nodes")
+}
+
+// 組織關係
+model OrgRelation {
+  id      String   @id @default(cuid())
+  chartId String
+  chart   OrgChart @relation(fields: [chartId], references: [id], onDelete: Cascade)
+
+  fromNodeId String
+  fromNode   OrgNode @relation("FromOrgNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNodeId   String
+  toNode     OrgNode @relation("ToOrgNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  relationType OrgRelationType @default(SOLID)
+
+  // 簽核相關設定
+  includeInApproval Boolean @default(true)
+  approvalOrder     Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([chartId, fromNodeId, toNodeId])
+  @@index([chartId])
+  @@map("org_relations")
+}
+
+// ==================== 工作流程引擎 ====================
+
+// 流程範圍
+enum WorkflowScope {
+  EMPLOYEE // 員工特殊路徑
+  REQUEST_TYPE // 申請類型流程
+  DEFAULT // 預設流程
+}
+
+// 流程節點類型
+enum WorkflowNodeType {
+  START // 開始
+  APPROVAL // 簽核
+  CONDITION // 條件判斷
+  PARALLEL_START // 並行開始
+  PARALLEL_JOIN // 並行匯合
+  END // 結束
+}
+
+// 簽核人指定類型
+enum WorkflowApproverType {
+  SPECIFIC_EMPLOYEE // 特定員工
+  POSITION // 職位
+  ROLE // 角色
+  ORG_RELATION // 組織關係
+  DEPARTMENT_HEAD // 部門主管
+  CUSTOM_FIELD // 自訂欄位
+}
+
+// 組織關係簽核人類型
+enum OrgRelationApproverType {
+  DIRECT_SUPERVISOR // 直屬主管
+  DOTTED_SUPERVISOR // 虛線主管
+  N_LEVEL_UP // 往上N層
+  DEPARTMENT_MANAGER // 部門最高主管
+  COMPANY_HEAD // 公司負責人
+}
+
+// 並行模式
+enum WorkflowParallelMode {
+  ALL // 全部通過
+  ANY // 任一通過
+  MAJORITY // 多數通過
+}
+
+// 條件運算子
+enum WorkflowConditionOperator {
+  EQUALS
+  NOT_EQUALS
+  GREATER_THAN
+  LESS_THAN
+  GREATER_OR_EQUAL
+  LESS_OR_EQUAL
+  CONTAINS
+  IN
+  NOT_IN
+}
+
+// 流程實例狀態
+enum WorkflowInstanceStatus {
+  DRAFT
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  CANCELLED
+  WITHDRAWN
+}
+
+// 簽核紀錄狀態
+enum WorkflowApprovalStatus {
+  WAITING
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+// 簽核動作
+enum WorkflowApprovalAction {
+  APPROVE
+  REJECT
+  RETURN
+  ADD_SIGNER
+  TRANSFER
+}
+
+// 流程定義
+model WorkflowDefinition {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  // 適用範圍
+  scopeType WorkflowScope
+  groupId   String?
+  group     Group?        @relation(fields: [groupId], references: [id])
+  companyId String?
+  company   Company?      @relation("CompanyWorkflows", fields: [companyId], references: [id])
+
+  // 員工特殊路徑
+  employeeId String?
+  employee   Employee? @relation("EmployeeWorkflows", fields: [employeeId], references: [id])
+
+  // 申請類型
+  requestType String?
+
+  // 生效期間
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+
+  // 版本控制
+  version Int @default(1)
+
+  // 設定者
+  createdById String
+  createdBy   Employee @relation("WorkflowCreator", fields: [createdById], references: [id])
+
+  nodes     WorkflowNode[]
+  edges     WorkflowEdge[]
+  instances WorkflowInstance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([requestType])
+  @@index([scopeType, isActive])
+  @@map("workflow_definitions")
+}
+
+// 流程節點
+model WorkflowNode {
+  id           String             @id @default(cuid())
+  definitionId String
+  definition   WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  nodeType WorkflowNodeType
+  name     String?
+
+  // 簽核人設定
+  approverType    WorkflowApproverType?
+  approverId      String?
+  orgRelation     OrgRelationApproverType?
+  orgLevelUp      Int?
+  customFieldName String?
+
+  // 並行設定
+  parallelMode WorkflowParallelMode?
+
+  // 視覺化位置
+  posX Float @default(0)
+  posY Float @default(0)
+
+  fromEdges       WorkflowEdge[]           @relation("FromWorkflowNode")
+  toEdges         WorkflowEdge[]           @relation("ToWorkflowNode")
+  approvalRecords WorkflowApprovalRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([definitionId])
+  @@map("workflow_nodes")
+}
+
+// 節點連線
+model WorkflowEdge {
+  id           String             @id @default(cuid())
+  definitionId String
+  definition   WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  fromNodeId String
+  fromNode   WorkflowNode @relation("FromWorkflowNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNodeId   String
+  toNode     WorkflowNode @relation("ToWorkflowNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  // 條件設定
+  conditionField    String?
+  conditionOperator WorkflowConditionOperator?
+  conditionValue    String?
+  isDefault         Boolean                    @default(false)
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([definitionId])
+  @@index([fromNodeId])
+  @@map("workflow_edges")
+}
+
+// 流程實例
+model WorkflowInstance {
+  id           String             @id @default(cuid())
+  definitionId String
+  definition   WorkflowDefinition @relation(fields: [definitionId], references: [id])
+
+  // 關聯申請單
+  requestType String
+  requestId   String
+
+  // 申請人
+  applicantId String
+  applicant   Employee @relation(fields: [applicantId], references: [id])
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  // 狀態
+  status        WorkflowInstanceStatus @default(DRAFT)
+  currentNodeId String?
+
+  // 時間戳
+  submittedAt DateTime?
+  completedAt DateTime?
+
+  approvalRecords WorkflowApprovalRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([requestType, requestId])
+  @@index([applicantId])
+  @@index([companyId])
+  @@index([status])
+  @@map("workflow_instances")
+}
+
+// 簽核紀錄
+model WorkflowApprovalRecord {
+  id         String           @id @default(cuid())
+  instanceId String
+  instance   WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  nodeId     String
+  node       WorkflowNode     @relation(fields: [nodeId], references: [id])
+
+  // 簽核人
+  approverId     String
+  approver       Employee  @relation("WorkflowApprover", fields: [approverId], references: [id])
+  actualSignerId String?
+  actualSigner   Employee? @relation("WorkflowActualSigner", fields: [actualSignerId], references: [id])
+
+  // 簽核結果
+  status  WorkflowApprovalStatus  @default(WAITING)
+  action  WorkflowApprovalAction?
+  comment String?
+
+  // 時間
+  assignedAt DateTime  @default(now())
+  actionAt   DateTime?
+
+  // 加簽/轉簽/退回
+  addedSignerIds  String[]
+  transferredToId String?
+  returnToNodeId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([instanceId])
+  @@index([approverId])
+  @@index([status])
+  @@map("workflow_approval_records")
+}
+
+// 職務代理
+model WorkflowApprovalDelegate {
+  id          String   @id @default(cuid())
+  principalId String
+  principal   Employee @relation("DelegatePrincipal", fields: [principalId], references: [id])
+  delegateId  String
+  delegate    Employee @relation("DelegateDelegate", fields: [delegateId], references: [id])
+
+  startDate DateTime
+  endDate   DateTime
+
+  // 代理範圍
+  requestTypes String[]
+  companyIds   String[]
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([principalId])
+  @@index([delegateId])
+  @@index([startDate, endDate])
+  @@map("workflow_approval_delegates")
+}
+
 // ==================== 審核流程引擎 ====================
 
 // 審核流程模板
 model ApprovalFlow {
-  id          String   @id @default(cuid())
-  companyId   String?  // NULL = 集團通用
-  code        String   // LEAVE, EXPENSE, OVERTIME, etc.
+  id          String  @id @default(cuid())
+  companyId   String? // NULL = 集團通用
+  code        String // LEAVE, EXPENSE, OVERTIME, etc.
   name        String
   description String?
-  module      String   // leave, expense, overtime, etc.
+  module      String // leave, expense, overtime, etc.
 
   // 條件觸發（JSON 格式）
-  conditions  String?
+  conditions String?
 
-  isActive    Boolean  @default(true)
-  isDefault   Boolean  @default(false)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive  Boolean  @default(true)
+  isDefault Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  company   Company?       @relation(fields: [companyId], references: [id])
+  company   Company?           @relation(fields: [companyId], references: [id])
   steps     ApprovalStep[]
   instances ApprovalInstance[]
 
@@ -695,30 +1103,30 @@ model ApprovalFlow {
 
 // 審核關卡
 model ApprovalStep {
-  id         String   @id @default(cuid())
-  flowId     String
-  stepOrder  Int
-  name       String
+  id        String @id @default(cuid())
+  flowId    String
+  stepOrder Int
+  name      String
 
-  approverType   ApproverType
-  approverValue  String?
+  approverType  ApproverType
+  approverValue String?
 
-  approvalMode   ApprovalMode @default(ANY)
+  approvalMode ApprovalMode @default(ANY)
 
-  canSkip        Boolean  @default(false)
-  skipCondition  String?
+  canSkip       Boolean @default(false)
+  skipCondition String?
 
-  ccType         ApproverType?
-  ccValue        String?
+  ccType  ApproverType?
+  ccValue String?
 
-  timeoutHours   Int      @default(0)
-  timeoutAction  TimeoutAction @default(NONE)
+  timeoutHours  Int           @default(0)
+  timeoutAction TimeoutAction @default(NONE)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  flow           ApprovalFlow       @relation(fields: [flowId], references: [id], onDelete: Cascade)
-  stepInstances  ApprovalStepInstance[]
+  flow          ApprovalFlow           @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  stepInstances ApprovalStepInstance[]
 
   @@unique([flowId, stepOrder])
   @@map("approval_steps")
@@ -749,25 +1157,25 @@ enum TimeoutAction {
 
 // 審核流程實例
 model ApprovalInstance {
-  id           String   @id @default(cuid())
-  flowId       String
+  id     String @id @default(cuid())
+  flowId String
 
-  module       String
-  referenceId  String
+  module      String
+  referenceId String
 
-  applicantId  String
-  companyId    String
+  applicantId String
+  companyId   String
 
-  status       ApprovalInstanceStatus @default(IN_PROGRESS)
-  currentStep  Int      @default(1)
+  status      ApprovalInstanceStatus @default(IN_PROGRESS)
+  currentStep Int                    @default(1)
 
-  startedAt    DateTime @default(now())
-  completedAt  DateTime?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  flow         ApprovalFlow          @relation(fields: [flowId], references: [id])
+  flow          ApprovalFlow           @relation(fields: [flowId], references: [id])
   stepInstances ApprovalStepInstance[]
 
   @@unique([module, referenceId])
@@ -785,25 +1193,25 @@ enum ApprovalInstanceStatus {
 
 // 審核關卡實例
 model ApprovalStepInstance {
-  id           String   @id @default(cuid())
-  instanceId   String
-  stepId       String
-  stepOrder    Int
+  id         String @id @default(cuid())
+  instanceId String
+  stepId     String
+  stepOrder  Int
 
-  assignedTo   String   // JSON array of employeeIds
+  assignedTo String // JSON array of employeeIds
 
-  status       StepInstanceStatus @default(PENDING)
+  status StepInstanceStatus @default(PENDING)
 
-  assignedAt   DateTime @default(now())
-  dueAt        DateTime?
-  completedAt  DateTime?
+  assignedAt  DateTime  @default(now())
+  dueAt       DateTime?
+  completedAt DateTime?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  instance     ApprovalInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
-  step         ApprovalStep     @relation(fields: [stepId], references: [id])
-  actions      ApprovalAction[]
+  instance ApprovalInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  step     ApprovalStep     @relation(fields: [stepId], references: [id])
+  actions  ApprovalAction[]
 
   @@unique([instanceId, stepOrder])
   @@map("approval_step_instances")
@@ -818,17 +1226,17 @@ enum StepInstanceStatus {
 
 // 審核動作記錄
 model ApprovalAction {
-  id              String   @id @default(cuid())
-  stepInstanceId  String
+  id             String @id @default(cuid())
+  stepInstanceId String
 
-  actorId         String
+  actorId String
 
-  action          ActionType
-  comment         String?
+  action  ActionType
+  comment String?
 
-  actedAt         DateTime @default(now())
+  actedAt DateTime @default(now())
 
-  stepInstance    ApprovalStepInstance @relation(fields: [stepInstanceId], references: [id], onDelete: Cascade)
+  stepInstance ApprovalStepInstance @relation(fields: [stepInstanceId], references: [id], onDelete: Cascade)
 
   @@map("approval_actions")
 }
@@ -845,25 +1253,25 @@ enum ActionType {
 
 // 費用類別
 model ExpenseCategory {
-  id           String   @id @default(cuid())
-  companyId    String?  // NULL = 集團通用
-  code         String   // TRAVEL, MEAL, TRANSPORT, SUPPLIES, etc.
-  name         String
-  description  String?
+  id          String  @id @default(cuid())
+  companyId   String? // NULL = 集團通用
+  code        String // TRAVEL, MEAL, TRANSPORT, SUPPLIES, etc.
+  name        String
+  description String?
 
   // 報銷規則
-  requiresReceipt      Boolean @default(true)  // 是否需要發票/收據
-  maxAmountPerItem     Float?                  // 單項最高金額限制
-  maxAmountPerMonth    Float?                  // 每月最高金額限制
-  requiresPreApproval  Boolean @default(false) // 是否需要事前核准
+  requiresReceipt     Boolean @default(true) // 是否需要發票/收據
+  maxAmountPerItem    Float? // 單項最高金額限制
+  maxAmountPerMonth   Float? // 每月最高金額限制
+  requiresPreApproval Boolean @default(false) // 是否需要事前核准
 
-  isActive     Boolean  @default(true)
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  company      Company?         @relation(fields: [companyId], references: [id])
-  items        ExpenseItem[]
+  company Company?      @relation(fields: [companyId], references: [id])
+  items   ExpenseItem[]
 
   @@unique([companyId, code])
   @@map("expense_categories")
@@ -871,27 +1279,27 @@ model ExpenseCategory {
 
 // 費用報銷申請
 model ExpenseRequest {
-  id           String   @id @default(cuid())
-  requestNo    String   @unique        // 申請單號
-  employeeId   String
-  companyId    String
+  id         String @id @default(cuid())
+  requestNo  String @unique // 申請單號
+  employeeId String
+  companyId  String
 
   // 報銷期間
-  periodStart  DateTime @db.Date       // 報銷起始日
-  periodEnd    DateTime @db.Date       // 報銷結束日
+  periodStart DateTime @db.Date // 報銷起始日
+  periodEnd   DateTime @db.Date // 報銷結束日
 
   // 金額
-  totalAmount  Float    @default(0)    // 總金額
-  currency     String   @default("TWD")
+  totalAmount Float  @default(0) // 總金額
+  currency    String @default("TWD")
 
   // 說明
-  title        String                  // 報銷標題
-  description  String?                 // 說明
+  title       String // 報銷標題
+  description String? // 說明
 
   // 狀態
-  status       ExpenseStatus @default(DRAFT)
-  submittedAt  DateTime?
-  processedAt  DateTime?
+  status      ExpenseStatus @default(DRAFT)
+  submittedAt DateTime?
+  processedAt DateTime?
 
   // 審核資訊
   currentApproverId String?
@@ -902,12 +1310,12 @@ model ExpenseRequest {
   // 付款資訊
   paymentStatus PaymentStatus @default(UNPAID)
   paidAt        DateTime?
-  paymentRef    String?                // 付款參考號
+  paymentRef    String? // 付款參考號
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  items        ExpenseItem[]
+  items ExpenseItem[]
 
   @@index([employeeId, companyId])
   @@index([status])
@@ -915,103 +1323,103 @@ model ExpenseRequest {
 }
 
 enum ExpenseStatus {
-  DRAFT      // 草稿
-  PENDING    // 審核中
-  APPROVED   // 已核准
-  REJECTED   // 已拒絕
-  CANCELLED  // 已取消
+  DRAFT // 草稿
+  PENDING // 審核中
+  APPROVED // 已核准
+  REJECTED // 已拒絕
+  CANCELLED // 已取消
 }
 
 enum PaymentStatus {
-  UNPAID     // 未付款
+  UNPAID // 未付款
   PROCESSING // 處理中
-  PAID       // 已付款
+  PAID // 已付款
 }
 
 // ==================== 財務會計 Enums ====================
 
 // 會計科目類別
 enum AccountCategory {
-  ASSET       // 資產
-  LIABILITY   // 負債
-  EQUITY      // 權益
-  REVENUE     // 收入
-  EXPENSE     // 費用
+  ASSET // 資產
+  LIABILITY // 負債
+  EQUITY // 權益
+  REVENUE // 收入
+  EXPENSE // 費用
 }
 
 // 科目性質
 enum AccountType {
-  DEBIT       // 借方科目
-  CREDIT      // 貸方科目
+  DEBIT // 借方科目
+  CREDIT // 貸方科目
 }
 
 // 傳票類型
 enum VoucherType {
-  RECEIPT     // 收款傳票
-  PAYMENT     // 付款傳票
-  TRANSFER    // 轉帳傳票
+  RECEIPT // 收款傳票
+  PAYMENT // 付款傳票
+  TRANSFER // 轉帳傳票
 }
 
 // 傳票來源
 enum VoucherSource {
-  MANUAL      // 人工輸入
-  EXPENSE     // 費用報支
-  AR          // 應收帳款
-  AP          // 應付帳款
+  MANUAL // 人工輸入
+  EXPENSE // 費用報支
+  AR // 應收帳款
+  AP // 應付帳款
 }
 
 // 傳票狀態
 enum VoucherStatus {
-  DRAFT       // 草稿
-  PENDING     // 待審核
-  POSTED      // 已過帳
-  VOID        // 作廢
+  DRAFT // 草稿
+  PENDING // 待審核
+  POSTED // 已過帳
+  VOID // 作廢
 }
 
 // 會計期間狀態
 enum PeriodStatus {
-  OPEN        // 開放
-  CLOSED      // 已結帳
-  LOCKED      // 已鎖定
+  OPEN // 開放
+  CLOSED // 已結帳
+  LOCKED // 已鎖定
 }
 
 // 應收應付狀態
 enum ARAPStatus {
-  OPEN        // 未收付
-  PARTIAL     // 部分收付
-  PAID        // 已收付
-  VOID        // 作廢
+  OPEN // 未收付
+  PARTIAL // 部分收付
+  PAID // 已收付
+  VOID // 作廢
 }
 
 // 費用明細項目
 model ExpenseItem {
-  id           String   @id @default(cuid())
-  requestId    String
-  categoryId   String
+  id         String @id @default(cuid())
+  requestId  String
+  categoryId String
 
   // 費用資訊
-  date         DateTime @db.Date       // 消費日期
-  description  String                  // 費用說明
-  amount       Float                   // 金額
-  currency     String   @default("TWD")
+  date        DateTime @db.Date // 消費日期
+  description String // 費用說明
+  amount      Float // 金額
+  currency    String   @default("TWD")
 
   // 發票/收據
-  receiptNo    String?                 // 發票號碼
-  receiptDate  DateTime?               // 發票日期
-  vendorName   String?                 // 廠商名稱
-  taxId        String?                 // 統一編號
+  receiptNo   String? // 發票號碼
+  receiptDate DateTime? // 發票日期
+  vendorName  String? // 廠商名稱
+  taxId       String? // 統一編號
 
   // 附件
-  attachments  String?                 // JSON array of file URLs
+  attachments String? // JSON array of file URLs
 
   // 備註
-  notes        String?
+  notes String?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  request      ExpenseRequest   @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  category     ExpenseCategory  @relation(fields: [categoryId], references: [id])
+  request  ExpenseRequest  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  category ExpenseCategory @relation(fields: [categoryId], references: [id])
 
   @@map("expense_items")
 }
@@ -1020,9 +1428,9 @@ model ExpenseItem {
 
 // 會計科目表
 model AccountChart {
-  id          String          @id @default(cuid())
-  companyId   String
-  company     Company         @relation(fields: [companyId], references: [id])
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
   code        String
   name        String
@@ -1030,21 +1438,21 @@ model AccountChart {
   accountType AccountType
   level       Int
 
-  parentId    String?
-  parent      AccountChart?   @relation("AccountHierarchy", fields: [parentId], references: [id])
-  children    AccountChart[]  @relation("AccountHierarchy")
+  parentId String?
+  parent   AccountChart?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children AccountChart[] @relation("AccountHierarchy")
 
-  isDetail    Boolean         @default(true)
-  isActive    Boolean         @default(true)
-  isSystem    Boolean         @default(false)
-  requiresAux Boolean         @default(false)
+  isDetail    Boolean @default(true)
+  isActive    Boolean @default(true)
+  isSystem    Boolean @default(false)
+  requiresAux Boolean @default(false)
 
-  openingBalance Decimal      @default(0) @db.Decimal(15, 2)
+  openingBalance Decimal @default(0) @db.Decimal(15, 2)
 
   voucherLines VoucherLine[]
 
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, code])
   @@index([companyId, category])
@@ -1053,23 +1461,23 @@ model AccountChart {
 
 // 會計期間
 model AccountingPeriod {
-  id          String        @id @default(cuid())
-  companyId   String
-  company     Company       @relation(fields: [companyId], references: [id])
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
-  year        Int
-  period      Int
-  startDate   DateTime
-  endDate     DateTime
+  year      Int
+  period    Int
+  startDate DateTime
+  endDate   DateTime
 
-  status      PeriodStatus  @default(OPEN)
-  closedAt    DateTime?
-  closedBy    String?
+  status   PeriodStatus @default(OPEN)
+  closedAt DateTime?
+  closedBy String?
 
-  vouchers    Voucher[]
+  vouchers Voucher[]
 
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, year, period])
   @@map("accounting_periods")
@@ -1077,27 +1485,27 @@ model AccountingPeriod {
 
 // 客戶
 model Customer {
-  id            String    @id @default(cuid())
-  companyId     String
-  company       Company   @relation(fields: [companyId], references: [id])
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
-  code          String
-  name          String
-  taxId         String?
-  contactName   String?
-  contactPhone  String?
-  contactEmail  String?
-  address       String?
-  paymentTerms  Int       @default(30)
-  creditLimit   Decimal?  @db.Decimal(15, 2)
+  code         String
+  name         String
+  taxId        String?
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  address      String?
+  paymentTerms Int      @default(30)
+  creditLimit  Decimal? @db.Decimal(15, 2)
 
-  isActive      Boolean   @default(true)
+  isActive Boolean @default(true)
 
-  receivables   AccountReceivable[]
-  voucherLines  VoucherLine[]
+  receivables  AccountReceivable[]
+  voucherLines VoucherLine[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, code])
   @@map("customers")
@@ -1105,28 +1513,28 @@ model Customer {
 
 // 供應商
 model Vendor {
-  id            String    @id @default(cuid())
-  companyId     String
-  company       Company   @relation(fields: [companyId], references: [id])
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
-  code          String
-  name          String
-  taxId         String?
-  contactName   String?
-  contactPhone  String?
-  contactEmail  String?
-  address       String?
-  paymentTerms  Int       @default(30)
-  bankName      String?
-  bankAccount   String?
+  code         String
+  name         String
+  taxId        String?
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  address      String?
+  paymentTerms Int     @default(30)
+  bankName     String?
+  bankAccount  String?
 
-  isActive      Boolean   @default(true)
+  isActive Boolean @default(true)
 
-  payables      AccountPayable[]
-  voucherLines  VoucherLine[]
+  payables     AccountPayable[]
+  voucherLines VoucherLine[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, code])
   @@map("vendors")
@@ -1134,37 +1542,37 @@ model Vendor {
 
 // 傳票
 model Voucher {
-  id            String          @id @default(cuid())
-  companyId     String
-  company       Company         @relation(fields: [companyId], references: [id])
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
-  voucherNo     String
-  voucherDate   DateTime
-  voucherType   VoucherType
-  sourceType    VoucherSource   @default(MANUAL)
-  sourceId      String?
+  voucherNo   String
+  voucherDate DateTime
+  voucherType VoucherType
+  sourceType  VoucherSource @default(MANUAL)
+  sourceId    String?
 
-  periodId      String
-  period        AccountingPeriod @relation(fields: [periodId], references: [id])
+  periodId String
+  period   AccountingPeriod @relation(fields: [periodId], references: [id])
 
-  description   String?
-  totalDebit    Decimal         @db.Decimal(15, 2)
-  totalCredit   Decimal         @db.Decimal(15, 2)
+  description String?
+  totalDebit  Decimal @db.Decimal(15, 2)
+  totalCredit Decimal @db.Decimal(15, 2)
 
-  status        VoucherStatus   @default(DRAFT)
-  postedAt      DateTime?
+  status   VoucherStatus @default(DRAFT)
+  postedAt DateTime?
 
-  createdById   String
-  createdBy     Employee        @relation("VoucherCreator", fields: [createdById], references: [id])
-  approvedById  String?
-  approvedBy    Employee?       @relation("VoucherApprover", fields: [approvedById], references: [id])
-  postedById    String?
-  postedBy      Employee?       @relation("VoucherPoster", fields: [postedById], references: [id])
+  createdById  String
+  createdBy    Employee  @relation("VoucherCreator", fields: [createdById], references: [id])
+  approvedById String?
+  approvedBy   Employee? @relation("VoucherApprover", fields: [approvedById], references: [id])
+  postedById   String?
+  postedBy     Employee? @relation("VoucherPoster", fields: [postedById], references: [id])
 
-  lines         VoucherLine[]
+  lines VoucherLine[]
 
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, voucherNo])
   @@index([companyId, voucherDate])
@@ -1174,26 +1582,26 @@ model Voucher {
 
 // 傳票分錄
 model VoucherLine {
-  id            String        @id @default(cuid())
-  voucherId     String
-  voucher       Voucher       @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  voucherId String
+  voucher   Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
 
-  lineNo        Int
-  accountId     String
-  account       AccountChart  @relation(fields: [accountId], references: [id])
+  lineNo    Int
+  accountId String
+  account   AccountChart @relation(fields: [accountId], references: [id])
 
-  debitAmount   Decimal       @default(0) @db.Decimal(15, 2)
-  creditAmount  Decimal       @default(0) @db.Decimal(15, 2)
-  description   String?
+  debitAmount  Decimal @default(0) @db.Decimal(15, 2)
+  creditAmount Decimal @default(0) @db.Decimal(15, 2)
+  description  String?
 
-  customerId    String?
-  customer      Customer?     @relation(fields: [customerId], references: [id])
-  vendorId      String?
-  vendor        Vendor?       @relation(fields: [vendorId], references: [id])
-  departmentId  String?
-  department    Department?   @relation(fields: [departmentId], references: [id])
+  customerId   String?
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+  vendorId     String?
+  vendor       Vendor?     @relation(fields: [vendorId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
 
-  createdAt     DateTime      @default(now())
+  createdAt DateTime @default(now())
 
   @@index([voucherId])
   @@map("voucher_lines")
@@ -1201,31 +1609,31 @@ model VoucherLine {
 
 // 應收帳款
 model AccountReceivable {
-  id            String      @id @default(cuid())
-  companyId     String
-  company       Company     @relation(fields: [companyId], references: [id])
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
-  arNo          String
-  arDate        DateTime
-  dueDate       DateTime
+  arNo    String
+  arDate  DateTime
+  dueDate DateTime
 
-  customerId    String
-  customer      Customer    @relation(fields: [customerId], references: [id])
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
 
-  amount        Decimal     @db.Decimal(15, 2)
-  paidAmount    Decimal     @default(0) @db.Decimal(15, 2)
-  balance       Decimal     @db.Decimal(15, 2)
+  amount     Decimal @db.Decimal(15, 2)
+  paidAmount Decimal @default(0) @db.Decimal(15, 2)
+  balance    Decimal @db.Decimal(15, 2)
 
-  invoiceNo     String?
-  invoiceDate   DateTime?
-  description   String?
+  invoiceNo   String?
+  invoiceDate DateTime?
+  description String?
 
-  status        ARAPStatus  @default(OPEN)
+  status ARAPStatus @default(OPEN)
 
-  voucherId     String?
+  voucherId String?
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, arNo])
   @@index([companyId, customerId])
@@ -1235,32 +1643,32 @@ model AccountReceivable {
 
 // 應付帳款
 model AccountPayable {
-  id            String      @id @default(cuid())
-  companyId     String
-  company       Company     @relation(fields: [companyId], references: [id])
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
-  apNo          String
-  apDate        DateTime
-  dueDate       DateTime
+  apNo    String
+  apDate  DateTime
+  dueDate DateTime
 
-  vendorId      String
-  vendor        Vendor      @relation(fields: [vendorId], references: [id])
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id])
 
-  amount        Decimal     @db.Decimal(15, 2)
-  paidAmount    Decimal     @default(0) @db.Decimal(15, 2)
-  balance       Decimal     @db.Decimal(15, 2)
+  amount     Decimal @db.Decimal(15, 2)
+  paidAmount Decimal @default(0) @db.Decimal(15, 2)
+  balance    Decimal @db.Decimal(15, 2)
 
-  invoiceNo     String?
-  invoiceDate   DateTime?
-  description   String?
+  invoiceNo   String?
+  invoiceDate DateTime?
+  description String?
 
-  status        ARAPStatus  @default(OPEN)
+  status ARAPStatus @default(OPEN)
 
-  voucherId     String?
+  voucherId        String?
   expenseRequestId String?
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, apNo])
   @@index([companyId, vendorId])
@@ -1272,56 +1680,56 @@ model AccountPayable {
 
 // 用印類型
 enum SealType {
-  COMPANY_SEAL        // 公司大章
-  COMPANY_SMALL_SEAL  // 公司小章
-  CONTRACT_SEAL       // 合約用印
-  INVOICE_SEAL        // 發票章
-  BOARD_SEAL          // 董事會印鑑
-  BANK_SEAL           // 銀行印鑑
+  COMPANY_SEAL // 公司大章
+  COMPANY_SMALL_SEAL // 公司小章
+  CONTRACT_SEAL // 合約用印
+  INVOICE_SEAL // 發票章
+  BOARD_SEAL // 董事會印鑑
+  BANK_SEAL // 銀行印鑑
 }
 
 // 用印申請狀態
 enum SealRequestStatus {
-  DRAFT       // 草稿
-  PENDING     // 待審核
-  APPROVED    // 已核准
-  REJECTED    // 已駁回
-  PROCESSING  // 處理中 (用印中)
-  COMPLETED   // 已完成
-  CANCELLED   // 已取消
+  DRAFT // 草稿
+  PENDING // 待審核
+  APPROVED // 已核准
+  REJECTED // 已駁回
+  PROCESSING // 處理中 (用印中)
+  COMPLETED // 已完成
+  CANCELLED // 已取消
 }
 
 // 用印申請
 model SealRequest {
-  id              String            @id @default(cuid())
-  requestNo       String            @unique  // SR202601-0001
-  companyId       String
-  company         Company           @relation(fields: [companyId], references: [id])
-  applicantId     String
-  applicant       Employee          @relation("SealApplicant", fields: [applicantId], references: [id])
+  id          String   @id @default(cuid())
+  requestNo   String   @unique // SR202601-0001
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  applicantId String
+  applicant   Employee @relation("SealApplicant", fields: [applicantId], references: [id])
 
-  sealType        SealType
-  purpose         String            // 用途說明
-  documentName    String?           // 文件名稱
-  documentCount   Int               @default(1)  // 用印份數
+  sealType      SealType
+  purpose       String // 用途說明
+  documentName  String? // 文件名稱
+  documentCount Int      @default(1) // 用印份數
 
-  isCarryOut      Boolean           @default(false)  // 是否攜出
-  expectedReturn  DateTime?         // 預計歸還時間
-  actualReturn    DateTime?         // 實際歸還時間
-  returnNote      String?           // 歸還備註
+  isCarryOut     Boolean   @default(false) // 是否攜出
+  expectedReturn DateTime? // 預計歸還時間
+  actualReturn   DateTime? // 實際歸還時間
+  returnNote     String? // 歸還備註
 
-  status          SealRequestStatus @default(DRAFT)
-  attachments     Json?             // 附件 [{name, url}]
+  status      SealRequestStatus @default(DRAFT)
+  attachments Json? // 附件 [{name, url}]
 
   // 審批相關
-  approvalInstanceId String?        // 關聯的審批流程實例
-  processedById   String?           // 處理人 (行政人員)
-  processedBy     Employee?         @relation("SealProcessor", fields: [processedById], references: [id])
-  processedAt     DateTime?         // 處理時間
-  completedAt     DateTime?         // 完成時間
+  approvalInstanceId String? // 關聯的審批流程實例
+  processedById      String? // 處理人 (行政人員)
+  processedBy        Employee? @relation("SealProcessor", fields: [processedById], references: [id])
+  processedAt        DateTime? // 處理時間
+  completedAt        DateTime? // 完成時間
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([companyId])
   @@index([applicantId])
@@ -1334,51 +1742,51 @@ model SealRequest {
 
 // 名片申請狀態
 enum CardRequestStatus {
-  DRAFT       // 草稿
-  PENDING     // 待審核
-  APPROVED    // 已核准
-  REJECTED    // 已駁回
-  PRINTING    // 印刷中
-  COMPLETED   // 已完成
-  CANCELLED   // 已取消
+  DRAFT // 草稿
+  PENDING // 待審核
+  APPROVED // 已核准
+  REJECTED // 已駁回
+  PRINTING // 印刷中
+  COMPLETED // 已完成
+  CANCELLED // 已取消
 }
 
 // 名片申請
 model BusinessCardRequest {
-  id              String            @id @default(cuid())
-  requestNo       String            @unique  // BC202601-0001
+  id        String @id @default(cuid())
+  requestNo String @unique // BC202601-0001
 
   // 申請對象公司
-  companyId       String
-  company         Company           @relation(fields: [companyId], references: [id])
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
   // 申請人
-  applicantId     String
-  applicant       Employee          @relation("CardApplicant", fields: [applicantId], references: [id])
+  applicantId String
+  applicant   Employee @relation("CardApplicant", fields: [applicantId], references: [id])
 
   // 名片資料
-  name            String            // 姓名
-  nameEn          String?           // 英文名
-  title           String            // 職稱
-  titleEn         String?           // 英文職稱
-  department      String?           // 部門名稱
-  phone           String?           // 公司電話
-  mobile          String?           // 手機
-  fax             String?           // 傳真
-  email           String?           // Email
-  address         String?           // 公司地址
-  quantity        Int               @default(100)  // 數量（盒）
-  note            String?           // 備註
+  name       String // 姓名
+  nameEn     String? // 英文名
+  title      String // 職稱
+  titleEn    String? // 英文職稱
+  department String? // 部門名稱
+  phone      String? // 公司電話
+  mobile     String? // 手機
+  fax        String? // 傳真
+  email      String? // Email
+  address    String? // 公司地址
+  quantity   Int     @default(100) // 數量（盒）
+  note       String? // 備註
 
   // 狀態流程
-  status          CardRequestStatus @default(DRAFT)
-  approvedById    String?
-  approvedBy      Employee?         @relation("CardApprover", fields: [approvedById], references: [id])
-  approvedAt      DateTime?
-  printedAt       DateTime?         // 印刷完成時間
+  status       CardRequestStatus @default(DRAFT)
+  approvedById String?
+  approvedBy   Employee?         @relation("CardApprover", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  printedAt    DateTime? // 印刷完成時間
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([companyId])
   @@index([applicantId])
@@ -1390,30 +1798,30 @@ model BusinessCardRequest {
 
 // 文具申請狀態
 enum StationeryRequestStatus {
-  DRAFT       // 草稿
-  PENDING     // 待審核
-  APPROVED    // 已核准
-  REJECTED    // 已駁回
-  ISSUED      // 已發放
-  CANCELLED   // 已取消
+  DRAFT // 草稿
+  PENDING // 待審核
+  APPROVED // 已核准
+  REJECTED // 已駁回
+  ISSUED // 已發放
+  CANCELLED // 已取消
 }
 
 // 文具品項
 model StationeryItem {
-  id          String   @id @default(cuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
-  code        String            // 品項代碼 ST001
-  name        String            // 原子筆、便條紙...
-  unit        String            // 個、盒、本
-  unitPrice   Decimal  @db.Decimal(10, 2)  // 單價
-  stock       Int      @default(0)         // 現有庫存
-  alertLevel  Int      @default(10)        // 警戒庫存
-  isActive    Boolean  @default(true)
+  code       String // 品項代碼 ST001
+  name       String // 原子筆、便條紙...
+  unit       String // 個、盒、本
+  unitPrice  Decimal @db.Decimal(10, 2) // 單價
+  stock      Int     @default(0) // 現有庫存
+  alertLevel Int     @default(10) // 警戒庫存
+  isActive   Boolean @default(true)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -1422,35 +1830,35 @@ model StationeryItem {
 
 // 文具申請單
 model StationeryRequest {
-  id              String                   @id @default(cuid())
-  requestNo       String                   @unique  // ST202601-0001
+  id        String @id @default(cuid())
+  requestNo String @unique // ST202601-0001
 
   // 申請對象公司
-  companyId       String
-  company         Company                  @relation(fields: [companyId], references: [id])
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
   // 申請人
-  applicantId     String
-  applicant       Employee                 @relation("StationeryApplicant", fields: [applicantId], references: [id])
+  applicantId String
+  applicant   Employee @relation("StationeryApplicant", fields: [applicantId], references: [id])
 
   // 申請明細 [{itemId, itemCode, itemName, quantity, unitPrice, subtotal}]
-  items           Json
-  totalAmount     Decimal                  @db.Decimal(10, 2)
-  purpose         String?                  // 用途說明
+  items       Json
+  totalAmount Decimal @db.Decimal(10, 2)
+  purpose     String? // 用途說明
 
   // 狀態流程
-  status          StationeryRequestStatus  @default(DRAFT)
-  approvedById    String?
-  approvedBy      Employee?                @relation("StationeryApprover", fields: [approvedById], references: [id])
-  approvedAt      DateTime?
+  status       StationeryRequestStatus @default(DRAFT)
+  approvedById String?
+  approvedBy   Employee?               @relation("StationeryApprover", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
 
   // 發放資訊
-  issuedAt        DateTime?                // 發放時間
-  issuedById      String?                  // 發放人
-  issuedBy        Employee?                @relation("StationeryIssuer", fields: [issuedById], references: [id])
+  issuedAt   DateTime? // 發放時間
+  issuedById String? // 發放人
+  issuedBy   Employee? @relation("StationeryIssuer", fields: [issuedById], references: [id])
 
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([companyId])
   @@index([applicantId])

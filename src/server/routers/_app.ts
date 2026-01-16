@@ -27,6 +27,10 @@ import { sealRequestRouter } from './sealRequest'
 import { businessCardRouter } from './businessCard'
 import { stationeryRouter } from './stationery'
 import { groupRouter } from './group'
+import { permissionRouter } from './permission'
+import { orgChartRouter } from './orgChart'
+import { workflowRouter } from './workflow'
+import { delegateRouter } from './delegate'
 
 export const appRouter = router({
   health: healthRouter,
@@ -57,6 +61,10 @@ export const appRouter = router({
   businessCard: businessCardRouter,
   stationery: stationeryRouter,
   group: groupRouter,
+  permission: permissionRouter,
+  orgChart: orgChartRouter,
+  workflow: workflowRouter,
+  delegate: delegateRouter,
 })
 
 export type AppRouter = typeof appRouter
