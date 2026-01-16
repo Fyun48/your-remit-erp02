@@ -16,12 +16,14 @@ import {
   Building2,
   Stamp,
   Network,
+  Workflow,
 } from 'lucide-react'
 
 const navigation = [
   { name: '儀表板', href: '/dashboard', icon: LayoutDashboard },
   { name: '人事管理', href: '/dashboard/hr', icon: Users },
   { name: '組織圖', href: '/dashboard/organization', icon: Network },
+  { name: '流程管理', href: '/dashboard/workflow', icon: Workflow },
   { name: '出勤管理', href: '/dashboard/attendance', icon: Clock },
   { name: '請假管理', href: '/dashboard/leave', icon: Calendar },
   { name: '費用報銷', href: '/dashboard/expense', icon: Receipt },
