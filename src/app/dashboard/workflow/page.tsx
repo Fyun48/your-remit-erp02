@@ -18,11 +18,17 @@ export default async function WorkflowPage() {
     )
   }
 
+  // 取得公司的 groupId
+  const companyWithGroup = await prisma.company.findUnique({
+    where: { id: currentCompany.id },
+    select: { groupId: true },
+  })
+
   const workflows = await prisma.workflowDefinition.findMany({
     where: {
       OR: [
         { companyId: currentCompany.id },
-        { groupId: currentCompany.groupId },
+        ...(companyWithGroup?.groupId ? [{ groupId: companyWithGroup.groupId }] : []),
       ],
     },
     include: {
