@@ -143,8 +143,8 @@ export async function hasPermission(
   permissionCode: ModuleCode
 ): Promise<boolean> {
   // 1. 基本權限：所有員工都有
-  const module = Object.values(SYSTEM_MODULES).find(m => m.code === permissionCode)
-  if (module?.isBasic) {
+  const systemModule = Object.values(SYSTEM_MODULES).find(m => m.code === permissionCode)
+  if (systemModule?.isBasic) {
     return true
   }
 
@@ -315,16 +315,16 @@ export async function grantPermission(
 
   if (!permission) {
     // 從系統模組中取得資訊
-    const module = Object.values(SYSTEM_MODULES).find(m => m.code === permissionCode)
-    if (!module) {
+    const systemModule = Object.values(SYSTEM_MODULES).find(m => m.code === permissionCode)
+    if (!systemModule) {
       throw new Error(`未知的權限代碼: ${permissionCode}`)
     }
 
     permission = await prisma.permission.create({
       data: {
         code: permissionCode,
-        name: module.name,
-        module: module.module,
+        name: systemModule.name,
+        module: systemModule.module,
       },
     })
   }

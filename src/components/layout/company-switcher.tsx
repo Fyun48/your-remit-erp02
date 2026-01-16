@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Building, ChevronDown, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -24,7 +23,6 @@ export function CompanySwitcher({
   currentCompanyName,
   isGroupAdmin,
 }: CompanySwitcherProps) {
-  const router = useRouter()
   const { data: session } = useSession()
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
