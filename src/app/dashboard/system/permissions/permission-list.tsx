@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,40 +44,16 @@ import {
   UserMinus,
   ArrowLeft,
   Search,
+  Loader2,
+  Pencil,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 
-interface PermissionItem {
-  id: string
-  employeeId: string
-  permission: string
-  grantedAt: Date
-  expiresAt: Date | null
-  isActive: boolean
-  note: string | null
-  employee: {
-    id: string
-    name: string
-    employeeNo: string
-    email: string
-    assignments: Array<{
-      company: { name: string }
-      position: { name: string }
-    }>
-  }
-  grantedBy: {
-    id: string
-    name: string
-    employeeNo: string
-  }
-}
-
 interface PermissionListProps {
   userId: string
-  permissions: PermissionItem[]
 }
 
 const permissionLabels: Record<string, { name: string; description: string; color: string }> = {
@@ -109,15 +84,20 @@ const permissionLabels: Record<string, { name: string; description: string; colo
   },
 }
 
-export function PermissionList({ userId, permissions }: PermissionListProps) {
-  const router = useRouter()
+export function PermissionList({ userId }: PermissionListProps) {
+  const utils = trpc.useUtils()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPermissionType, setSelectedPermissionType] = useState<string>('all')
+
+  // 使用 tRPC Query 取得資料
+  const { data: permissions = [], isLoading } = trpc.groupPermission.listAll.useQuery({ userId })
 
   // Dialog states
   const [showGrantDialog, setShowGrantDialog] = useState(false)
   const [showRevokeDialog, setShowRevokeDialog] = useState(false)
-  const [selectedPermission, setSelectedPermission] = useState<PermissionItem | null>(null)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [selectedPermission, setSelectedPermission] = useState<typeof permissions[0] | null>(null)
+  const [editNote, setEditNote] = useState('')
 
   // Search employee state
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('')
@@ -148,14 +128,22 @@ export function PermissionList({ userId, permissions }: PermissionListProps) {
       setShowGrantDialog(false)
       setSelectedEmployee(null)
       setEmployeeSearchTerm('')
-      router.refresh()
+      utils.groupPermission.listAll.invalidate()
     },
   })
 
   const revokeMutation = trpc.groupPermission.revoke.useMutation({
     onSuccess: () => {
       setShowRevokeDialog(false)
-      router.refresh()
+      utils.groupPermission.listAll.invalidate()
+    },
+  })
+
+  const updateMutation = trpc.groupPermission.update.useMutation({
+    onSuccess: () => {
+      setShowEditDialog(false)
+      setSelectedPermission(null)
+      utils.groupPermission.listAll.invalidate()
     },
   })
 
@@ -180,9 +168,23 @@ export function PermissionList({ userId, permissions }: PermissionListProps) {
     setShowGrantDialog(true)
   }
 
-  const handleRevoke = (perm: PermissionItem) => {
+  const handleRevoke = (perm: typeof permissions[0]) => {
     setSelectedPermission(perm)
     setShowRevokeDialog(true)
+  }
+
+  const handleEdit = (perm: typeof permissions[0]) => {
+    setSelectedPermission(perm)
+    setEditNote(perm.note || '')
+    setShowEditDialog(true)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   const submitGrant = () => {
@@ -201,6 +203,16 @@ export function PermissionList({ userId, permissions }: PermissionListProps) {
       userId,
       employeeId: selectedPermission.employeeId,
       permission: selectedPermission.permission as 'GROUP_ADMIN' | 'CROSS_COMPANY_VIEW' | 'CROSS_COMPANY_EDIT' | 'AUDIT_LOG_VIEW' | 'COMPANY_MANAGEMENT',
+    })
+  }
+
+  const submitEdit = () => {
+    if (!selectedPermission) return
+    updateMutation.mutate({
+      userId,
+      employeeId: selectedPermission.employeeId,
+      permission: selectedPermission.permission as 'GROUP_ADMIN' | 'CROSS_COMPANY_VIEW' | 'CROSS_COMPANY_EDIT' | 'AUDIT_LOG_VIEW' | 'COMPANY_MANAGEMENT',
+      note: editNote || undefined,
     })
   }
 
@@ -305,14 +317,25 @@ export function PermissionList({ userId, permissions }: PermissionListProps) {
                   </TableCell>
                   <TableCell>{perm.note || '-'}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRevoke(perm)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <UserMinus className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(perm)}
+                        title="編輯備註"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRevoke(perm)}
+                        className="text-destructive hover:text-destructive"
+                        title="撤銷權限"
+                      >
+                        <UserMinus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -469,6 +492,56 @@ export function PermissionList({ userId, permissions }: PermissionListProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 編輯權限 Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>編輯權限備註</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedPermission && (
+              <>
+                <div className="space-y-2">
+                  <Label>員工</Label>
+                  <div className="text-sm text-muted-foreground">
+                    {selectedPermission.employee.name} ({selectedPermission.employee.employeeNo})
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>權限類型</Label>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={`${permissionLabels[selectedPermission.permission]?.color} text-white`}
+                    >
+                      {permissionLabels[selectedPermission.permission]?.name}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editNote">備註</Label>
+                  <Input
+                    id="editNote"
+                    value={editNote}
+                    onChange={(e) => setEditNote(e.target.value)}
+                    placeholder="說明授權原因或用途"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              取消
+            </Button>
+            <Button onClick={submitEdit} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? '儲存中...' : '儲存'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

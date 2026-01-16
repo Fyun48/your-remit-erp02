@@ -40,7 +40,20 @@ export const groupPermissionRouter = router({
       return ctx.prisma.groupPermission.findMany({
         include: {
           employee: {
-            select: { id: true, name: true, employeeNo: true, email: true },
+            select: {
+              id: true,
+              name: true,
+              employeeNo: true,
+              email: true,
+              assignments: {
+                where: { isPrimary: true, status: 'ACTIVE' },
+                include: {
+                  company: { select: { name: true } },
+                  position: { select: { name: true } },
+                },
+                take: 1,
+              },
+            },
           },
           grantedBy: {
             select: { id: true, name: true, employeeNo: true },
@@ -131,6 +144,44 @@ export const groupPermissionRouter = router({
       await auditCreate('GroupPermission', result.id, result, input.userId)
 
       return result
+    }),
+
+  // 更新權限備註 (僅集團管理員)
+  update: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      employeeId: z.string(),
+      permission: groupPermissionTypeSchema,
+      note: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const hasPermission = await isGroupAdmin(input.userId)
+      if (!hasPermission) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '僅集團管理員可編輯權限' })
+      }
+
+      const existing = await ctx.prisma.groupPermission.findUnique({
+        where: {
+          employeeId_permission: {
+            employeeId: input.employeeId,
+            permission: input.permission as GroupPermissionType,
+          },
+        },
+      })
+
+      if (!existing) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '權限不存在' })
+      }
+
+      return ctx.prisma.groupPermission.update({
+        where: {
+          employeeId_permission: {
+            employeeId: input.employeeId,
+            permission: input.permission as GroupPermissionType,
+          },
+        },
+        data: { note: input.note },
+      })
     }),
 
   // 撤銷權限 (僅集團管理員)

@@ -19,9 +19,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        qrToken: { label: 'QR Token', type: 'text' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        if (!credentials?.email) {
           return null
         }
 
@@ -41,6 +42,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         })
 
         if (!employee || !employee.isActive) {
+          return null
+        }
+
+        // Check for QR login token
+        if (credentials.qrToken) {
+          const qrLoginToken = await prisma.qrLoginToken.findFirst({
+            where: {
+              employeeId: employee.id,
+              status: 'AUTHENTICATED',
+              expiresAt: { gt: new Date() },
+            },
+            orderBy: { authenticatedAt: 'desc' },
+          })
+
+          if (qrLoginToken) {
+            // Mark token as used
+            await prisma.qrLoginToken.update({
+              where: { id: qrLoginToken.id },
+              data: { status: 'USED' },
+            })
+
+            return {
+              id: employee.id,
+              email: employee.email,
+              name: employee.name,
+              employeeNo: employee.employeeNo,
+            }
+          }
+        }
+
+        // Standard password authentication
+        if (!credentials.password) {
           return null
         }
 

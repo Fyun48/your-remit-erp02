@@ -23,6 +23,10 @@ import { hrRouter } from './hr'
 import { companyRouter } from './company'
 import { groupPermissionRouter } from './groupPermission'
 import { auditLogRouter } from './auditLog'
+import { sealRequestRouter } from './sealRequest'
+import { businessCardRouter } from './businessCard'
+import { stationeryRouter } from './stationery'
+import { groupRouter } from './group'
 
 export const appRouter = router({
   health: healthRouter,
@@ -49,6 +53,10 @@ export const appRouter = router({
   company: companyRouter,
   groupPermission: groupPermissionRouter,
   auditLog: auditLogRouter,
+  sealRequest: sealRequestRouter,
+  businessCard: businessCardRouter,
+  stationery: stationeryRouter,
+  group: groupRouter,
 })
 
 export type AppRouter = typeof appRouter

@@ -13,6 +13,8 @@ import {
   Receipt,
   BarChart3,
   BookOpen,
+  Building2,
+  Stamp,
 } from 'lucide-react'
 
 const navigation = [
@@ -23,7 +25,9 @@ const navigation = [
   { name: '費用報銷', href: '/dashboard/expense', icon: Receipt },
   { name: '審核中心', href: '/dashboard/approval', icon: FileText },
   { name: '財務會計', href: '/dashboard/finance', icon: BookOpen },
+  { name: '行政管理', href: '/dashboard/admin', icon: Stamp },
   { name: '報表中心', href: '/dashboard/reports', icon: BarChart3 },
+  { name: '系統管理', href: '/dashboard/system', icon: Building2 },
   { name: '系統設定', href: '/dashboard/settings', icon: Settings },
 ]
 

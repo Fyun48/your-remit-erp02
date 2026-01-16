@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,52 +48,30 @@ import {
   Edit,
   Power,
   ArrowLeft,
+  Loader2,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import Link from 'next/link'
 
-interface Group {
-  id: string
-  name: string
-  code: string
-  isActive: boolean
-}
-
-interface Company {
-  id: string
-  groupId: string
-  name: string
-  code: string
-  taxId: string | null
-  address: string | null
-  phone: string | null
-  isActive: boolean
-  group: Group
-  _count: {
-    departments: number
-    positions: number
-    employees: number
-  }
-}
-
 interface CompanyListProps {
   userId: string
-  groups: Group[]
-  companies: Company[]
   canManage: boolean
 }
 
-export function CompanyList({ userId, groups, companies: initialCompanies, canManage }: CompanyListProps) {
-  const router = useRouter()
-  const [companies] = useState(initialCompanies)
+export function CompanyList({ userId, canManage }: CompanyListProps) {
+  const utils = trpc.useUtils()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all')
+
+  // 使用 tRPC Query 取得資料
+  const { data: companies = [], isLoading: isLoadingCompanies } = trpc.company.listAll.useQuery({ userId })
+  const { data: groups = [], isLoading: isLoadingGroups } = trpc.company.listGroups.useQuery({ userId })
 
   // Dialog states
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false)
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
+  const [selectedCompany, setSelectedCompany] = useState<typeof companies[0] | null>(null)
 
   // Form states
   const [formData, setFormData] = useState({
@@ -112,21 +89,21 @@ export function CompanyList({ userId, groups, companies: initialCompanies, canMa
   const createMutation = trpc.company.create.useMutation({
     onSuccess: () => {
       setShowCreateDialog(false)
-      router.refresh()
+      utils.company.listAll.invalidate()
     },
   })
 
   const updateMutation = trpc.company.update.useMutation({
     onSuccess: () => {
       setShowEditDialog(false)
-      router.refresh()
+      utils.company.listAll.invalidate()
     },
   })
 
   const deactivateMutation = trpc.company.deactivate.useMutation({
     onSuccess: () => {
       setShowDeactivateDialog(false)
-      router.refresh()
+      utils.company.listAll.invalidate()
     },
   })
 
@@ -154,7 +131,7 @@ export function CompanyList({ userId, groups, companies: initialCompanies, canMa
     setShowCreateDialog(true)
   }
 
-  const handleEdit = (company: Company) => {
+  const handleEdit = (company: typeof companies[0]) => {
     setSelectedCompany(company)
     setFormData({
       groupId: company.groupId,
@@ -170,7 +147,7 @@ export function CompanyList({ userId, groups, companies: initialCompanies, canMa
     setShowEditDialog(true)
   }
 
-  const handleDeactivate = (company: Company) => {
+  const handleDeactivate = (company: typeof companies[0]) => {
     setSelectedCompany(company)
     setShowDeactivateDialog(true)
   }
@@ -208,6 +185,14 @@ export function CompanyList({ userId, groups, companies: initialCompanies, canMa
       userId,
       id: selectedCompany.id,
     })
+  }
+
+  if (isLoadingCompanies || isLoadingGroups) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (

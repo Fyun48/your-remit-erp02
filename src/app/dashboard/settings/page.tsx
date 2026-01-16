@@ -13,7 +13,7 @@ export default function SettingsPage() {
     {
       title: '角色權限',
       description: '管理系統角色與權限設定',
-      href: '/dashboard/settings/roles',
+      href: '/dashboard/system/permissions',
       icon: Shield,
     },
     {

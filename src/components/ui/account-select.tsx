@@ -23,13 +23,14 @@ interface Account {
   name: string
   category: string
   isDetail: boolean
+  requiresAux: boolean
 }
 
 interface AccountSelectProps {
   companyId: string
   value: string // accountId
   displayValue?: string // 顯示文字 (如 "1102 銀行存款")
-  onChange: (accountId: string, accountCode: string, accountName: string) => void
+  onChange: (accountId: string, accountCode: string, accountName: string, requiresAux: boolean) => void
   placeholder?: string
   className?: string
 }
@@ -87,7 +88,7 @@ export function AccountSelect({
 
   // 選擇科目
   const handleSelect = (account: Account) => {
-    onChange(account.id, account.code, account.name)
+    onChange(account.id, account.code, account.name, account.requiresAux)
     setIsOpen(false)
     setSearchText('')
   }

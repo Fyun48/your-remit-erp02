@@ -29,8 +29,16 @@ interface SystemDashboardProps {
 export function SystemDashboard({ permissions, stats }: SystemDashboardProps) {
   const menuItems = [
     {
+      title: '集團管理',
+      description: '管理集團基本資料',
+      icon: Building2,
+      href: '/dashboard/system/groups',
+      color: 'text-indigo-500',
+      show: permissions.isGroupAdmin,
+    },
+    {
       title: '公司管理',
-      description: '管理集團與分公司',
+      description: '管理集團下的分公司',
       icon: Building,
       href: '/dashboard/system/companies',
       color: 'text-blue-500',
@@ -111,7 +119,7 @@ export function SystemDashboard({ permissions, stats }: SystemDashboardProps) {
       </div>
 
       {/* 功能選單 */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {menuItems.map((item) => (
           <Link key={item.href} href={item.href}>
             <Card className="h-full hover:bg-accent/50 transition-colors cursor-pointer">

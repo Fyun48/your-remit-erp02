@@ -109,6 +109,16 @@ model Company {
   // 稽核日誌
   auditLogs         AuditLog[]
 
+  // 用印申請
+  sealRequests      SealRequest[]
+
+  // 名片申請
+  businessCardRequests BusinessCardRequest[]
+
+  // 文具管理
+  stationeryItems      StationeryItem[]
+  stationeryRequests   StationeryRequest[]
+
   @@map("companies")
 }
 
@@ -161,6 +171,7 @@ model Employee {
   personalEmail      String? // 個人 Email
   passwordHash       String
   name               String
+  avatarUrl          String? // 員工頭像 URL
   idNumber           String? // 身分證字號
   gender             Gender?
   birthDate          DateTime?
@@ -189,6 +200,22 @@ model Employee {
   auditLogs             AuditLog[]        @relation("AuditOperator")
   groupPermissions      GroupPermission[]
   groupPermissionsGranted GroupPermission[] @relation("GroupPermissionGranter")
+
+  // 用印申請
+  sealRequestsApplied   SealRequest[]     @relation("SealApplicant")
+  sealRequestsProcessed SealRequest[]     @relation("SealProcessor")
+
+  // 名片申請
+  businessCardRequestsApplied  BusinessCardRequest[] @relation("CardApplicant")
+  businessCardRequestsApproved BusinessCardRequest[] @relation("CardApprover")
+
+  // 文具申請
+  stationeryRequestsApplied  StationeryRequest[] @relation("StationeryApplicant")
+  stationeryRequestsApproved StationeryRequest[] @relation("StationeryApprover")
+  stationeryRequestsIssued   StationeryRequest[] @relation("StationeryIssuer")
+
+  // QR Code 登入
+  qrLoginTokens QrLoginToken[]
 
   @@map("employees")
 }
@@ -338,6 +365,31 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+// QR Code 登入 Token
+model QrLoginToken {
+  id          String         @id @default(cuid())
+  token       String         @unique // QR Code 包含的 token
+  status      QrLoginStatus  @default(PENDING)
+  employeeId  String?        // 驗證後的員工 ID
+  employee    Employee?      @relation(fields: [employeeId], references: [id])
+  ipAddress   String?        // 產生 QR 的用戶端 IP
+  userAgent   String?        // 產生 QR 的用戶端 UA
+  createdAt   DateTime       @default(now())
+  expiresAt   DateTime       // 過期時間 (通常 5 分鐘)
+  authenticatedAt DateTime?  // 驗證時間
+
+  @@index([token])
+  @@index([status])
+  @@map("qr_login_tokens")
+}
+
+enum QrLoginStatus {
+  PENDING       // 等待掃描
+  AUTHENTICATED // 已掃描驗證
+  USED          // 已使用完成登入
+  EXPIRED       // 已過期
 }
 
 // ==================== 出勤管理 ====================
@@ -1214,4 +1266,194 @@ model AccountPayable {
   @@index([companyId, vendorId])
   @@index([companyId, status])
   @@map("account_payables")
+}
+
+// ==================== 用印申請 ====================
+
+// 用印類型
+enum SealType {
+  COMPANY_SEAL        // 公司大章
+  COMPANY_SMALL_SEAL  // 公司小章
+  CONTRACT_SEAL       // 合約用印
+  INVOICE_SEAL        // 發票章
+  BOARD_SEAL          // 董事會印鑑
+  BANK_SEAL           // 銀行印鑑
+}
+
+// 用印申請狀態
+enum SealRequestStatus {
+  DRAFT       // 草稿
+  PENDING     // 待審核
+  APPROVED    // 已核准
+  REJECTED    // 已駁回
+  PROCESSING  // 處理中 (用印中)
+  COMPLETED   // 已完成
+  CANCELLED   // 已取消
+}
+
+// 用印申請
+model SealRequest {
+  id              String            @id @default(cuid())
+  requestNo       String            @unique  // SR202601-0001
+  companyId       String
+  company         Company           @relation(fields: [companyId], references: [id])
+  applicantId     String
+  applicant       Employee          @relation("SealApplicant", fields: [applicantId], references: [id])
+
+  sealType        SealType
+  purpose         String            // 用途說明
+  documentName    String?           // 文件名稱
+  documentCount   Int               @default(1)  // 用印份數
+
+  isCarryOut      Boolean           @default(false)  // 是否攜出
+  expectedReturn  DateTime?         // 預計歸還時間
+  actualReturn    DateTime?         // 實際歸還時間
+  returnNote      String?           // 歸還備註
+
+  status          SealRequestStatus @default(DRAFT)
+  attachments     Json?             // 附件 [{name, url}]
+
+  // 審批相關
+  approvalInstanceId String?        // 關聯的審批流程實例
+  processedById   String?           // 處理人 (行政人員)
+  processedBy     Employee?         @relation("SealProcessor", fields: [processedById], references: [id])
+  processedAt     DateTime?         // 處理時間
+  completedAt     DateTime?         // 完成時間
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([companyId])
+  @@index([applicantId])
+  @@index([status])
+  @@index([isCarryOut, status])
+  @@map("seal_requests")
+}
+
+// ==================== 名片申請 ====================
+
+// 名片申請狀態
+enum CardRequestStatus {
+  DRAFT       // 草稿
+  PENDING     // 待審核
+  APPROVED    // 已核准
+  REJECTED    // 已駁回
+  PRINTING    // 印刷中
+  COMPLETED   // 已完成
+  CANCELLED   // 已取消
+}
+
+// 名片申請
+model BusinessCardRequest {
+  id              String            @id @default(cuid())
+  requestNo       String            @unique  // BC202601-0001
+
+  // 申請對象公司
+  companyId       String
+  company         Company           @relation(fields: [companyId], references: [id])
+
+  // 申請人
+  applicantId     String
+  applicant       Employee          @relation("CardApplicant", fields: [applicantId], references: [id])
+
+  // 名片資料
+  name            String            // 姓名
+  nameEn          String?           // 英文名
+  title           String            // 職稱
+  titleEn         String?           // 英文職稱
+  department      String?           // 部門名稱
+  phone           String?           // 公司電話
+  mobile          String?           // 手機
+  fax             String?           // 傳真
+  email           String?           // Email
+  address         String?           // 公司地址
+  quantity        Int               @default(100)  // 數量（盒）
+  note            String?           // 備註
+
+  // 狀態流程
+  status          CardRequestStatus @default(DRAFT)
+  approvedById    String?
+  approvedBy      Employee?         @relation("CardApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  printedAt       DateTime?         // 印刷完成時間
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([companyId])
+  @@index([applicantId])
+  @@index([status])
+  @@map("business_card_requests")
+}
+
+// ==================== 文具申請 ====================
+
+// 文具申請狀態
+enum StationeryRequestStatus {
+  DRAFT       // 草稿
+  PENDING     // 待審核
+  APPROVED    // 已核准
+  REJECTED    // 已駁回
+  ISSUED      // 已發放
+  CANCELLED   // 已取消
+}
+
+// 文具品項
+model StationeryItem {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  code        String            // 品項代碼 ST001
+  name        String            // 原子筆、便條紙...
+  unit        String            // 個、盒、本
+  unitPrice   Decimal  @db.Decimal(10, 2)  // 單價
+  stock       Int      @default(0)         // 現有庫存
+  alertLevel  Int      @default(10)        // 警戒庫存
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("stationery_items")
+}
+
+// 文具申請單
+model StationeryRequest {
+  id              String                   @id @default(cuid())
+  requestNo       String                   @unique  // ST202601-0001
+
+  // 申請對象公司
+  companyId       String
+  company         Company                  @relation(fields: [companyId], references: [id])
+
+  // 申請人
+  applicantId     String
+  applicant       Employee                 @relation("StationeryApplicant", fields: [applicantId], references: [id])
+
+  // 申請明細 [{itemId, itemCode, itemName, quantity, unitPrice, subtotal}]
+  items           Json
+  totalAmount     Decimal                  @db.Decimal(10, 2)
+  purpose         String?                  // 用途說明
+
+  // 狀態流程
+  status          StationeryRequestStatus  @default(DRAFT)
+  approvedById    String?
+  approvedBy      Employee?                @relation("StationeryApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+
+  // 發放資訊
+  issuedAt        DateTime?                // 發放時間
+  issuedById      String?                  // 發放人
+  issuedBy        Employee?                @relation("StationeryIssuer", fields: [issuedById], references: [id])
+
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@index([companyId])
+  @@index([applicantId])
+  @@index([status])
+  @@map("stationery_requests")
 }

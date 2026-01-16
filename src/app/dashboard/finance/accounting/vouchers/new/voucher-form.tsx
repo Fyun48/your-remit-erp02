@@ -24,6 +24,11 @@ interface VoucherLine {
   accountId: string
   accountCode: string
   accountName: string
+  requiresAux: boolean
+  customerId: string
+  customerName: string
+  vendorId: string
+  vendorName: string
   debitAmount: number
   creditAmount: number
   description: string
@@ -46,6 +51,16 @@ export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormP
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // 查詢客戶與供應商
+  const { data: customers = [] } = trpc.customer.list.useQuery(
+    { companyId },
+    { enabled: !!companyId }
+  )
+  const { data: vendors = [] } = trpc.vendor.list.useQuery(
+    { companyId },
+    { enabled: !!companyId }
+  )
+
   const createVoucher = trpc.voucher.create.useMutation({
     onSuccess: () => {
       router.push('/dashboard/finance/accounting/vouchers')
@@ -61,8 +76,8 @@ export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormP
   )
   const [description, setDescription] = useState('')
   const [lines, setLines] = useState<VoucherLine[]>([
-    { id: '1', accountId: '', accountCode: '', accountName: '', debitAmount: 0, creditAmount: 0, description: '' },
-    { id: '2', accountId: '', accountCode: '', accountName: '', debitAmount: 0, creditAmount: 0, description: '' },
+    { id: '1', accountId: '', accountCode: '', accountName: '', requiresAux: false, customerId: '', customerName: '', vendorId: '', vendorName: '', debitAmount: 0, creditAmount: 0, description: '' },
+    { id: '2', accountId: '', accountCode: '', accountName: '', requiresAux: false, customerId: '', customerName: '', vendorId: '', vendorName: '', debitAmount: 0, creditAmount: 0, description: '' },
   ])
 
   const totalDebit = lines.reduce((sum, line) => sum + (line.debitAmount || 0), 0)
@@ -77,6 +92,11 @@ export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormP
         accountId: '',
         accountCode: '',
         accountName: '',
+        requiresAux: false,
+        customerId: '',
+        customerName: '',
+        vendorId: '',
+        vendorName: '',
         debitAmount: 0,
         creditAmount: 0,
         description: '',
@@ -102,13 +122,30 @@ export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormP
     id: string,
     accountId: string,
     accountCode: string,
-    accountName: string
+    accountName: string,
+    requiresAux: boolean
   ) => {
     setLines(
       lines.map((line) =>
         line.id === id
-          ? { ...line, accountId, accountCode, accountName }
+          ? { ...line, accountId, accountCode, accountName, requiresAux, customerId: '', customerName: '', vendorId: '', vendorName: '' }
           : line
+      )
+    )
+  }
+
+  const updateLineCustomer = (id: string, customerId: string, customerName: string) => {
+    setLines(
+      lines.map((line) =>
+        line.id === id ? { ...line, customerId, customerName } : line
+      )
+    )
+  }
+
+  const updateLineVendor = (id: string, vendorId: string, vendorName: string) => {
+    setLines(
+      lines.map((line) =>
+        line.id === id ? { ...line, vendorId, vendorName } : line
       )
     )
   }
@@ -148,6 +185,8 @@ export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormP
         debitAmount: line.debitAmount,
         creditAmount: line.creditAmount,
         description: line.description || undefined,
+        customerId: line.customerId || undefined,
+        vendorId: line.vendorId || undefined,
       })),
     })
   }
@@ -229,6 +268,7 @@ export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormP
                     <tr className="border-b">
                       <th className="text-left py-2 px-2 w-8">#</th>
                       <th className="text-left py-2 px-2 min-w-[280px]">會計科目</th>
+                      <th className="text-left py-2 px-2 min-w-[160px]">輔助核算</th>
                       <th className="text-left py-2 px-2 min-w-[150px]">摘要</th>
                       <th className="text-right py-2 px-2 w-32">借方金額</th>
                       <th className="text-right py-2 px-2 w-32">貸方金額</th>
@@ -250,11 +290,62 @@ export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormP
                                 ? `${line.accountCode} ${line.accountName}`
                                 : ''
                             }
-                            onChange={(accountId, accountCode, accountName) =>
-                              updateLineAccount(line.id, accountId, accountCode, accountName)
+                            onChange={(accountId, accountCode, accountName, requiresAux) =>
+                              updateLineAccount(line.id, accountId, accountCode, accountName, requiresAux)
                             }
                             placeholder="輸入代碼或名稱搜尋..."
                           />
+                        </td>
+                        <td className="py-2 px-2">
+                          {line.requiresAux ? (
+                            line.accountCode.startsWith('1103') ? (
+                              <Select
+                                value={line.customerId}
+                                onValueChange={(value) => {
+                                  const customer = customers.find((c) => c.id === value)
+                                  updateLineCustomer(line.id, value, customer?.name || '')
+                                }}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue placeholder="選擇客戶">
+                                    {line.customerName || '選擇客戶'}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {customers.map((customer) => (
+                                    <SelectItem key={customer.id} value={customer.id}>
+                                      {customer.code} {customer.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : line.accountCode.startsWith('2101') ? (
+                              <Select
+                                value={line.vendorId}
+                                onValueChange={(value) => {
+                                  const vendor = vendors.find((v) => v.id === value)
+                                  updateLineVendor(line.id, value, vendor?.name || '')
+                                }}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue placeholder="選擇供應商">
+                                    {line.vendorName || '選擇供應商'}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {vendors.map((vendor) => (
+                                    <SelectItem key={vendor.id} value={vendor.id}>
+                                      {vendor.code} {vendor.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">需設定</span>
+                            )
+                          ) : (
+                            <span className="text-muted-foreground text-xs">-</span>
+                          )}
                         </td>
                         <td className="py-2 px-2">
                           <Input
@@ -313,7 +404,7 @@ export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormP
                   </tbody>
                   <tfoot>
                     <tr className="font-medium">
-                      <td colSpan={3} className="py-3 px-2 text-right">
+                      <td colSpan={4} className="py-3 px-2 text-right">
                         合計
                       </td>
                       <td className="py-3 px-2 text-right font-mono">
@@ -325,7 +416,7 @@ export function VoucherForm({ companyId, companyName, employeeId }: VoucherFormP
                       <td></td>
                     </tr>
                     <tr>
-                      <td colSpan={6} className="py-2 px-2">
+                      <td colSpan={7} className="py-2 px-2">
                         <div
                           className={`text-sm ${
                             isBalanced ? 'text-green-600' : 'text-red-600'
