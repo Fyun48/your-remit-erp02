@@ -34,6 +34,7 @@ import {
   Building2,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
+import { WorkflowStatus } from '@/components/workflow/workflow-status'
 
 interface RequestItem {
   itemId: string
@@ -371,6 +372,12 @@ export function StationeryRequestDetail({
               </div>
             </CardContent>
           </Card>
+
+          {/* 簽核狀態 */}
+          <WorkflowStatus
+            requestType="STATIONERY"
+            requestId={request.id}
+          />
         </div>
       </div>
 
