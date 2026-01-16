@@ -136,9 +136,9 @@ export const useOrgChartStore = create<OrgChartState>((set, get) => ({
     set({
       edges: get().edges.map((edge) =>
         edge.id === edgeId
-          ? { ...edge, data: { ...edge.data, ...data } }
+          ? { ...edge, data: { ...edge.data, ...data } as OrgEdgeData }
           : edge
-      ),
+      ) as Edge<OrgEdgeData>[],
     })
   },
 

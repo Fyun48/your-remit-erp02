@@ -157,8 +157,8 @@ export function OrgChartList({ companyId, companyName, orgCharts }: OrgChartList
               <Label>組織圖類型</Label>
               <Select
                 value={createData.type}
-                onValueChange={(value: 'GROUP' | 'COMPANY') =>
-                  setCreateData({ ...createData, type: value })
+                onValueChange={(value) =>
+                  setCreateData({ ...createData, type: value as 'GROUP' | 'COMPANY' })
                 }
               >
                 <SelectTrigger>

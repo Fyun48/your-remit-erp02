@@ -115,8 +115,8 @@ export function PropertyPanel() {
             <Label>關係類型</Label>
             <Select
               value={selectedEdge.data?.relationType || 'SOLID'}
-              onValueChange={(value: OrgRelationType) =>
-                updateEdgeData(selectedEdge.id, { relationType: value })
+              onValueChange={(value) =>
+                updateEdgeData(selectedEdge.id, { relationType: value as OrgRelationType })
               }
             >
               <SelectTrigger>
