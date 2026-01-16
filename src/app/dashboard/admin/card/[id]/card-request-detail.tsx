@@ -27,6 +27,7 @@ import {
   Building2,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
+import { WorkflowStatus } from '@/components/workflow/workflow-status'
 
 interface CardRequest {
   id: string
@@ -382,6 +383,12 @@ export function CardRequestDetail({ request, currentUserId }: CardRequestDetailP
               </div>
             </CardContent>
           </Card>
+
+          {/* 簽核狀態 */}
+          <WorkflowStatus
+            requestType="CARD"
+            requestId={request.id}
+          />
         </div>
       </div>
 
