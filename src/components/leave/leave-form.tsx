@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,6 +15,7 @@ interface LeaveFormProps {
 }
 
 export function LeaveForm({ employeeId, companyId, onSuccess }: LeaveFormProps) {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     leaveTypeId: '',
     startDate: '',
@@ -40,6 +42,7 @@ export function LeaveForm({ employeeId, companyId, onSuccess }: LeaveFormProps) 
       onSuccess?.()
     },
   })
+  const startWorkflow = trpc.workflow.startInstance.useMutation()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,7 +58,36 @@ export function LeaveForm({ employeeId, companyId, onSuccess }: LeaveFormProps) 
         endPeriod: formData.endPeriod as 'FULL_DAY' | 'AM' | 'PM',
         reason: formData.reason || undefined,
       })
-      await submitMutation.mutateAsync({ id: request.id })
+
+      // 嘗試啟動工作流程
+      try {
+        await startWorkflow.mutateAsync({
+          requestType: 'LEAVE',
+          requestId: request.id,
+          applicantId: employeeId,
+          companyId,
+          requestData: {
+            leaveTypeId: formData.leaveTypeId,
+            totalHours: request.totalHours,
+          },
+        })
+      } catch {
+        // 無工作流程定義，使用傳統審批
+        console.log('No workflow defined, using traditional approval')
+        await submitMutation.mutateAsync({ id: request.id })
+      }
+
+      // 重置表單
+      setFormData({
+        leaveTypeId: '',
+        startDate: '',
+        startPeriod: 'FULL_DAY',
+        endDate: '',
+        endPeriod: 'FULL_DAY',
+        reason: '',
+      })
+      router.refresh()
+      onSuccess?.()
     } catch (error) {
       console.error('Submit error:', error)
       alert(error instanceof Error ? error.message : '申請失敗')
