@@ -75,6 +75,8 @@ export function SealRequestForm({
     },
   })
 
+  const startWorkflow = trpc.workflow.startInstance.useMutation()
+
   const validate = () => {
     const newErrors: Record<string, string> = {}
 
@@ -116,7 +118,7 @@ export function SealRequestForm({
 
     setIsSubmitting(true)
 
-    // 先建立再提交
+    // 先建立再啟動工作流程
     create.mutate(
       {
         companyId,
@@ -129,8 +131,26 @@ export function SealRequestForm({
         expectedReturn: formData.expectedReturn ? new Date(formData.expectedReturn) : undefined,
       },
       {
-        onSuccess: (data) => {
-          submit.mutate({ id: data.id })
+        onSuccess: async (data) => {
+          // 嘗試啟動工作流程
+          try {
+            await startWorkflow.mutateAsync({
+              requestType: 'SEAL',
+              requestId: data.id,
+              applicantId,
+              companyId,
+              requestData: {
+                sealType: formData.sealType,
+                documentCount: formData.documentCount,
+                isCarryOut: formData.isCarryOut,
+              },
+            })
+            router.push('/dashboard/admin/seal')
+          } catch {
+            // 無工作流程定義，使用傳統審批
+            console.log('No workflow defined, using traditional approval')
+            submit.mutate({ id: data.id })
+          }
         },
       }
     )
