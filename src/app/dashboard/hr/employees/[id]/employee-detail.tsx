@@ -779,7 +779,7 @@ export function EmployeeDetail({
 
       {/* 編輯個人資料 Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>編輯個人資料</DialogTitle>
           </DialogHeader>
@@ -890,7 +890,7 @@ export function EmployeeDetail({
 
       {/* 調動 Dialog */}
       <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>調動作業</DialogTitle>
           </DialogHeader>
@@ -1015,7 +1015,7 @@ export function EmployeeDetail({
 
       {/* 新增兼任 Dialog */}
       <Dialog open={isAddAssignmentOpen} onOpenChange={setIsAddAssignmentOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>新增兼任職位</DialogTitle>
           </DialogHeader>

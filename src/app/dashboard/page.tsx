@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getCurrentCompany } from '@/lib/use-current-company'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, Clock, Calendar, FileText, Receipt } from 'lucide-react'
 import Link from 'next/link'
@@ -12,18 +13,13 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // 取得員工任職資訊
+  // 取得員工資訊
   const employee = await prisma.employee.findUnique({
     where: { id: session.user.id },
-    include: {
-      assignments: {
-        where: { status: 'ACTIVE' },
-        include: { company: true, department: true },
-      },
-    },
+    select: { id: true, name: true },
   })
 
-  if (!employee || employee.assignments.length === 0) {
+  if (!employee) {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold">歡迎回來</h1>
@@ -32,7 +28,29 @@ export default async function DashboardPage() {
     )
   }
 
-  const assignment = employee.assignments[0]
+  // 取得當前選擇的公司（集團管理員可切換）
+  const currentCompany = await getCurrentCompany(session.user.id)
+  if (!currentCompany) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold">歡迎回來，{employee.name}</h1>
+        <p className="text-muted-foreground mt-2">請聯繫管理員設定您的任職資訊</p>
+      </div>
+    )
+  }
+
+  // 取得在當前公司的任職資訊
+  const assignment = await prisma.employeeAssignment.findFirst({
+    where: {
+      employeeId: session.user.id,
+      companyId: currentCompany.id,
+      status: 'ACTIVE',
+    },
+    include: { company: true, department: true },
+  })
+
+  // 如果該員工在選擇的公司沒有任職，顯示提示（集團管理員可能切換到沒有任職的公司）
+  const displayDepartment = assignment?.department?.name || '（無部門資訊）'
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
@@ -44,7 +62,7 @@ export default async function DashboardPage() {
   const attendanceCount = await prisma.attendanceRecord.count({
     where: {
       employeeId: employee.id,
-      companyId: assignment.companyId,
+      companyId: currentCompany.id,
       date: { gte: startOfMonth, lt: startOfNextMonth },
       status: { in: ['NORMAL', 'LATE', 'EARLY_LEAVE'] },
     },
@@ -58,11 +76,11 @@ export default async function DashboardPage() {
     where: { employeeId: employee.id, status: 'PENDING' },
   })
 
-  // 待我審核（主管）
-  const subordinates = await prisma.employeeAssignment.findMany({
+  // 待我審核（主管）- 只有在該公司有任職時才查詢
+  const subordinates = assignment ? await prisma.employeeAssignment.findMany({
     where: { supervisorId: assignment.id, status: 'ACTIVE' },
     select: { employeeId: true, companyId: true },
-  })
+  }) : []
 
   let pendingForMe = 0
   if (subordinates.length > 0) {
@@ -88,7 +106,7 @@ export default async function DashboardPage() {
     const balance = await prisma.leaveBalance.findFirst({
       where: {
         employeeId: employee.id,
-        companyId: assignment.companyId,
+        companyId: currentCompany.id,
         leaveTypeId: annualLeaveType.id,
         year,
       },
@@ -104,7 +122,7 @@ export default async function DashboardPage() {
   const expenseTotal = await prisma.expenseRequest.aggregate({
     where: {
       employeeId: employee.id,
-      companyId: assignment.companyId,
+      companyId: currentCompany.id,
       status: 'APPROVED',
       periodStart: { gte: startOfYear },
     },
@@ -182,7 +200,7 @@ export default async function DashboardPage() {
           歡迎回來，{employee.name}
         </h1>
         <p className="text-muted-foreground">
-          {assignment.company.name} - {assignment.department?.name || '未分配部門'}
+          {currentCompany.name} - {displayDepartment}
         </p>
       </div>
 

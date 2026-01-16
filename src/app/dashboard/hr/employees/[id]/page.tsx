@@ -35,30 +35,32 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
 
   if (!employee) notFound()
 
-  // 取得當前用戶的公司 ID
-  const assignment = await prisma.employeeAssignment.findFirst({
-    where: {
-      employeeId: session.user.id,
-      isPrimary: true,
-      status: 'ACTIVE',
-    },
-    include: { company: true },
-  })
+  // 取得被查看員工的主要任職公司
+  const employeePrimaryAssignment = employee.assignments.find(
+    (a) => a.status === 'ACTIVE' && a.isPrimary
+  )
 
-  if (!assignment) redirect('/dashboard/hr')
+  if (!employeePrimaryAssignment) {
+    // 如果沒有主要任職，使用第一個有效任職
+    const anyActiveAssignment = employee.assignments.find((a) => a.status === 'ACTIVE')
+    if (!anyActiveAssignment) redirect('/dashboard/hr')
+  }
 
-  // 取得部門和職位列表供編輯使用
+  const targetCompanyId = employeePrimaryAssignment?.company.id || employee.assignments[0]?.company.id
+  const targetCompanyName = employeePrimaryAssignment?.company.name || employee.assignments[0]?.company.name || '未知公司'
+
+  // 取得部門和職位列表供編輯使用（使用員工所屬公司）
   const [departments, positions, supervisors] = await Promise.all([
     prisma.department.findMany({
-      where: { companyId: assignment.companyId, isActive: true },
+      where: { companyId: targetCompanyId, isActive: true },
       orderBy: { code: 'asc' },
     }),
     prisma.position.findMany({
-      where: { companyId: assignment.companyId, isActive: true },
+      where: { companyId: targetCompanyId, isActive: true },
       orderBy: { level: 'desc' },
     }),
     prisma.employeeAssignment.findMany({
-      where: { companyId: assignment.companyId, status: 'ACTIVE' },
+      where: { companyId: targetCompanyId, status: 'ACTIVE' },
       include: {
         employee: { select: { id: true, name: true, employeeNo: true } },
         position: { select: { name: true, level: true } },
@@ -70,8 +72,8 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
   return (
     <EmployeeDetail
       employee={employee}
-      companyId={assignment.companyId}
-      companyName={assignment.company.name}
+      companyId={targetCompanyId}
+      companyName={targetCompanyName}
       departments={departments}
       positions={positions}
       supervisors={supervisors.filter((s) => s.employee.id !== id)}

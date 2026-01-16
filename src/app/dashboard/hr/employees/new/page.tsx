@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { isGroupAdmin } from '@/lib/group-permission'
+import { getCurrentCompany } from '@/lib/use-current-company'
 import { OnboardForm } from './onboard-form'
 
 export default async function OnboardPage() {
@@ -13,16 +14,9 @@ export default async function OnboardPage() {
   // 檢查是否為集團管理員
   const hasAdminPermission = await isGroupAdmin(userId)
 
-  const assignment = await prisma.employeeAssignment.findFirst({
-    where: {
-      employeeId: userId,
-      isPrimary: true,
-      status: 'ACTIVE',
-    },
-    include: { company: true },
-  })
-
-  if (!assignment) redirect('/dashboard/hr')
+  // 取得當前工作公司（集團管理員可能選擇了不同公司）
+  const currentCompany = await getCurrentCompany(userId)
+  if (!currentCompany) redirect('/dashboard/hr')
 
   // 如果是集團管理員，載入所有公司；否則只載入當前公司
   let companies: { id: string; name: string; code: string }[] = []
@@ -36,18 +30,18 @@ export default async function OnboardPage() {
 
   const [departments, positions, roles, supervisors] = await Promise.all([
     prisma.department.findMany({
-      where: { companyId: assignment.companyId, isActive: true },
+      where: { companyId: currentCompany.id, isActive: true },
       orderBy: { code: 'asc' },
     }),
     prisma.position.findMany({
-      where: { companyId: assignment.companyId, isActive: true },
+      where: { companyId: currentCompany.id, isActive: true },
       orderBy: { level: 'desc' },
     }),
     prisma.role.findMany({
       orderBy: { name: 'asc' },
     }),
     prisma.employeeAssignment.findMany({
-      where: { companyId: assignment.companyId, status: 'ACTIVE' },
+      where: { companyId: currentCompany.id, status: 'ACTIVE' },
       include: {
         employee: { select: { id: true, name: true, employeeNo: true } },
         position: { select: { name: true, level: true } },
@@ -73,8 +67,8 @@ export default async function OnboardPage() {
 
   return (
     <OnboardForm
-      companyId={assignment.companyId}
-      companyName={assignment.company.name}
+      companyId={currentCompany.id}
+      companyName={currentCompany.name}
       departments={departments}
       positions={positions}
       roles={roles}

@@ -24,6 +24,12 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ArrowLeft, Plus, Users, Search, Eye } from 'lucide-react'
 
+interface SecondaryAssignment {
+  company: { id: string; name: string }
+  department: { name: string }
+  position: { name: string }
+}
+
 interface Employee {
   id: string
   employeeNo: string
@@ -33,6 +39,7 @@ interface Employee {
   phone: string | null
   hireDate: Date
   isActive: boolean
+  assignments: SecondaryAssignment[]
 }
 
 interface EmployeeAssignment {
@@ -122,7 +129,7 @@ export function EmployeeList({
         <Link href="/dashboard/hr/employees/new">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            到職作業
+            新增人員
           </Button>
         </Link>
       </div>
@@ -197,6 +204,7 @@ export function EmployeeList({
                   <TableHead>姓名</TableHead>
                   <TableHead>部門</TableHead>
                   <TableHead>職位</TableHead>
+                  <TableHead>兼任</TableHead>
                   <TableHead>直屬主管</TableHead>
                   <TableHead>到職日</TableHead>
                   <TableHead className="text-center">狀態</TableHead>
@@ -224,6 +232,19 @@ export function EmployeeList({
                         <Badge variant="outline">{emp.department.name}</Badge>
                       </TableCell>
                       <TableCell>{emp.position.name}</TableCell>
+                      <TableCell>
+                        {emp.employee.assignments.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {emp.employee.assignments.map((a, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs whitespace-nowrap">
+                                {a.company.name} · {a.position.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {emp.supervisor?.employee.name || (
                           <span className="text-muted-foreground">-</span>

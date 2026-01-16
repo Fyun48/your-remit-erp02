@@ -73,7 +73,7 @@
     @apply border-border;
   }
   html {
-    font-size: 18px; /* 預設 16px + 2pt ≈ 18px */
+    font-size: 20px; /* 基礎字型大小 */
   }
   body {
     @apply bg-background text-foreground;

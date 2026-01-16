@@ -73,13 +73,14 @@ export default async function AdminPage() {
     prisma.stationeryRequest.count({
       where: { companyId: assignment.companyId, status: 'APPROVED' },
     }),
-    // 文具低庫存
-    prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count FROM stationery_items
-      WHERE company_id = ${assignment.companyId}
-        AND is_active = true
-        AND stock <= alert_level
-    `.then((result) => Number(result[0]?.count || 0)),
+    // 文具低庫存 - 先取得所有文具項目再計算
+    prisma.stationeryItem.findMany({
+      where: {
+        companyId: assignment.companyId,
+        isActive: true,
+      },
+      select: { stock: true, alertLevel: true },
+    }).then((items) => items.filter((item) => item.stock <= item.alertLevel).length),
     // 本月用印
     prisma.sealRequest.count({
       where: { companyId: assignment.companyId, createdAt: { gte: startOfMonth } },

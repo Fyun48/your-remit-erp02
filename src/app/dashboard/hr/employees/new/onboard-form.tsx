@@ -166,8 +166,8 @@ export function OnboardForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.employeeNo || !formData.name || !formData.email || !formData.password) {
-      alert('請填寫必要欄位：員工編號、姓名、Email、密碼')
+    if (!formData.employeeNo || !formData.name || !formData.email) {
+      alert('請填寫必要欄位：員工編號、姓名、Email')
       return
     }
 
@@ -176,10 +176,13 @@ export function OnboardForm({
       return
     }
 
-    const passwordErrors = validatePassword(formData.password)
-    if (passwordErrors.length > 0) {
-      alert(`密碼不符合規則：\n${passwordErrors.join('\n')}`)
-      return
+    // 只有在手動輸入密碼時才驗證
+    if (formData.password) {
+      const passwordErrors = validatePassword(formData.password)
+      if (passwordErrors.length > 0) {
+        alert(`密碼不符合規則：\n${passwordErrors.join('\n')}`)
+        return
+      }
     }
 
     setIsSubmitting(true)
@@ -188,7 +191,7 @@ export function OnboardForm({
       employeeNo: formData.employeeNo,
       name: formData.name,
       email: formData.email,
-      password: formData.password,
+      password: formData.password || undefined, // 若為空則由後端自動產生
       idNumber: formData.idNumber || undefined,
       gender: formData.gender as 'MALE' | 'FEMALE' | 'OTHER' | undefined,
       birthDate: formData.birthDate ? new Date(formData.birthDate) : undefined,
@@ -220,7 +223,7 @@ export function OnboardForm({
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">到職作業</h1>
+          <h1 className="text-2xl font-bold">新增人員</h1>
           <p className="text-muted-foreground">{currentCompanyName}</p>
         </div>
       </div>
@@ -283,7 +286,12 @@ export function OnboardForm({
                       載入中...
                     </div>
                   ) : (
-                    <SelectValue placeholder="選擇部門" />
+                    <SelectValue placeholder="選擇部門">
+                      {(() => {
+                        const dept = currentDepartments.find(d => d.id === formData.departmentId)
+                        return dept ? `${dept.code} ${dept.name}` : null
+                      })()}
+                    </SelectValue>
                   )}
                 </SelectTrigger>
                 <SelectContent>
@@ -313,7 +321,9 @@ export function OnboardForm({
                       載入中...
                     </div>
                   ) : (
-                    <SelectValue placeholder="選擇職位" />
+                    <SelectValue placeholder="選擇職位">
+                      {currentPositions.find(p => p.id === formData.positionId)?.name}
+                    </SelectValue>
                   )}
                 </SelectTrigger>
                 <SelectContent>
@@ -340,7 +350,13 @@ export function OnboardForm({
                       載入中...
                     </div>
                   ) : (
-                    <SelectValue placeholder="選擇直屬主管（可選）" />
+                    <SelectValue placeholder="選擇直屬主管（可選）">
+                      {(() => {
+                        if (!formData.supervisorId) return null
+                        const supervisor = currentSupervisors.find(s => s.id === formData.supervisorId)
+                        return supervisor ? `${supervisor.employee.name} - ${supervisor.position.name}` : null
+                      })()}
+                    </SelectValue>
                   )}
                 </SelectTrigger>
                 <SelectContent>
@@ -358,7 +374,9 @@ export function OnboardForm({
               <Label>系統角色</Label>
               <Select value={formData.roleId} onValueChange={(v) => update('roleId', v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="選擇角色（可選）" />
+                  <SelectValue placeholder="選擇角色（可選）">
+                    {formData.roleId ? roles.find(r => r.id === formData.roleId)?.name : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">無特定角色</SelectItem>
@@ -412,14 +430,19 @@ export function OnboardForm({
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="password">密碼 *</Label>
+              <Label htmlFor="password">密碼（選填）</Label>
               <Input
                 id="password"
                 type="password"
                 value={formData.password}
                 onChange={(e) => update('password', e.target.value)}
-                placeholder="請輸入密碼"
+                placeholder="留空則自動產生並寄送 Email"
               />
+              {!formData.password && (
+                <p className="text-xs text-muted-foreground">
+                  若不輸入密碼，系統將自動產生隨機密碼並寄送至員工 Email
+                </p>
+              )}
               {formData.password && (
                 <div className="space-y-2 mt-2">
                   {/* Password strength bar */}

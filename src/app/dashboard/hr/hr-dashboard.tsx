@@ -48,8 +48,8 @@ export function HRDashboard({ companyName, stats }: HRDashboardProps) {
       color: 'text-purple-500',
     },
     {
-      title: '到職作業',
-      description: '新進員工報到流程',
+      title: '新增人員',
+      description: '新增員工資料',
       icon: UserPlus,
       href: '/dashboard/hr/employees/new',
       color: 'text-emerald-500',
