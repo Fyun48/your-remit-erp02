@@ -5,6 +5,66 @@ import { canManageCompany, canViewCrossCompany, DEFAULT_DEPARTMENTS, DEFAULT_POS
 import { auditCreate, auditUpdate } from '@/lib/audit'
 
 export const companyRouter = router({
+  // 取得使用者可選擇的報銷公司
+  getSelectableForExpense: publicProcedure
+    .input(z.object({ userId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const { userId } = input
+
+      // 1. 檢查是否為集團管理員 (可選擇所有公司)
+      const groupPermission = await ctx.prisma.groupPermission.findFirst({
+        where: {
+          employeeId: userId,
+          permissionType: 'GROUP_ADMIN',
+        },
+      })
+
+      if (groupPermission) {
+        // 集團管理員：回傳所有啟用的公司
+        return ctx.prisma.company.findMany({
+          where: { isActive: true },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            group: { select: { id: true, name: true } },
+          },
+          orderBy: [{ group: { name: 'asc' } }, { name: 'asc' }],
+        })
+      }
+
+      // 2. 一般員工：回傳有任職的公司
+      const assignments = await ctx.prisma.employeeAssignment.findMany({
+        where: {
+          employeeId: userId,
+          status: 'ACTIVE',
+        },
+        select: {
+          companyId: true,
+        },
+      })
+
+      const companyIds = [...new Set(assignments.map(a => a.companyId))]
+
+      if (companyIds.length === 0) {
+        return []
+      }
+
+      return ctx.prisma.company.findMany({
+        where: {
+          id: { in: companyIds },
+          isActive: true,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          group: { select: { id: true, name: true } },
+        },
+        orderBy: [{ group: { name: 'asc' } }, { name: 'asc' }],
+      })
+    }),
+
   // 列出所有公司 (需要跨公司檢視權限)
   listAll: publicProcedure
     .input(z.object({ userId: z.string() }))
