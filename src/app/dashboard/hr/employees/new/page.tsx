@@ -1,15 +1,21 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { isGroupAdmin } from '@/lib/group-permission'
 import { OnboardForm } from './onboard-form'
 
 export default async function OnboardPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
+  const userId = session.user.id
+
+  // 檢查是否為集團管理員
+  const hasAdminPermission = await isGroupAdmin(userId)
+
   const assignment = await prisma.employeeAssignment.findFirst({
     where: {
-      employeeId: session.user.id,
+      employeeId: userId,
       isPrimary: true,
       status: 'ACTIVE',
     },
@@ -17,6 +23,16 @@ export default async function OnboardPage() {
   })
 
   if (!assignment) redirect('/dashboard/hr')
+
+  // 如果是集團管理員，載入所有公司；否則只載入當前公司
+  let companies: { id: string; name: string; code: string }[] = []
+  if (hasAdminPermission) {
+    companies = await prisma.company.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, code: true },
+      orderBy: { name: 'asc' },
+    })
+  }
 
   const [departments, positions, roles, supervisors] = await Promise.all([
     prisma.department.findMany({
@@ -64,6 +80,8 @@ export default async function OnboardPage() {
       roles={roles}
       supervisors={supervisors}
       suggestedEmployeeNo={nextEmployeeNo}
+      isGroupAdmin={hasAdminPermission}
+      allCompanies={companies}
     />
   )
 }

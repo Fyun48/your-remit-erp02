@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, UserPlus, User, Briefcase, Building2, Check, X } from 'lucide-react'
+import { ArrowLeft, UserPlus, User, Briefcase, Building2, Building, Check, X, Loader2 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 
 // Password validation rules
@@ -61,6 +61,12 @@ interface Supervisor {
   position: { name: string; level: number }
 }
 
+interface Company {
+  id: string
+  name: string
+  code: string
+}
+
 interface OnboardFormProps {
   companyId: string
   companyName: string
@@ -69,19 +75,47 @@ interface OnboardFormProps {
   roles: Role[]
   supervisors: Supervisor[]
   suggestedEmployeeNo: string
+  isGroupAdmin?: boolean
+  allCompanies?: Company[]
 }
 
 export function OnboardForm({
-  companyId,
-  companyName,
-  departments,
-  positions,
+  companyId: defaultCompanyId,
+  companyName: defaultCompanyName,
+  departments: defaultDepartments,
+  positions: defaultPositions,
   roles,
-  supervisors,
+  supervisors: defaultSupervisors,
   suggestedEmployeeNo,
+  isGroupAdmin = false,
+  allCompanies = [],
 }: OnboardFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedCompanyId, setSelectedCompanyId] = useState(defaultCompanyId)
+
+  // 動態載入選定公司的部門、職位、主管
+  const { data: companyData, isLoading: isLoadingCompanyData } = trpc.hr.getCompanyData.useQuery(
+    { companyId: selectedCompanyId },
+    { enabled: isGroupAdmin && selectedCompanyId !== defaultCompanyId }
+  )
+
+  // 根據是否為集團管理員和選定的公司來決定使用哪組數據
+  const currentDepartments = (isGroupAdmin && selectedCompanyId !== defaultCompanyId && companyData)
+    ? companyData.departments
+    : defaultDepartments
+
+  const currentPositions = (isGroupAdmin && selectedCompanyId !== defaultCompanyId && companyData)
+    ? companyData.positions
+    : defaultPositions
+
+  const currentSupervisors = (isGroupAdmin && selectedCompanyId !== defaultCompanyId && companyData)
+    ? companyData.supervisors
+    : defaultSupervisors
+
+  const currentCompanyName = isGroupAdmin
+    ? (allCompanies.find(c => c.id === selectedCompanyId)?.name || defaultCompanyName)
+    : defaultCompanyName
 
   const [formData, setFormData] = useState({
     // 帳號資料
@@ -106,6 +140,18 @@ export function OnboardForm({
     roleId: '',
     hireDate: new Date().toISOString().split('T')[0],
   })
+
+  // 當公司變更時，清空部門、職位、主管選擇
+  useEffect(() => {
+    if (isGroupAdmin) {
+      setFormData(prev => ({
+        ...prev,
+        departmentId: '',
+        positionId: '',
+        supervisorId: '',
+      }))
+    }
+  }, [selectedCompanyId, isGroupAdmin])
 
   const onboard = trpc.hr.onboard.useMutation({
     onSuccess: () => {
@@ -152,7 +198,7 @@ export function OnboardForm({
       householdAddress: formData.householdAddress || undefined,
       emergencyContact: formData.emergencyContact || undefined,
       emergencyPhone: formData.emergencyPhone || undefined,
-      companyId,
+      companyId: selectedCompanyId,
       departmentId: formData.departmentId,
       positionId: formData.positionId,
       supervisorId: formData.supervisorId || undefined,
@@ -175,11 +221,158 @@ export function OnboardForm({
         </Link>
         <div>
           <h1 className="text-2xl font-bold">到職作業</h1>
-          <p className="text-muted-foreground">{companyName}</p>
+          <p className="text-muted-foreground">{currentCompanyName}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* 任職資料 - 放在最上方 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5" />
+              任職資料
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            {/* 集團管理員可選擇公司 */}
+            {isGroupAdmin && allCompanies.length > 0 && (
+              <div className="space-y-2 md:col-span-2">
+                <Label>所屬公司 *</Label>
+                <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇公司">
+                      {allCompanies.find(c => c.id === selectedCompanyId)?.name || '選擇公司'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allCompanies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4" />
+                          {c.code} {c.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="hireDate">到職日期 *</Label>
+              <Input
+                id="hireDate"
+                type="date"
+                value={formData.hireDate}
+                onChange={(e) => update('hireDate', e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>部門 *</Label>
+              <Select
+                value={formData.departmentId}
+                onValueChange={(v) => update('departmentId', v)}
+                disabled={isLoadingCompanyData}
+              >
+                <SelectTrigger>
+                  {isLoadingCompanyData ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      載入中...
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="選擇部門" />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {currentDepartments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        {d.code} {d.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>職位 *</Label>
+              <Select
+                value={formData.positionId}
+                onValueChange={(v) => update('positionId', v)}
+                disabled={isLoadingCompanyData}
+              >
+                <SelectTrigger>
+                  {isLoadingCompanyData ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      載入中...
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="選擇職位" />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {currentPositions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>直屬主管</Label>
+              <Select
+                value={formData.supervisorId}
+                onValueChange={(v) => update('supervisorId', v)}
+                disabled={isLoadingCompanyData}
+              >
+                <SelectTrigger>
+                  {isLoadingCompanyData ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      載入中...
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="選擇直屬主管（可選）" />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">無</SelectItem>
+                  {currentSupervisors.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.employee.employeeNo} {s.employee.name} - {s.position.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>系統角色</Label>
+              <Select value={formData.roleId} onValueChange={(v) => update('roleId', v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇角色（可選）" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">無特定角色</SelectItem>
+                  {roles.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* 帳號資料 */}
         <Card>
           <CardHeader>
@@ -265,96 +458,6 @@ export function OnboardForm({
                   </div>
                 </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 任職資料 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5" />
-              任職資料
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="hireDate">到職日期 *</Label>
-              <Input
-                id="hireDate"
-                type="date"
-                value={formData.hireDate}
-                onChange={(e) => update('hireDate', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>部門 *</Label>
-              <Select value={formData.departmentId} onValueChange={(v) => update('departmentId', v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇部門" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4" />
-                        {d.code} {d.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>職位 *</Label>
-              <Select value={formData.positionId} onValueChange={(v) => update('positionId', v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇職位" />
-                </SelectTrigger>
-                <SelectContent>
-                  {positions.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>直屬主管</Label>
-              <Select value={formData.supervisorId} onValueChange={(v) => update('supervisorId', v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇直屬主管（可選）" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">無</SelectItem>
-                  {supervisors.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.employee.employeeNo} {s.employee.name} - {s.position.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>系統角色</Label>
-              <Select value={formData.roleId} onValueChange={(v) => update('roleId', v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇角色（可選）" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">無特定角色</SelectItem>
-                  {roles.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </CardContent>
         </Card>

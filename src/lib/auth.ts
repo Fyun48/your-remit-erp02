@@ -68,6 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               email: employee.email,
               name: employee.name,
               employeeNo: employee.employeeNo,
+              avatarUrl: employee.avatarUrl,
             }
           }
         }
@@ -91,6 +92,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: employee.email,
           name: employee.name,
           employeeNo: employee.employeeNo,
+          avatarUrl: employee.avatarUrl,
         }
       },
     }),
@@ -101,6 +103,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         token.employeeNo = (user as any).employeeNo
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        token.avatarUrl = (user as any).avatarUrl
       }
       return token
     },
@@ -109,6 +113,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id as string
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(session.user as any).employeeNo = token.employeeNo
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(session.user as any).avatarUrl = token.avatarUrl
       }
       return session
     },

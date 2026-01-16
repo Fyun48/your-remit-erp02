@@ -9,6 +9,7 @@ interface SelectContextValue {
   onValueChange: (value: string) => void
   open: boolean
   setOpen: (open: boolean) => void
+  disabled: boolean
 }
 
 const SelectContext = React.createContext<SelectContextValue | undefined>(undefined)
@@ -17,9 +18,10 @@ interface SelectProps {
   value?: string
   onValueChange?: (value: string) => void
   children: React.ReactNode
+  disabled?: boolean
 }
 
-function Select({ value = '', onValueChange, children }: SelectProps) {
+function Select({ value = '', onValueChange, children, disabled = false }: SelectProps) {
   const [open, setOpen] = React.useState(false)
 
   return (
@@ -28,7 +30,8 @@ function Select({ value = '', onValueChange, children }: SelectProps) {
         value,
         onValueChange: onValueChange || (() => {}),
         open,
-        setOpen,
+        setOpen: disabled ? () => {} : setOpen,
+        disabled,
       }}
     >
       <div className="relative">{children}</div>
@@ -54,6 +57,7 @@ function SelectTrigger({
         className
       )}
       onClick={() => context.setOpen(!context.open)}
+      disabled={context.disabled}
     >
       {children}
       <ChevronDown className="h-4 w-4 opacity-50" />

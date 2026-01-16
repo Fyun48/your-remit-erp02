@@ -390,6 +390,32 @@ export const hrRouter = router({
       })
     }),
 
+  // 取得指定公司的部門、職位、主管資料（用於集團管理員新增員工）
+  getCompanyData: publicProcedure
+    .input(z.object({ companyId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const [departments, positions, supervisors] = await Promise.all([
+        ctx.prisma.department.findMany({
+          where: { companyId: input.companyId, isActive: true },
+          orderBy: { code: 'asc' },
+        }),
+        ctx.prisma.position.findMany({
+          where: { companyId: input.companyId, isActive: true },
+          orderBy: { level: 'desc' },
+        }),
+        ctx.prisma.employeeAssignment.findMany({
+          where: { companyId: input.companyId, status: 'ACTIVE' },
+          include: {
+            employee: { select: { id: true, name: true, employeeNo: true } },
+            position: { select: { name: true, level: true } },
+          },
+          orderBy: { position: { level: 'desc' } },
+        }),
+      ])
+
+      return { departments, positions, supervisors }
+    }),
+
   // 人事統計
   statistics: publicProcedure
     .input(z.object({ companyId: z.string() }))

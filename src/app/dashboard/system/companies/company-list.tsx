@@ -341,7 +341,9 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
                 onValueChange={(v) => setFormData({ ...formData, groupId: v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="選擇集團" />
+                  <SelectValue placeholder="選擇集團">
+                    {groups.find(g => g.id === formData.groupId)?.name || '選擇集團'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {groups.map((group) => (

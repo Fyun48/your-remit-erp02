@@ -2,10 +2,19 @@
 
 import { signOut, useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { LogOut, User } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { LogOut } from 'lucide-react'
 
 export function Header() {
   const { data: session } = useSession()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const avatarUrl = (session?.user as any)?.avatarUrl
+  const userName = session?.user?.name || '使用者'
+
+  const getInitials = (name: string) => {
+    return name.slice(0, 2)
+  }
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-white px-6">
@@ -14,8 +23,13 @@ export function Header() {
       </div>
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2 text-sm text-gray-600">
-          <User className="h-4 w-4" />
-          <span>{session?.user?.name || '使用者'}</span>
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={avatarUrl || undefined} alt={userName} />
+            <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+              {getInitials(userName)}
+            </AvatarFallback>
+          </Avatar>
+          <span>{userName}</span>
         </div>
         <Button
           variant="ghost"
