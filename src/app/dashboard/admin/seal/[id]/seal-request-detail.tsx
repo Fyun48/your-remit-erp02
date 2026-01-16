@@ -40,6 +40,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
+import { WorkflowStatus } from '@/components/workflow/workflow-status'
 
 interface SealRequest {
   id: string
@@ -417,6 +418,12 @@ export function SealRequestDetail({ request, currentUserId }: SealRequestDetailP
               </div>
             </CardContent>
           </Card>
+
+          {/* 簽核狀態 */}
+          <WorkflowStatus
+            requestType="SEAL"
+            requestId={request.id}
+          />
         </div>
       </div>
 
