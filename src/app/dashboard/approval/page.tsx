@@ -1,7 +1,6 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { Card, CardContent } from '@/components/ui/card'
 import { PendingList } from '@/components/approval/pending-list'
 import { WorkflowApprovalList } from '@/components/approval/workflow-approval-list'
 import { getCurrentCompany } from '@/lib/use-current-company'

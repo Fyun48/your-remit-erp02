@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Workflow, Plus, Pencil, Eye, GitBranch, Users, Copy, Trash2 } from 'lucide-react'
+import { Workflow, Plus, Pencil, Eye, GitBranch, Users, Copy, Trash2, UserCog } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 
 interface WorkflowDef {
@@ -134,10 +134,18 @@ export function WorkflowList({ companyId, companyName, userId, workflows }: Work
           <h1 className="text-2xl font-bold">流程管理</h1>
           <p className="text-muted-foreground">{companyName}</p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          新增流程
-        </Button>
+        <div className="flex gap-2">
+          <Link href="/dashboard/workflow/employee-paths">
+            <Button variant="outline">
+              <UserCog className="h-4 w-4 mr-2" />
+              員工特殊路徑
+            </Button>
+          </Link>
+          <Button onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            新增流程
+          </Button>
+        </div>
       </div>
 
       {workflows.length === 0 ? (

@@ -62,6 +62,7 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
   // tRPC mutations
   const createMutation = trpc.expenseRequest.create.useMutation()
   const submitMutation = trpc.expenseRequest.submit.useMutation()
+  const startWorkflow = trpc.workflow.startInstance.useMutation()
 
   // 計算總金額
   const totalAmount = items.reduce((sum, item) => {
@@ -196,8 +197,24 @@ export function ExpenseForm({ employeeId, companyId, companyName }: ExpenseFormP
         })),
       })
 
-      // 送出審核
-      await submitMutation.mutateAsync({ id: request.id })
+      // 啟動工作流程
+      try {
+        await startWorkflow.mutateAsync({
+          requestType: 'EXPENSE',
+          requestId: request.id,
+          applicantId: employeeId,
+          companyId,
+          requestData: {
+            totalAmount,
+            title: formData.title,
+            itemCount: items.length,
+          },
+        })
+      } catch {
+        // 如果沒有設定工作流程，使用傳統審批
+        console.log('No workflow defined, using traditional approval')
+        await submitMutation.mutateAsync({ id: request.id })
+      }
 
       router.push('/dashboard/expense')
     } catch (err) {

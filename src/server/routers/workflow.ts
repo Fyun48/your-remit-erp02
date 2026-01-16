@@ -380,7 +380,7 @@ export const workflowRouter = router({
       requestId: z.string(),
       applicantId: z.string(),
       companyId: z.string(),
-      requestData: z.record(z.unknown()).optional(),
+      requestData: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ input }) => {
       let definitionId = input.definitionId
