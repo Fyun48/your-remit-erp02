@@ -95,6 +95,8 @@ export function StationeryRequestForm({
     },
   })
 
+  const startWorkflow = trpc.workflow.startInstance.useMutation()
+
   const handleCompanyChange = (newCompanyId: string) => {
     setCompanyId(newCompanyId)
     setSelectedItems([]) // 清空已選品項
@@ -193,8 +195,25 @@ export function StationeryRequestForm({
         purpose: purpose || undefined,
       },
       {
-        onSuccess: (data) => {
-          submit.mutate({ id: data.id })
+        onSuccess: async (data) => {
+          // 嘗試啟動工作流程
+          try {
+            await startWorkflow.mutateAsync({
+              requestType: 'STATIONERY',
+              requestId: data.id,
+              applicantId,
+              companyId,
+              requestData: {
+                totalAmount,
+                itemCount: selectedItems.length,
+              },
+            })
+            router.push('/dashboard/admin/stationery')
+          } catch {
+            // 無工作流程定義，使用傳統審批
+            console.log('No workflow defined, using traditional approval')
+            submit.mutate({ id: data.id })
+          }
         },
       }
     )
