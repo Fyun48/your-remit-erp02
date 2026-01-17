@@ -28,6 +28,12 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
     return name.slice(0, 2)
   }
 
+  // 手機版顯示姓名後2字
+  const getMobileDisplayName = (name: string) => {
+    if (name.length <= 2) return name
+    return name.slice(-2)
+  }
+
   // 點擊外部關閉選單
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -40,16 +46,16 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
   }, [])
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-4 md:px-6">
-      <div className="flex items-center space-x-2 md:space-x-4">
+    <header className="flex h-14 md:h-16 items-center justify-between border-b bg-white px-2 md:px-6">
+      <div className="flex items-center space-x-1 md:space-x-4">
         {/* 手機版漢堡選單按鈕 */}
         <button
           onClick={openSidebar}
-          className="md:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+          className="md:hidden p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
         >
-          <Menu className="h-6 w-6" />
+          <Menu className="h-5 w-5" />
         </button>
-        <h2 className="text-base md:text-lg font-semibold hidden sm:block">歡迎使用 ERP 系統</h2>
+        <h2 className="text-base md:text-lg font-semibold hidden md:block">歡迎使用 ERP 系統</h2>
         {companyId && companyName && (
           <CompanySwitcher
             currentCompanyId={companyId}
@@ -58,21 +64,22 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
           />
         )}
       </div>
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-1 md:space-x-4">
         {/* 用戶下拉選單 */}
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors rounded-md px-2 py-1 hover:bg-gray-100"
+            className="flex items-center space-x-1 md:space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors rounded-md px-1.5 md:px-2 py-1 hover:bg-gray-100"
           >
-            <Avatar className="h-8 w-8">
+            <Avatar className="h-7 w-7 md:h-8 md:w-8">
               <AvatarImage src={avatarUrl || undefined} alt={userName} />
               <AvatarFallback className="text-xs bg-primary text-primary-foreground">
                 {getInitials(userName)}
               </AvatarFallback>
             </Avatar>
-            <span>{userName}</span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
+            <span className="hidden md:inline">{userName}</span>
+            <span className="md:hidden text-xs">{getMobileDisplayName(userName)}</span>
+            <ChevronDown className={`h-3 w-3 md:h-4 md:w-4 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* 下拉選單 */}

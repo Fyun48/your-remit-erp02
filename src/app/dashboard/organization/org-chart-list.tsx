@@ -15,13 +15,23 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Network, Plus, Pencil, Eye, Building2, Users } from 'lucide-react'
+import { Network, Plus, Pencil, Eye, Building2, Users, Trash2 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 
 interface OrgChart {
@@ -45,6 +55,7 @@ interface OrgChartListProps {
 export function OrgChartList({ companyId, companyName, userId, orgCharts }: OrgChartListProps) {
   const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<OrgChart | null>(null)
   const [createData, setCreateData] = useState({
     name: '',
     description: '',
@@ -81,6 +92,22 @@ export function OrgChartList({ companyId, companyName, userId, orgCharts }: OrgC
       alert(error.message)
     },
   })
+
+  const deleteChart = trpc.orgChart.delete.useMutation({
+    onSuccess: () => {
+      setDeleteTarget(null)
+      router.refresh()
+    },
+    onError: (error) => {
+      alert(error.message)
+    },
+  })
+
+  const handleDelete = () => {
+    if (deleteTarget) {
+      deleteChart.mutate({ id: deleteTarget.id })
+    }
+  }
 
   const handleCreate = () => {
     if (!createData.name.trim()) {
@@ -171,6 +198,14 @@ export function OrgChartList({ companyId, companyName, userId, orgCharts }: OrgC
                       編輯
                     </Button>
                   </Link>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setDeleteTarget(chart)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -275,6 +310,30 @@ export function OrgChartList({ companyId, companyName, userId, orgCharts }: OrgC
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 刪除確認 Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確認刪除</AlertDialogTitle>
+            <AlertDialogDescription>
+              您確定要刪除組織圖「{deleteTarget?.name}」嗎？
+              <br />
+              此操作將會刪除所有節點和關係，且無法復原。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteChart.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteChart.isPending ? '刪除中...' : '確認刪除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

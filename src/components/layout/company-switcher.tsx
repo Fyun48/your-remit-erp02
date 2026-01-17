@@ -70,12 +70,19 @@ export function CompanySwitcher({
     }
   }
 
+  // 取得公司名稱簡寫（手機版用）
+  const getShortCompanyName = (name: string) => {
+    if (name.length <= 4) return name
+    return name.slice(0, 4) + '...'
+  }
+
   // 非集團管理員只顯示當前公司
   if (!isGroupAdmin) {
     return (
-      <div className="flex items-center gap-2 text-gray-700">
-        <Building className="h-5 w-5" />
-        <span className="text-base font-semibold">{currentCompanyName}</span>
+      <div className="flex items-center gap-1 md:gap-2 text-gray-700">
+        <Building className="h-4 w-4 md:h-5 md:w-5" />
+        <span className="text-sm md:text-base font-semibold hidden md:inline">{currentCompanyName}</span>
+        <span className="text-xs font-semibold md:hidden">{getShortCompanyName(currentCompanyName)}</span>
       </div>
     )
   }
@@ -85,16 +92,16 @@ export function CompanySwitcher({
       <Button
         variant="outline"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 h-10 px-4"
+        className="flex items-center gap-1 md:gap-2 h-8 md:h-10 px-2 md:px-4"
         disabled={isLoading}
       >
         {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin" />
         ) : (
-          <Building className="h-5 w-5" />
+          <Building className="h-4 w-4 md:h-5 md:w-5" />
         )}
-        <span className="max-w-[180px] truncate text-base font-semibold">{currentCompanyName}</span>
-        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="max-w-[80px] md:max-w-[180px] truncate text-xs md:text-base font-semibold">{currentCompanyName}</span>
+        <ChevronDown className={`h-3 w-3 md:h-4 md:w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </Button>
 
       {isOpen && (
