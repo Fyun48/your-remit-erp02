@@ -2,6 +2,26 @@ import { z } from 'zod'
 import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
 
+const stepSchema = z.object({
+  stepOrder: z.number(),
+  name: z.string(),
+  approverType: z.enum([
+    'SUPERVISOR', 'DEPARTMENT_HEAD', 'POSITION_LEVEL',
+    'SPECIFIC_POSITION', 'SPECIFIC_EMPLOYEE', 'ROLE'
+  ]),
+  approverValue: z.string().optional(),
+  approvalMode: z.enum(['ANY', 'ALL', 'MAJORITY']).default('ANY'),
+  canSkip: z.boolean().default(false),
+  skipCondition: z.string().optional(),
+  ccType: z.enum([
+    'SUPERVISOR', 'DEPARTMENT_HEAD', 'POSITION_LEVEL',
+    'SPECIFIC_POSITION', 'SPECIFIC_EMPLOYEE', 'ROLE'
+  ]).optional(),
+  ccValue: z.string().optional(),
+  timeoutHours: z.number().default(0),
+  timeoutAction: z.enum(['NONE', 'REMIND', 'ESCALATE', 'AUTO_APPROVE', 'AUTO_REJECT']).default('NONE'),
+})
+
 export const approvalFlowRouter = router({
   // 取得模組可用的審核流程
   listByModule: publicProcedure
@@ -42,6 +62,69 @@ export const approvalFlowRouter = router({
       })
     }),
 
+  // 搜尋員工（用於指定員工審核者）
+  searchEmployees: publicProcedure
+    .input(z.object({
+      companyId: z.string().optional(),
+      search: z.string().optional(),
+      limit: z.number().default(20),
+    }))
+    .query(async ({ ctx, input }) => {
+      const where = {
+        status: 'ACTIVE' as const,
+        ...(input.companyId && { companyId: input.companyId }),
+        ...(input.search && {
+          employee: {
+            OR: [
+              { name: { contains: input.search, mode: 'insensitive' as const } },
+              { employeeNo: { contains: input.search, mode: 'insensitive' as const } },
+            ],
+          },
+        }),
+      }
+
+      const assignments = await ctx.prisma.employeeAssignment.findMany({
+        where,
+        include: {
+          employee: {
+            select: {
+              id: true,
+              name: true,
+              employeeNo: true,
+            },
+          },
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          department: {
+            select: {
+              name: true,
+            },
+          },
+          position: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: { employee: { employeeNo: 'asc' } },
+        take: input.limit,
+      })
+
+      return assignments.map(a => ({
+        employeeId: a.employee.id,
+        employeeNo: a.employee.employeeNo,
+        name: a.employee.name,
+        companyId: a.company.id,
+        companyName: a.company.name,
+        department: a.department.name,
+        position: a.position.name,
+      }))
+    }),
+
   // 建立審核流程
   create: publicProcedure
     .input(z.object({
@@ -52,25 +135,7 @@ export const approvalFlowRouter = router({
       module: z.string(),
       conditions: z.string().optional(),
       isDefault: z.boolean().default(false),
-      steps: z.array(z.object({
-        stepOrder: z.number(),
-        name: z.string(),
-        approverType: z.enum([
-          'SUPERVISOR', 'DEPARTMENT_HEAD', 'POSITION_LEVEL',
-          'SPECIFIC_POSITION', 'SPECIFIC_EMPLOYEE', 'ROLE'
-        ]),
-        approverValue: z.string().optional(),
-        approvalMode: z.enum(['ANY', 'ALL', 'MAJORITY']).default('ANY'),
-        canSkip: z.boolean().default(false),
-        skipCondition: z.string().optional(),
-        ccType: z.enum([
-          'SUPERVISOR', 'DEPARTMENT_HEAD', 'POSITION_LEVEL',
-          'SPECIFIC_POSITION', 'SPECIFIC_EMPLOYEE', 'ROLE'
-        ]).optional(),
-        ccValue: z.string().optional(),
-        timeoutHours: z.number().default(0),
-        timeoutAction: z.enum(['NONE', 'REMIND', 'ESCALATE', 'AUTO_APPROVE', 'AUTO_REJECT']).default('NONE'),
-      })),
+      steps: z.array(stepSchema),
     }))
     .mutation(async ({ ctx, input }) => {
       const { steps, ...flowData } = input
@@ -111,9 +176,10 @@ export const approvalFlowRouter = router({
       conditions: z.string().optional(),
       isActive: z.boolean().optional(),
       isDefault: z.boolean().optional(),
+      steps: z.array(stepSchema).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input
+      const { id, steps, ...data } = input
 
       if (data.isDefault) {
         const flow = await ctx.prisma.approvalFlow.findUnique({ where: { id } })
@@ -130,9 +196,28 @@ export const approvalFlowRouter = router({
         }
       }
 
+      // 如果有提供 steps，刪除舊的並建立新的
+      if (steps) {
+        await ctx.prisma.approvalStep.deleteMany({
+          where: { flowId: id },
+        })
+      }
+
       return ctx.prisma.approvalFlow.update({
         where: { id },
-        data,
+        data: {
+          ...data,
+          ...(steps && {
+            steps: {
+              create: steps,
+            },
+          }),
+        },
+        include: {
+          steps: {
+            orderBy: { stepOrder: 'asc' },
+          },
+        },
       })
     }),
 
