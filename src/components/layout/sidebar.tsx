@@ -9,7 +9,7 @@ import { Settings2, X } from 'lucide-react'
 import { PWAInstallPrompt } from '@/components/pwa/pwa-install-prompt'
 import { useMobileSidebar } from './mobile-sidebar-context'
 import { PersonalizationModal } from '@/components/personalization'
-import { defaultMenuItems, getMenuItemById } from '@/lib/sidebar-menu'
+import { getMenuItemById } from '@/lib/sidebar-menu'
 import { useSidebarStore } from '@/stores/use-sidebar-store'
 import { trpc } from '@/lib/trpc'
 
