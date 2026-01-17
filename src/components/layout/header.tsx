@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { LogOut, User, Lock, ChevronDown } from 'lucide-react'
+import { LogOut, User, Lock, ChevronDown, Menu } from 'lucide-react'
 import { CompanySwitcher } from './company-switcher'
+import { useMobileSidebar } from './mobile-sidebar-context'
 
 interface HeaderProps {
   companyId?: string
@@ -17,6 +18,7 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
   const { data: session } = useSession()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const { open: openSidebar } = useMobileSidebar()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const avatarUrl = (session?.user as any)?.avatarUrl
@@ -38,9 +40,16 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
   }, [])
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-6">
-      <div className="flex items-center space-x-4">
-        <h2 className="text-lg font-semibold">歡迎使用 ERP 系統</h2>
+    <header className="flex h-16 items-center justify-between border-b bg-white px-4 md:px-6">
+      <div className="flex items-center space-x-2 md:space-x-4">
+        {/* 手機版漢堡選單按鈕 */}
+        <button
+          onClick={openSidebar}
+          className="md:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+        <h2 className="text-base md:text-lg font-semibold hidden sm:block">歡迎使用 ERP 系統</h2>
         {companyId && companyName && (
           <CompanySwitcher
             currentCompanyId={companyId}

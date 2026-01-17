@@ -17,8 +17,10 @@ import {
   Stamp,
   Network,
   Workflow,
+  X,
 } from 'lucide-react'
 import { PWAInstallPrompt } from '@/components/pwa/pwa-install-prompt'
+import { useMobileSidebar } from './mobile-sidebar-context'
 
 const navigation = [
   { name: '儀表板', href: '/dashboard', icon: LayoutDashboard },
@@ -40,21 +42,19 @@ interface SidebarProps {
   groupName?: string
 }
 
-export function Sidebar({ groupName = '集團' }: SidebarProps) {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-full w-64 flex-col bg-gray-900">
-      <div className="flex h-16 items-center justify-center border-b border-gray-800">
-        <h1 className="text-xl font-bold text-white">{groupName} ERP</h1>
-      </div>
-      <nav className="flex-1 space-y-1 px-2 py-4">
+    <>
+      <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <Link
               key={item.name}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 'group flex items-center rounded-md px-2 py-2 text-sm font-medium',
                 isActive
@@ -77,6 +77,46 @@ export function Sidebar({ groupName = '集團' }: SidebarProps) {
       <div className="border-t border-gray-800 p-4">
         <PWAInstallPrompt />
       </div>
-    </div>
+    </>
+  )
+}
+
+export function Sidebar({ groupName = '集團' }: SidebarProps) {
+  const { isOpen, close } = useMobileSidebar()
+
+  return (
+    <>
+      {/* 桌面版側邊欄 - 固定顯示 */}
+      <div className="hidden md:flex h-full w-64 flex-col bg-gray-900">
+        <div className="flex h-16 items-center justify-center border-b border-gray-800">
+          <h1 className="text-xl font-bold text-white">{groupName} ERP</h1>
+        </div>
+        <SidebarContent />
+      </div>
+
+      {/* 手機版側邊欄 - 覆蓋層 */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          {/* 背景遮罩 */}
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={close}
+          />
+          {/* 側邊欄 */}
+          <div className="fixed inset-y-0 left-0 w-64 flex flex-col bg-gray-900">
+            <div className="flex h-16 items-center justify-between border-b border-gray-800 px-4">
+              <h1 className="text-xl font-bold text-white">{groupName} ERP</h1>
+              <button
+                onClick={close}
+                className="text-gray-400 hover:text-white p-1"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <SidebarContent onNavigate={close} />
+          </div>
+        </div>
+      )}
+    </>
   )
 }
