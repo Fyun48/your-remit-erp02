@@ -64,6 +64,126 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
+
+  /* ==================== Theme: Classic Blue ==================== */
+  [data-theme="classic"] {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 40%;
+    --radius: 0.5rem;
+  }
+
+  /* ==================== Theme: Modern Dark ==================== */
+  [data-theme="dark"] {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 217 33% 17%;
+    --card-foreground: 210 40% 98%;
+    --popover: 217 33% 17%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 25%;
+    --input: 217 33% 25%;
+    --ring: 239 84% 67%;
+    --radius: 0.75rem;
+  }
+
+  /* ==================== Theme: Fresh Mint ==================== */
+  [data-theme="mint"] {
+    --background: 138 76% 97%;
+    --foreground: 143 64% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 143 64% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 143 64% 10%;
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 138 76% 94%;
+    --secondary-foreground: 143 64% 10%;
+    --muted: 138 76% 94%;
+    --muted-foreground: 143 30% 40%;
+    --accent: 138 76% 94%;
+    --accent-foreground: 143 64% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 143 50% 85%;
+    --input: 143 50% 85%;
+    --ring: 160 84% 39%;
+    --radius: 1rem;
+  }
+
+  /* ==================== Theme: Warm Sunset ==================== */
+  [data-theme="sunset"] {
+    --background: 48 100% 96%;
+    --foreground: 20 14% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 14% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14% 10%;
+    --primary: 25 95% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 48 100% 93%;
+    --secondary-foreground: 20 14% 10%;
+    --muted: 48 100% 93%;
+    --muted-foreground: 25 30% 45%;
+    --accent: 48 100% 93%;
+    --accent-foreground: 20 14% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 60% 85%;
+    --input: 40 60% 85%;
+    --ring: 25 95% 53%;
+    --radius: 0.75rem;
+  }
+
+  /* ==================== Theme: Elegant Purple ==================== */
+  [data-theme="purple"] {
+    --background: 270 100% 98%;
+    --foreground: 263 70% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 263 70% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 263 70% 15%;
+    --primary: 258 90% 66%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 100% 95%;
+    --secondary-foreground: 263 70% 15%;
+    --muted: 270 100% 95%;
+    --muted-foreground: 258 30% 50%;
+    --accent: 270 100% 95%;
+    --accent-foreground: 263 70% 15%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 263 50% 88%;
+    --input: 263 50% 88%;
+    --ring: 258 90% 66%;
+    --radius: 0.625rem;
+  }
 }
 
 
