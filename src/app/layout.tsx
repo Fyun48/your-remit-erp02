@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { TRPCProvider } from '@/components/providers/trpc-provider'
 import { SessionProvider } from '@/components/providers/session-provider'
+import { ThemeProvider } from '@/components/providers/theme-provider'
 import { PWARegister } from '@/components/pwa/pwa-register'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -35,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-TW">
+    <html lang="zh-TW" data-theme="classic">
       <head>
         <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icons/icon.svg" />
@@ -45,8 +46,10 @@ export default function RootLayout({
       <body className={inter.className}>
         <SessionProvider>
           <TRPCProvider>
-            {children}
-            <PWARegister />
+            <ThemeProvider>
+              {children}
+              <PWARegister />
+            </ThemeProvider>
           </TRPCProvider>
         </SessionProvider>
       </body>
