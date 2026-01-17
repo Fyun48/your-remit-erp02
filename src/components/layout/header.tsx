@@ -4,9 +4,10 @@ import { useState, useRef, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { LogOut, User, Lock, ChevronDown, Menu } from 'lucide-react'
+import { LogOut, User, Lock, ChevronDown, Menu, Search } from 'lucide-react'
 import { CompanySwitcher } from './company-switcher'
 import { useMobileSidebar } from './mobile-sidebar-context'
+import { SearchDialog } from '@/components/search'
 
 interface HeaderProps {
   companyId?: string
@@ -17,6 +18,7 @@ interface HeaderProps {
 export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderProps) {
   const { data: session } = useSession()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const { open: openSidebar } = useMobileSidebar()
 
@@ -65,6 +67,18 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
         )}
       </div>
       <div className="flex items-center space-x-1 md:space-x-4">
+        {/* 搜尋按鈕 */}
+        {companyId && (
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            className="flex items-center gap-1 px-2 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+            title="搜尋 (Ctrl+K)"
+          >
+            <Search className="h-4 w-4" />
+            <span className="hidden md:inline text-xs text-muted-foreground">Ctrl+K</span>
+          </button>
+        )}
+
         {/* 用戶下拉選單 */}
         <div className="relative" ref={menuRef}>
           <button
@@ -113,6 +127,15 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
           )}
         </div>
       </div>
+
+      {/* 搜尋對話框 */}
+      {companyId && (
+        <SearchDialog
+          open={isSearchOpen}
+          onOpenChange={setIsSearchOpen}
+          companyId={companyId}
+        />
+      )}
     </header>
   )
 }
