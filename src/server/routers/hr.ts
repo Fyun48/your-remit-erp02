@@ -652,4 +652,47 @@ export const hrRouter = router({
         })),
       }
     }),
+
+  // 取得所有角色列表
+  listRoles: publicProcedure
+    .query(async ({ ctx }) => {
+      return ctx.prisma.role.findMany({
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          isSystem: true,
+        },
+      })
+    }),
+
+  // 更新員工角色
+  updateEmployeeRole: publicProcedure
+    .input(z.object({
+      assignmentId: z.string(),
+      roleId: z.string().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const assignment = await ctx.prisma.employeeAssignment.findUnique({
+        where: { id: input.assignmentId },
+      })
+
+      if (!assignment) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: '找不到任職記錄',
+        })
+      }
+
+      return ctx.prisma.employeeAssignment.update({
+        where: { id: input.assignmentId },
+        data: {
+          roleId: input.roleId,
+        },
+        include: {
+          role: true,
+        },
+      })
+    }),
 })

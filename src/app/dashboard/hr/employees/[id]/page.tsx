@@ -49,8 +49,8 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
   const targetCompanyId = employeePrimaryAssignment?.company.id || employee.assignments[0]?.company.id
   const targetCompanyName = employeePrimaryAssignment?.company.name || employee.assignments[0]?.company.name || '未知公司'
 
-  // 取得部門和職位列表供編輯使用（使用員工所屬公司）
-  const [departments, positions, supervisors] = await Promise.all([
+  // 取得部門、職位、主管和角色列表供編輯使用（使用員工所屬公司）
+  const [departments, positions, supervisors, roles] = await Promise.all([
     prisma.department.findMany({
       where: { companyId: targetCompanyId, isActive: true },
       orderBy: { code: 'asc' },
@@ -67,6 +67,15 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
       },
       orderBy: { position: { level: 'desc' } },
     }),
+    prisma.role.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        isSystem: true,
+      },
+    }),
   ])
 
   return (
@@ -77,6 +86,7 @@ export default async function EmployeeDetailPage({ params }: PageProps) {
       departments={departments}
       positions={positions}
       supervisors={supervisors.filter((s) => s.employee.id !== id)}
+      roles={roles}
     />
   )
 }

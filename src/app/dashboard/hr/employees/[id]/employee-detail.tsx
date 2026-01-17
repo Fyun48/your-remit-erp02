@@ -91,7 +91,7 @@ interface Assignment {
   company: { id: string; name: string }
   department: { id: string; name: string; code: string }
   position: { id: string; name: string }
-  role: { id: string; name: string } | null
+  role: { id: string; name: string; description: string | null } | null
   supervisor: { employee: { id: string; name: string; employeeNo: string } } | null
 }
 
@@ -113,6 +113,13 @@ interface Supervisor {
   position: { name: string; level: number }
 }
 
+interface Role {
+  id: string
+  name: string
+  description: string | null
+  isSystem: boolean
+}
+
 interface EmployeeDetailProps {
   employee: Employee
   companyId: string
@@ -120,6 +127,7 @@ interface EmployeeDetailProps {
   departments: Department[]
   positions: Position[]
   supervisors: Supervisor[]
+  roles: Role[]
 }
 
 const genderLabels: Record<string, string> = {
@@ -141,6 +149,7 @@ export function EmployeeDetail({
   departments,
   positions,
   supervisors,
+  roles,
 }: EmployeeDetailProps) {
   const router = useRouter()
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -148,10 +157,12 @@ export function EmployeeDetail({
   const [isOffboardOpen, setIsOffboardOpen] = useState(false)
   const [isAddAssignmentOpen, setIsAddAssignmentOpen] = useState(false)
   const [isEndAssignmentOpen, setIsEndAssignmentOpen] = useState(false)
+  const [isRoleEditOpen, setIsRoleEditOpen] = useState(false)
   const [selectedAssignmentToEnd, setSelectedAssignmentToEnd] = useState<Assignment | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState(employee.avatarUrl)
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('')
 
   // 主要任職：優先找 ACTIVE + isPrimary，若無則找任何 ACTIVE
   const currentAssignment = employee.assignments.find(
@@ -282,6 +293,18 @@ export function EmployeeDetail({
     },
   })
 
+  const updateEmployeeRole = trpc.hr.updateEmployeeRole.useMutation({
+    onSuccess: () => {
+      setIsRoleEditOpen(false)
+      setIsSubmitting(false)
+      router.refresh()
+    },
+    onError: (error) => {
+      alert(error.message)
+      setIsSubmitting(false)
+    },
+  })
+
   const handleEdit = (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -356,6 +379,20 @@ export function EmployeeDetail({
     setSelectedAssignmentToEnd(assignment)
     setEndAssignmentDate(new Date().toISOString().split('T')[0])
     setIsEndAssignmentOpen(true)
+  }
+
+  const openRoleEditDialog = () => {
+    setSelectedRoleId(currentAssignment?.role?.id || '')
+    setIsRoleEditOpen(true)
+  }
+
+  const handleRoleUpdate = () => {
+    if (!currentAssignment) return
+    setIsSubmitting(true)
+    updateEmployeeRole.mutate({
+      assignmentId: currentAssignment.id,
+      roleId: selectedRoleId || null,
+    })
   }
 
   const formatDate = (date: Date | string | null) => {
@@ -524,12 +561,27 @@ export function EmployeeDetail({
                       {currentAssignment.supervisor?.employee.name || '-'}
                     </p>
                   </div>
-                  {currentAssignment.role && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">系統角色</p>
-                      <p className="font-medium">{currentAssignment.role.name}</p>
+                  <div>
+                    <p className="text-sm text-muted-foreground">系統角色</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">
+                        {currentAssignment.role
+                          ? (currentAssignment.role.description || currentAssignment.role.name)
+                          : '-'}
+                      </p>
+                      {!isResigned && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={openRoleEditDialog}
+                          title="修改角色"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
-                  )}
+                  </div>
                   <div>
                     <p className="text-sm text-muted-foreground">到任日期</p>
                     <p className="font-medium">{formatDate(currentAssignment.startDate)}</p>
@@ -1149,6 +1201,44 @@ export function EmployeeDetail({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 修改系統角色 Dialog */}
+      <Dialog open={isRoleEditOpen} onOpenChange={setIsRoleEditOpen}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>修改系統角色</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>系統角色</Label>
+              <Select
+                value={selectedRoleId}
+                onValueChange={setSelectedRoleId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇角色" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">無</SelectItem>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.description || role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsRoleEditOpen(false)}>
+                取消
+              </Button>
+              <Button onClick={handleRoleUpdate} disabled={isSubmitting}>
+                {isSubmitting ? '儲存中...' : '儲存'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
