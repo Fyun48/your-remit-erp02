@@ -8,13 +8,11 @@ import {
   Users,
   Calendar,
   Receipt,
-  FileText,
   Loader2,
   LayoutDashboard
 } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { trpc } from '@/lib/trpc'
-import { cn } from '@/lib/utils'
 
 interface SearchDialogProps {
   open: boolean

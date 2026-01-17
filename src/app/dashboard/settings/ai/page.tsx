@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +27,6 @@ const GEMINI_MODELS = [
 ]
 
 export default function AISettingsPage() {
-  const router = useRouter()
   const [provider, setProvider] = useState<'openai' | 'gemini' | 'disabled'>('disabled')
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState('')

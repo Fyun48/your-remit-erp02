@@ -61,6 +61,9 @@ export const searchRouter = router({
         take: limit,
       })
 
+      // 取得符合搜尋條件的員工 ID（用於後續請假單/報銷單搜尋）
+      const matchingEmployeeIds = employees.map(emp => emp.id)
+
       const employeeResults = employees.map(emp => ({
         id: `emp-${emp.id}`,
         type: 'employee' as const,
@@ -75,23 +78,31 @@ export const searchRouter = router({
         where: {
           companyId,
           OR: [
-            { employee: { name: { contains: query, mode: 'insensitive' } } },
+            // 依員工名稱搜尋（使用已找到的員工 ID）
+            ...(matchingEmployeeIds.length > 0 ? [{ employeeId: { in: matchingEmployeeIds } }] : []),
             { leaveType: { name: { contains: query, mode: 'insensitive' } } },
             { reason: { contains: query, mode: 'insensitive' } },
           ],
         },
         include: {
-          employee: true,
           leaveType: true,
         },
         take: limit,
         orderBy: { createdAt: 'desc' },
       })
 
+      // 取得請假單相關的員工資訊
+      const leaveEmployeeIds = leaveRequests.map(req => req.employeeId)
+      const leaveEmployees = await ctx.prisma.employee.findMany({
+        where: { id: { in: leaveEmployeeIds } },
+        select: { id: true, name: true },
+      })
+      const leaveEmployeeMap = new Map(leaveEmployees.map(e => [e.id, e.name]))
+
       const leaveResults = leaveRequests.map(req => ({
         id: `leave-${req.id}`,
         type: 'leave' as const,
-        title: `${req.employee.name} - ${req.leaveType.name}`,
+        title: `${leaveEmployeeMap.get(req.employeeId) || '未知'} - ${req.leaveType.name}`,
         subtitle: `${req.startDate.toLocaleDateString()} ~ ${req.endDate.toLocaleDateString()}`,
         href: `/dashboard/leave/${req.id}`,
       }))
@@ -102,23 +113,29 @@ export const searchRouter = router({
         where: {
           companyId,
           OR: [
-            { employee: { name: { contains: query, mode: 'insensitive' } } },
+            // 依員工名稱搜尋（使用已找到的員工 ID）
+            ...(matchingEmployeeIds.length > 0 ? [{ employeeId: { in: matchingEmployeeIds } }] : []),
             { title: { contains: query, mode: 'insensitive' } },
             { description: { contains: query, mode: 'insensitive' } },
           ],
-        },
-        include: {
-          employee: true,
         },
         take: limit,
         orderBy: { createdAt: 'desc' },
       })
 
+      // 取得報銷單相關的員工資訊
+      const expenseEmployeeIds = expenseRequests.map(req => req.employeeId)
+      const expenseEmployees = await ctx.prisma.employee.findMany({
+        where: { id: { in: expenseEmployeeIds } },
+        select: { id: true, name: true },
+      })
+      const expenseEmployeeMap = new Map(expenseEmployees.map(e => [e.id, e.name]))
+
       const expenseResults = expenseRequests.map(req => ({
         id: `expense-${req.id}`,
         type: 'expense' as const,
         title: req.title,
-        subtitle: `${req.employee.name} - $${req.totalAmount.toLocaleString()}`,
+        subtitle: `${expenseEmployeeMap.get(req.employeeId) || '未知'} - $${req.totalAmount.toLocaleString()}`,
         href: `/dashboard/expense/${req.id}`,
       }))
       results.push(...expenseResults)
