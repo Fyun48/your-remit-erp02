@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -9,9 +9,11 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SidebarSettings } from './sidebar-settings'
+import { ThemePicker } from './theme-picker'
 import { LayoutList, Palette } from 'lucide-react'
 import { useSidebarStore } from '@/stores/use-sidebar-store'
 import { trpc } from '@/lib/trpc'
+import { defaultTheme } from '@/lib/themes'
 
 interface PersonalizationModalProps {
   open: boolean
@@ -26,9 +28,39 @@ export function PersonalizationModal({
 }: PersonalizationModalProps) {
   const [activeTab, setActiveTab] = useState('sidebar')
   const { config } = useSidebarStore()
+  const [selectedTheme, setSelectedTheme] = useState(defaultTheme)
+  const [originalTheme, setOriginalTheme] = useState(defaultTheme)
+
+  // Fetch current preferences
+  const { data: preference } = trpc.userPreference.get.useQuery(
+    { employeeId },
+    { enabled: !!employeeId && open }
+  )
+
+  // Initialize theme when preference loads
+  useEffect(() => {
+    if (preference?.themeConfig?.theme) {
+      setSelectedTheme(preference.themeConfig.theme)
+      setOriginalTheme(preference.themeConfig.theme)
+    }
+  }, [preference])
+
+  // Reset theme preview on cancel
+  const handleCancel = () => {
+    // Restore original theme
+    document.documentElement.setAttribute('data-theme', originalTheme)
+    onOpenChange(false)
+  }
 
   const updateSidebar = trpc.userPreference.updateSidebar.useMutation({
     onSuccess: () => {
+      onOpenChange(false)
+    },
+  })
+
+  const updateTheme = trpc.userPreference.updateTheme.useMutation({
+    onSuccess: () => {
+      setOriginalTheme(selectedTheme)
       onOpenChange(false)
     },
   })
@@ -40,8 +72,21 @@ export function PersonalizationModal({
     })
   }
 
+  const handleSaveTheme = () => {
+    updateTheme.mutate({
+      employeeId,
+      theme: selectedTheme,
+    })
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isOpen) {
+        // Restore original theme when closing without save
+        document.documentElement.setAttribute('data-theme', originalTheme)
+      }
+      onOpenChange(isOpen)
+    }}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>個人化設定</DialogTitle>
@@ -53,7 +98,7 @@ export function PersonalizationModal({
               <LayoutList className="h-4 w-4" />
               側邊欄
             </TabsTrigger>
-            <TabsTrigger value="theme" className="flex items-center gap-2" disabled>
+            <TabsTrigger value="theme" className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
               佈景主題
             </TabsTrigger>
@@ -62,15 +107,19 @@ export function PersonalizationModal({
           <TabsContent value="sidebar" className="mt-4">
             <SidebarSettings
               onSave={handleSaveSidebar}
-              onCancel={() => onOpenChange(false)}
+              onCancel={handleCancel}
               isSaving={updateSidebar.isPending}
             />
           </TabsContent>
 
           <TabsContent value="theme" className="mt-4">
-            <p className="text-muted-foreground text-center py-8">
-              佈景主題功能即將推出
-            </p>
+            <ThemePicker
+              currentTheme={selectedTheme}
+              onThemeChange={setSelectedTheme}
+              onSave={handleSaveTheme}
+              onCancel={handleCancel}
+              isSaving={updateTheme.isPending}
+            />
           </TabsContent>
         </Tabs>
       </DialogContent>
