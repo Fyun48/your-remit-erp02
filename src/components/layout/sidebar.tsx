@@ -55,16 +55,16 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                'group flex items-center rounded-md px-2 py-2 text-sm font-medium',
+                'group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-gray-800 text-white'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-muted-foreground hover:bg-sidebar-muted hover:text-sidebar-foreground'
               )}
             >
               <item.icon
                 className={cn(
-                  'mr-3 h-5 w-5 flex-shrink-0',
-                  isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
+                  'mr-3 h-5 w-5 flex-shrink-0 transition-colors',
+                  isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-muted-foreground group-hover:text-sidebar-foreground'
                 )}
               />
               {item.name}
@@ -74,10 +74,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       {/* 底部按鈕區 */}
-      <div className="border-t border-gray-800 p-4 space-y-2">
+      <div className="border-t border-sidebar-border p-4 space-y-2">
         <button
           onClick={() => setShowSettings(true)}
-          className="flex items-center gap-2 w-full px-2 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors"
+          className="flex items-center gap-2 w-full px-2 py-2 text-sm text-sidebar-muted-foreground hover:bg-sidebar-muted hover:text-sidebar-foreground rounded-md transition-colors"
         >
           <Settings2 className="h-5 w-5" />
           個人化設定
@@ -101,9 +101,9 @@ export function Sidebar({ groupName = '集團' }: SidebarProps) {
   return (
     <>
       {/* 桌面版側邊欄 - 固定顯示 */}
-      <div className="hidden md:flex h-full w-64 flex-col bg-gray-900">
-        <div className="flex h-16 items-center justify-center border-b border-gray-800">
-          <h1 className="text-xl font-bold text-white">{groupName} ERP</h1>
+      <div className="hidden md:flex h-full w-64 flex-col bg-sidebar">
+        <div className="flex h-16 items-center justify-center border-b border-sidebar-border">
+          <h1 className="text-xl font-bold text-sidebar-foreground">{groupName} ERP</h1>
         </div>
         <SidebarContent />
       </div>
@@ -117,12 +117,12 @@ export function Sidebar({ groupName = '集團' }: SidebarProps) {
             onClick={close}
           />
           {/* 側邊欄 */}
-          <div className="fixed inset-y-0 left-0 w-64 flex flex-col bg-gray-900">
-            <div className="flex h-16 items-center justify-between border-b border-gray-800 px-4">
-              <h1 className="text-xl font-bold text-white">{groupName} ERP</h1>
+          <div className="fixed inset-y-0 left-0 w-64 flex flex-col bg-sidebar">
+            <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
+              <h1 className="text-xl font-bold text-sidebar-foreground">{groupName} ERP</h1>
               <button
                 onClick={close}
-                className="text-gray-400 hover:text-white p-1"
+                className="text-sidebar-muted-foreground hover:text-sidebar-foreground p-1 transition-colors"
               >
                 <X className="h-6 w-6" />
               </button>

@@ -31,7 +31,7 @@ export function DashboardShell({
             companyName={companyName}
             isGroupAdmin={isGroupAdmin}
           />
-          <main className="flex-1 overflow-y-auto bg-gray-100 p-4 md:p-6">
+          <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
             {children}
           </main>
         </div>

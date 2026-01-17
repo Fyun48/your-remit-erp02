@@ -79,7 +79,7 @@ export function CompanySwitcher({
   // 非集團管理員只顯示當前公司
   if (!isGroupAdmin) {
     return (
-      <div className="flex items-center gap-1 md:gap-2 text-gray-700">
+      <div className="flex items-center gap-1 md:gap-2 text-foreground">
         <Building className="h-4 w-4 md:h-5 md:w-5" />
         <span className="text-sm md:text-base font-semibold hidden md:inline">{currentCompanyName}</span>
         <span className="text-xs font-semibold md:hidden">{getShortCompanyName(currentCompanyName)}</span>
@@ -110,24 +110,24 @@ export function CompanySwitcher({
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-md border bg-white p-1 shadow-lg">
-            <div className="px-2 py-1.5 text-xs font-medium text-gray-500">
+          <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-md border bg-popover text-popover-foreground p-1 shadow-lg">
+            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
               切換公司
             </div>
             <div className="max-h-60 overflow-auto">
               {companies.map((company) => (
                 <div
                   key={company.id}
-                  className={`flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 text-sm hover:bg-gray-100 ${
-                    currentCompanyId === company.id ? 'bg-gray-50' : ''
+                  className={`flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 text-sm hover:bg-accent ${
+                    currentCompanyId === company.id ? 'bg-accent/50' : ''
                   }`}
                   onClick={() => handleSelectCompany(company)}
                 >
                   <div className="flex items-center gap-2">
-                    <Building className="h-4 w-4 text-gray-400" />
+                    <Building className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <div className="font-medium">{company.name}</div>
-                      <div className="text-xs text-gray-500">{company.code}</div>
+                      <div className="text-xs text-muted-foreground">{company.code}</div>
                     </div>
                   </div>
                   {currentCompanyId === company.id && (

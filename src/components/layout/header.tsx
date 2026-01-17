@@ -48,16 +48,16 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
   }, [])
 
   return (
-    <header className="flex h-14 md:h-16 items-center justify-between border-b bg-white px-2 md:px-6">
+    <header className="flex h-14 md:h-16 items-center justify-between border-b bg-card px-2 md:px-6">
       <div className="flex items-center space-x-1 md:space-x-4">
         {/* 手機版漢堡選單按鈕 */}
         <button
           onClick={openSidebar}
-          className="md:hidden p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+          className="md:hidden p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
         >
           <Menu className="h-5 w-5" />
         </button>
-        <h2 className="text-base md:text-lg font-semibold hidden md:block">歡迎使用 ERP 系統</h2>
+        <h2 className="text-base md:text-lg font-semibold hidden md:block text-foreground">歡迎使用 ERP 系統</h2>
         {companyId && companyName && (
           <CompanySwitcher
             currentCompanyId={companyId}
@@ -71,7 +71,7 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
         {companyId && (
           <button
             onClick={() => setIsSearchOpen(true)}
-            className="flex items-center gap-1 px-2 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
             title="搜尋 (Ctrl+K)"
           >
             <Search className="h-4 w-4" />
@@ -83,7 +83,7 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="flex items-center space-x-1 md:space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors rounded-md px-1.5 md:px-2 py-1 hover:bg-gray-100"
+            className="flex items-center space-x-1 md:space-x-2 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md px-1.5 md:px-2 py-1 hover:bg-accent"
           >
             <Avatar className="h-7 w-7 md:h-8 md:w-8">
               <AvatarImage src={avatarUrl || undefined} alt={userName} />
@@ -91,18 +91,18 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
                 {getInitials(userName)}
               </AvatarFallback>
             </Avatar>
-            <span className="hidden md:inline">{userName}</span>
-            <span className="md:hidden text-xs">{getMobileDisplayName(userName)}</span>
+            <span className="hidden md:inline text-foreground">{userName}</span>
+            <span className="md:hidden text-xs text-foreground">{getMobileDisplayName(userName)}</span>
             <ChevronDown className={`h-3 w-3 md:h-4 md:w-4 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* 下拉選單 */}
           {isMenuOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border py-1 z-50">
+            <div className="absolute right-0 mt-2 w-48 bg-popover text-popover-foreground rounded-md shadow-lg border py-1 z-50">
               <Link
                 href="/dashboard/profile"
                 onClick={() => setIsMenuOpen(false)}
-                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                className="flex items-center px-4 py-2 text-sm hover:bg-accent"
               >
                 <User className="mr-2 h-4 w-4" />
                 個人資料
@@ -110,7 +110,7 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
               <Link
                 href="/dashboard/profile"
                 onClick={() => setIsMenuOpen(false)}
-                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                className="flex items-center px-4 py-2 text-sm hover:bg-accent"
               >
                 <Lock className="mr-2 h-4 w-4" />
                 變更密碼
@@ -118,7 +118,7 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
               <div className="border-t my-1" />
               <button
                 onClick={() => signOut({ callbackUrl: '/login' })}
-                className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                className="flex items-center w-full px-4 py-2 text-sm text-destructive hover:bg-accent"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 登出

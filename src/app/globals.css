@@ -37,6 +37,14 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+    /* 預設側邊欄配色 */
+    --sidebar: 220 13% 10%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-muted: 220 13% 18%;
+    --sidebar-muted-foreground: 0 0% 70%;
+    --sidebar-accent: 0 0% 9%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 220 13% 15%;
   }
   .dark {
     --background: 0 0% 3.9%;
@@ -87,6 +95,14 @@
     --input: 214 32% 91%;
     --ring: 221 83% 40%;
     --radius: 0.5rem;
+    /* 側邊欄 - 經典藍深色配色 */
+    --sidebar: 221 47% 20%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-muted: 221 47% 28%;
+    --sidebar-muted-foreground: 214 32% 75%;
+    --sidebar-accent: 221 83% 40%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 221 47% 25%;
   }
 
   /* ==================== Theme: Modern Dark ==================== */
@@ -111,6 +127,14 @@
     --input: 217 33% 25%;
     --ring: 239 84% 67%;
     --radius: 0.75rem;
+    /* 側邊欄 - 深紫配色 */
+    --sidebar: 239 50% 15%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-muted: 239 40% 22%;
+    --sidebar-muted-foreground: 215 20% 70%;
+    --sidebar-accent: 239 84% 67%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 239 40% 20%;
   }
 
   /* ==================== Theme: Fresh Mint ==================== */
@@ -135,6 +159,14 @@
     --input: 143 50% 85%;
     --ring: 160 84% 39%;
     --radius: 1rem;
+    /* 側邊欄 - 深薄荷綠配色 */
+    --sidebar: 160 50% 18%;
+    --sidebar-foreground: 138 76% 97%;
+    --sidebar-muted: 160 45% 25%;
+    --sidebar-muted-foreground: 138 50% 75%;
+    --sidebar-accent: 160 84% 39%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 160 45% 22%;
   }
 
   /* ==================== Theme: Warm Sunset ==================== */
@@ -159,6 +191,14 @@
     --input: 40 60% 85%;
     --ring: 25 95% 53%;
     --radius: 0.75rem;
+    /* 側邊欄 - 深橙棕配色 */
+    --sidebar: 25 50% 18%;
+    --sidebar-foreground: 48 100% 96%;
+    --sidebar-muted: 25 45% 26%;
+    --sidebar-muted-foreground: 40 60% 75%;
+    --sidebar-accent: 25 95% 53%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 25 45% 22%;
   }
 
   /* ==================== Theme: Elegant Purple ==================== */
@@ -183,6 +223,14 @@
     --input: 263 50% 88%;
     --ring: 258 90% 66%;
     --radius: 0.625rem;
+    /* 側邊欄 - 深紫配色 */
+    --sidebar: 263 50% 18%;
+    --sidebar-foreground: 270 100% 98%;
+    --sidebar-muted: 263 45% 26%;
+    --sidebar-muted-foreground: 270 50% 75%;
+    --sidebar-accent: 258 90% 66%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 263 45% 22%;
   }
 }
 
