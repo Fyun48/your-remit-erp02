@@ -48,7 +48,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <>
       <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">
         {visibleMenuItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+          // 儀表板只有完全匹配時才高亮，其他頁面支援子路徑匹配
+          const isActive = item.href === '/dashboard'
+            ? pathname === '/dashboard'
+            : pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <Link
               key={item.id}

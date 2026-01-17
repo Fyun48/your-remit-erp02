@@ -44,7 +44,7 @@ export const themes: ThemeDefinition[] = [
   },
 ]
 
-export const defaultTheme = 'classic'
+export const defaultTheme = 'mint'
 
 export function getThemeById(id: string): ThemeDefinition | undefined {
   return themes.find((theme) => theme.id === id)
