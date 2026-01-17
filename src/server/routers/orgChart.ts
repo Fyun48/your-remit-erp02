@@ -108,7 +108,7 @@ export const orgChartRouter = router({
   addNode: publicProcedure
     .input(z.object({
       chartId: z.string(),
-      nodeType: z.enum(['DEPARTMENT', 'POSITION', 'EMPLOYEE']),
+      nodeType: z.enum(['DEPARTMENT', 'POSITION', 'EMPLOYEE', 'TEAM', 'DIVISION', 'COMMITTEE', 'COMPANY', 'EXTERNAL']),
       referenceId: z.string().optional(),
       label: z.string().optional(),
       posX: z.number().default(0),
@@ -227,7 +227,7 @@ export const orgChartRouter = router({
   getAvailableEntities: publicProcedure
     .input(z.object({
       companyId: z.string(),
-      nodeType: z.enum(['DEPARTMENT', 'POSITION', 'EMPLOYEE']),
+      nodeType: z.enum(['DEPARTMENT', 'POSITION', 'EMPLOYEE', 'TEAM', 'DIVISION', 'COMMITTEE', 'COMPANY', 'EXTERNAL']),
     }))
     .query(async ({ ctx, input }) => {
       if (input.nodeType === 'DEPARTMENT') {
@@ -246,23 +246,28 @@ export const orgChartRouter = router({
         })
       }
 
-      // EMPLOYEE
-      const assignments = await ctx.prisma.employeeAssignment.findMany({
-        where: { companyId: input.companyId, status: 'ACTIVE' },
-        include: {
-          employee: { select: { id: true, name: true, employeeNo: true } },
-          position: { select: { name: true } },
-          department: { select: { name: true } },
-        },
-        orderBy: { employee: { employeeNo: 'asc' } },
-      })
+      if (input.nodeType === 'EMPLOYEE') {
+        // EMPLOYEE
+        const assignments = await ctx.prisma.employeeAssignment.findMany({
+          where: { companyId: input.companyId, status: 'ACTIVE' },
+          include: {
+            employee: { select: { id: true, name: true, employeeNo: true } },
+            position: { select: { name: true } },
+            department: { select: { name: true } },
+          },
+          orderBy: { employee: { employeeNo: 'asc' } },
+        })
 
-      return assignments.map((a) => ({
-        id: a.employee.id,
-        name: a.employee.name,
-        employeeNo: a.employee.employeeNo,
-        position: a.position.name,
-        department: a.department.name,
-      }))
+        return assignments.map((a) => ({
+          id: a.employee.id,
+          name: a.employee.name,
+          employeeNo: a.employee.employeeNo,
+          position: a.position.name,
+          department: a.department.name,
+        }))
+      }
+
+      // 其他類型（TEAM, DIVISION, COMMITTEE, COMPANY, EXTERNAL）暫不支援自動帶入
+      return []
     }),
 })

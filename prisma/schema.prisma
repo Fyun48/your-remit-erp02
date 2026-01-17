@@ -694,8 +694,13 @@ enum OrgChartType {
 // 組織節點類型
 enum OrgNodeType {
   DEPARTMENT // 部門
-  POSITION // 職位
-  EMPLOYEE // 員工
+  POSITION   // 職位
+  EMPLOYEE   // 員工
+  TEAM       // 團隊
+  DIVISION   // 事業部
+  COMMITTEE  // 委員會
+  COMPANY    // 公司
+  EXTERNAL   // 外部單位
 }
 
 // 組織關係類型

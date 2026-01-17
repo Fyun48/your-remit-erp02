@@ -79,12 +79,32 @@ export function PropertyPanel() {
             />
           </div>
 
+          {/* 職位節點顯示員工名稱輸入 */}
+          {selectedNode.data.nodeType === 'POSITION' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="employee-name">負責人姓名</Label>
+              <Input
+                id="employee-name"
+                value={selectedNode.data.employeeName || ''}
+                onChange={(e) =>
+                  updateNodeData(selectedNode.id, { employeeName: e.target.value })
+                }
+                placeholder="輸入負責人姓名"
+              />
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label>節點類型</Label>
             <div className="px-3 py-2 bg-muted rounded-md text-sm">
               {selectedNode.data.nodeType === 'DEPARTMENT' && '部門'}
               {selectedNode.data.nodeType === 'POSITION' && '職位'}
               {selectedNode.data.nodeType === 'EMPLOYEE' && '員工'}
+              {selectedNode.data.nodeType === 'TEAM' && '團隊'}
+              {selectedNode.data.nodeType === 'DIVISION' && '事業部'}
+              {selectedNode.data.nodeType === 'COMMITTEE' && '委員會'}
+              {selectedNode.data.nodeType === 'COMPANY' && '公司'}
+              {selectedNode.data.nodeType === 'EXTERNAL' && '外部單位'}
             </div>
           </div>
         </div>

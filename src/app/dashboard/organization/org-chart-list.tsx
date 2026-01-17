@@ -38,22 +38,43 @@ interface OrgChart {
 interface OrgChartListProps {
   companyId: string
   companyName: string
+  userId: string
   orgCharts: OrgChart[]
 }
 
-export function OrgChartList({ companyId, companyName, orgCharts }: OrgChartListProps) {
+export function OrgChartList({ companyId, companyName, userId, orgCharts }: OrgChartListProps) {
   const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createData, setCreateData] = useState({
     name: '',
     description: '',
     type: 'COMPANY' as 'GROUP' | 'COMPANY',
+    selectedCompanyId: companyId,
+    selectedGroupId: '',
   })
+
+  // 取得公司列表
+  const { data: companies } = trpc.company.listAll.useQuery(
+    { userId },
+    { enabled: isCreateOpen }
+  )
+
+  // 取得集團列表
+  const { data: groups } = trpc.company.listGroups.useQuery(
+    { userId },
+    { enabled: isCreateOpen && createData.type === 'GROUP' }
+  )
 
   const createChart = trpc.orgChart.create.useMutation({
     onSuccess: (data) => {
       setIsCreateOpen(false)
-      setCreateData({ name: '', description: '', type: 'COMPANY' })
+      setCreateData({
+        name: '',
+        description: '',
+        type: 'COMPANY',
+        selectedCompanyId: companyId,
+        selectedGroupId: '',
+      })
       router.push(`/dashboard/organization/editor/${data.id}`)
     },
     onError: (error) => {
@@ -67,11 +88,22 @@ export function OrgChartList({ companyId, companyName, orgCharts }: OrgChartList
       return
     }
 
+    if (createData.type === 'COMPANY' && !createData.selectedCompanyId) {
+      alert('請選擇公司')
+      return
+    }
+
+    if (createData.type === 'GROUP' && !createData.selectedGroupId) {
+      alert('請選擇集團')
+      return
+    }
+
     createChart.mutate({
       name: createData.name,
       description: createData.description || undefined,
       type: createData.type,
-      companyId: createData.type === 'COMPANY' ? companyId : undefined,
+      companyId: createData.type === 'COMPANY' ? createData.selectedCompanyId : undefined,
+      groupId: createData.type === 'GROUP' ? createData.selectedGroupId : undefined,
     })
   }
 
@@ -170,6 +202,50 @@ export function OrgChartList({ companyId, companyName, orgCharts }: OrgChartList
                 </SelectContent>
               </Select>
             </div>
+            {createData.type === 'COMPANY' && (
+              <div className="space-y-2">
+                <Label>選擇公司</Label>
+                <Select
+                  value={createData.selectedCompanyId}
+                  onValueChange={(value) =>
+                    setCreateData({ ...createData, selectedCompanyId: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇公司" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies?.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {createData.type === 'GROUP' && (
+              <div className="space-y-2">
+                <Label>選擇集團</Label>
+                <Select
+                  value={createData.selectedGroupId}
+                  onValueChange={(value) =>
+                    setCreateData({ ...createData, selectedGroupId: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇集團" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groups?.map((group) => (
+                      <SelectItem key={group.id} value={group.id}>
+                        {group.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="chart-name">名稱 *</Label>
               <Input

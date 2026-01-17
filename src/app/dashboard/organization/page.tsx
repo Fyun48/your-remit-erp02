@@ -38,6 +38,7 @@ export default async function OrganizationPage() {
     <OrgChartList
       companyId={currentCompany.id}
       companyName={currentCompany.name}
+      userId={session.user.id}
       orgCharts={orgCharts}
     />
   )

@@ -12,7 +12,7 @@ import {
   EdgeChange,
 } from 'reactflow'
 
-export type OrgNodeType = 'DEPARTMENT' | 'POSITION' | 'EMPLOYEE'
+export type OrgNodeType = 'DEPARTMENT' | 'POSITION' | 'EMPLOYEE' | 'TEAM' | 'DIVISION' | 'COMMITTEE' | 'COMPANY' | 'EXTERNAL'
 export type OrgRelationType = 'SOLID' | 'DOTTED' | 'MATRIX'
 
 export interface OrgNodeData {
@@ -20,6 +20,9 @@ export interface OrgNodeData {
   referenceId?: string
   label: string
   subtitle?: string
+  employeeName?: string  // 職位節點的負責人姓名
+  width?: number
+  height?: number
 }
 
 export interface OrgEdgeData {

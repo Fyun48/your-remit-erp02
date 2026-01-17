@@ -161,10 +161,15 @@ function OrgChartEditorInner({
       })
 
       const id = `node-${Date.now()}`
-      const labels = {
+      const labels: Record<OrgNodeType, string> = {
         DEPARTMENT: '新部門',
         POSITION: '新職位',
         EMPLOYEE: '新員工',
+        TEAM: '新團隊',
+        DIVISION: '新事業部',
+        COMMITTEE: '新委員會',
+        COMPANY: '新公司',
+        EXTERNAL: '新外部單位',
       }
 
       addNode({
@@ -291,10 +296,15 @@ function OrgChartEditorInner({
           <Controls />
           <MiniMap
             nodeColor={(node) => {
-              const colors = {
+              const colors: Record<OrgNodeType, string> = {
                 DEPARTMENT: '#93c5fd',
                 POSITION: '#c4b5fd',
                 EMPLOYEE: '#86efac',
+                TEAM: '#5eead4',
+                DIVISION: '#a5b4fc',
+                COMMITTEE: '#fcd34d',
+                COMPANY: '#94a3b8',
+                EXTERNAL: '#fda4af',
               }
               return colors[node.data?.nodeType as OrgNodeType] || '#e5e7eb'
             }}
