@@ -50,12 +50,12 @@ interface SealRequestListProps {
 }
 
 const sealTypeLabels: Record<string, string> = {
-  COMPANY_SEAL: '公司大章',
-  COMPANY_SMALL_SEAL: '公司小章',
+  COMPANY_SEAL: '公司章',
   CONTRACT_SEAL: '合約用印',
   INVOICE_SEAL: '發票章',
   BOARD_SEAL: '董事會印鑑',
   BANK_SEAL: '銀行印鑑',
+  PERFORATION_SEAL: '騎縫章',
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
@@ -141,7 +141,11 @@ export function SealRequestList({
       }
     }
     if (filterStatus && req.status !== filterStatus) return false
-    if (filterType && req.sealType !== filterType) return false
+    // sealTypes 是 Json 陣列，檢查是否包含選擇的類型
+    if (filterType) {
+      const types = req.sealTypes as string[] | null
+      if (!types || !Array.isArray(types) || !types.includes(filterType)) return false
+    }
     return true
   })
 
@@ -350,7 +354,15 @@ export function SealRequestList({
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{sealTypeLabels[req.sealType]}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {((req.sealTypes as string[] | null) || []).map((type) => (
+                            <Badge key={type} variant="outline" className="text-xs">
+                              {sealTypeLabels[type] || type}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
                       <TableCell className="max-w-[200px] truncate">{req.purpose}</TableCell>
                       <TableCell className="text-center">
                         {req.isCarryOut ? (
@@ -462,9 +474,15 @@ export function SealRequestList({
                   <span className="text-muted-foreground">申請人</span>
                   <span>{actionDialog.request.applicant.name}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-start">
                   <span className="text-muted-foreground">印章類型</span>
-                  <span>{sealTypeLabels[actionDialog.request.sealType]}</span>
+                  <div className="flex flex-wrap gap-1 justify-end">
+                    {((actionDialog.request.sealTypes as string[] | null) || []).map((type) => (
+                      <Badge key={type} variant="outline" className="text-xs">
+                        {sealTypeLabels[type] || type}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </div>
 

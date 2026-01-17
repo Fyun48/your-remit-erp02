@@ -8,14 +8,17 @@ export const sealRequestRouter = router({
     .input(z.object({
       companyId: z.string(),
       status: z.enum(['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'PROCESSING', 'COMPLETED', 'CANCELLED']).optional(),
-      sealType: z.enum(['COMPANY_SEAL', 'COMPANY_SMALL_SEAL', 'CONTRACT_SEAL', 'INVOICE_SEAL', 'BOARD_SEAL', 'BANK_SEAL']).optional(),
+      sealType: z.enum(['COMPANY_SEAL', 'CONTRACT_SEAL', 'INVOICE_SEAL', 'BOARD_SEAL', 'BANK_SEAL', 'PERFORATION_SEAL']).optional(),
       startDate: z.date().optional(),
       endDate: z.date().optional(),
     }))
     .query(async ({ ctx, input }) => {
       const where: Record<string, unknown> = { companyId: input.companyId }
       if (input.status) where.status = input.status
-      if (input.sealType) where.sealType = input.sealType
+      // 使用 Json path contains 查詢包含特定印章類型的申請
+      if (input.sealType) {
+        where.sealTypes = { array_contains: input.sealType }
+      }
       if (input.startDate || input.endDate) {
         where.createdAt = {}
         if (input.startDate) (where.createdAt as Record<string, unknown>).gte = input.startDate
@@ -114,7 +117,7 @@ export const sealRequestRouter = router({
     .input(z.object({
       companyId: z.string(),
       applicantId: z.string(),
-      sealType: z.enum(['COMPANY_SEAL', 'COMPANY_SMALL_SEAL', 'CONTRACT_SEAL', 'INVOICE_SEAL', 'BOARD_SEAL', 'BANK_SEAL']),
+      sealTypes: z.array(z.enum(['COMPANY_SEAL', 'CONTRACT_SEAL', 'INVOICE_SEAL', 'BOARD_SEAL', 'BANK_SEAL', 'PERFORATION_SEAL'])).min(1, '請至少選擇一種印章類型'),
       purpose: z.string().min(1, '請填寫用途說明'),
       documentName: z.string().optional(),
       documentCount: z.number().min(1).default(1),
@@ -154,7 +157,7 @@ export const sealRequestRouter = router({
           requestNo,
           companyId: input.companyId,
           applicantId: input.applicantId,
-          sealType: input.sealType,
+          sealTypes: input.sealTypes,
           purpose: input.purpose,
           documentName: input.documentName,
           documentCount: input.documentCount,
@@ -170,7 +173,7 @@ export const sealRequestRouter = router({
   update: publicProcedure
     .input(z.object({
       id: z.string(),
-      sealType: z.enum(['COMPANY_SEAL', 'COMPANY_SMALL_SEAL', 'CONTRACT_SEAL', 'INVOICE_SEAL', 'BOARD_SEAL', 'BANK_SEAL']).optional(),
+      sealTypes: z.array(z.enum(['COMPANY_SEAL', 'CONTRACT_SEAL', 'INVOICE_SEAL', 'BOARD_SEAL', 'BANK_SEAL', 'PERFORATION_SEAL'])).min(1, '請至少選擇一種印章類型').optional(),
       purpose: z.string().optional(),
       documentName: z.string().optional(),
       documentCount: z.number().min(1).optional(),
@@ -434,7 +437,7 @@ export const sealRequestRouter = router({
         pendingCount,
         processingCount,
         overdueCount,
-        byType,
+        requestsThisYear,
       ] = await Promise.all([
         // 本月申請數
         ctx.prisma.sealRequest.count({
@@ -474,16 +477,30 @@ export const sealRequestRouter = router({
             expectedReturn: { lt: now },
           },
         }),
-        // 按類型統計
-        ctx.prisma.sealRequest.groupBy({
-          by: ['sealType'],
+        // 取得本年度所有申請的印章類型 (用於計算按類型統計)
+        ctx.prisma.sealRequest.findMany({
           where: {
             companyId: input.companyId,
             createdAt: { gte: startOfYear },
           },
-          _count: true,
+          select: { sealTypes: true },
         }),
       ])
+
+      // 計算按類型統計 (由於 sealTypes 是 Json 陣列，需要在 JS 端統計)
+      const typeCountMap: Record<string, number> = {}
+      for (const req of requestsThisYear) {
+        const types = req.sealTypes as string[]
+        if (Array.isArray(types)) {
+          for (const t of types) {
+            typeCountMap[t] = (typeCountMap[t] || 0) + 1
+          }
+        }
+      }
+      const byType = Object.entries(typeCountMap).map(([sealType, count]) => ({
+        sealType,
+        _count: count,
+      }))
 
       return {
         totalThisMonth,

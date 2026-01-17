@@ -47,7 +47,7 @@ interface SealRequest {
   requestNo: string
   companyId: string
   applicantId: string
-  sealType: string
+  sealTypes: string[] | unknown  // Json 陣列
   purpose: string
   documentName: string | null
   documentCount: number
@@ -74,12 +74,12 @@ interface SealRequestDetailProps {
 }
 
 const sealTypeLabels: Record<string, string> = {
-  COMPANY_SEAL: '公司大章',
-  COMPANY_SMALL_SEAL: '公司小章',
+  COMPANY_SEAL: '公司章',
   CONTRACT_SEAL: '合約用印',
   INVOICE_SEAL: '發票章',
   BOARD_SEAL: '董事會印鑑',
   BANK_SEAL: '銀行印鑑',
+  PERFORATION_SEAL: '騎縫章',
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
@@ -264,7 +264,13 @@ export function SealRequestDetail({ request, currentUserId }: SealRequestDetailP
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label className="text-muted-foreground">印章類型</Label>
-                  <p className="font-medium">{sealTypeLabels[request.sealType]}</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {((request.sealTypes as string[] | null) || []).map((type) => (
+                      <Badge key={type} variant="outline">
+                        {sealTypeLabels[type] || type}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">用印份數</Label>

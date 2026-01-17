@@ -9,13 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowLeft, Stamp, Save, Send } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 
@@ -27,12 +21,12 @@ interface SealRequestFormProps {
 }
 
 const sealTypes = [
-  { value: 'COMPANY_SEAL', label: '公司大章', description: '用於重要合約、官方文件' },
-  { value: 'COMPANY_SMALL_SEAL', label: '公司小章', description: '用於一般文件' },
+  { value: 'COMPANY_SEAL', label: '公司章', description: '用於重要合約、官方文件' },
   { value: 'CONTRACT_SEAL', label: '合約用印', description: '用於合約簽署' },
   { value: 'INVOICE_SEAL', label: '發票章', description: '用於發票開立' },
   { value: 'BOARD_SEAL', label: '董事會印鑑', description: '用於董事會決議' },
   { value: 'BANK_SEAL', label: '銀行印鑑', description: '用於銀行往來' },
+  { value: 'PERFORATION_SEAL', label: '騎縫章', description: '用於多頁文件防偽' },
 ]
 
 export function SealRequestForm({
@@ -45,7 +39,7 @@ export function SealRequestForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
-    sealType: '' as string,
+    sealTypes: [] as string[],
     purpose: '',
     documentName: '',
     documentCount: 1,
@@ -80,8 +74,8 @@ export function SealRequestForm({
   const validate = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.sealType) {
-      newErrors.sealType = '請選擇印章類型'
+    if (formData.sealTypes.length === 0) {
+      newErrors.sealTypes = '請至少選擇一種印章類型'
     }
     if (!formData.purpose.trim()) {
       newErrors.purpose = '請填寫用途說明'
@@ -104,7 +98,7 @@ export function SealRequestForm({
     create.mutate({
       companyId,
       applicantId,
-      sealType: formData.sealType as 'COMPANY_SEAL' | 'COMPANY_SMALL_SEAL' | 'CONTRACT_SEAL' | 'INVOICE_SEAL' | 'BOARD_SEAL' | 'BANK_SEAL',
+      sealTypes: formData.sealTypes as ('COMPANY_SEAL' | 'CONTRACT_SEAL' | 'INVOICE_SEAL' | 'BOARD_SEAL' | 'BANK_SEAL' | 'PERFORATION_SEAL')[],
       purpose: formData.purpose,
       documentName: formData.documentName || undefined,
       documentCount: formData.documentCount,
@@ -123,7 +117,7 @@ export function SealRequestForm({
       {
         companyId,
         applicantId,
-        sealType: formData.sealType as 'COMPANY_SEAL' | 'COMPANY_SMALL_SEAL' | 'CONTRACT_SEAL' | 'INVOICE_SEAL' | 'BOARD_SEAL' | 'BANK_SEAL',
+        sealTypes: formData.sealTypes as ('COMPANY_SEAL' | 'CONTRACT_SEAL' | 'INVOICE_SEAL' | 'BOARD_SEAL' | 'BANK_SEAL' | 'PERFORATION_SEAL')[],
         purpose: formData.purpose,
         documentName: formData.documentName || undefined,
         documentCount: formData.documentCount,
@@ -140,7 +134,7 @@ export function SealRequestForm({
               applicantId,
               companyId,
               requestData: {
-                sealType: formData.sealType,
+                sealTypes: formData.sealTypes,
                 documentCount: formData.documentCount,
                 isCarryOut: formData.isCarryOut,
               },
@@ -182,32 +176,44 @@ export function SealRequestForm({
               <CardDescription>請填寫用印申請相關資訊</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="sealType">印章類型 *</Label>
-                <Select
-                  value={formData.sealType}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, sealType: value })
-                  }
-                >
-                  <SelectTrigger className={errors.sealType ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="選擇印章類型" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sealTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        <div>
-                          <div>{type.label}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {type.description}
-                          </div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.sealType && (
-                  <p className="text-sm text-red-500">{errors.sealType}</p>
+              <div className="space-y-3">
+                <Label>印章類型 * (可複選)</Label>
+                <div className={`grid gap-3 md:grid-cols-2 p-4 border rounded-lg ${errors.sealTypes ? 'border-red-500' : ''}`}>
+                  {sealTypes.map((type) => (
+                    <div key={type.value} className="flex items-start space-x-3">
+                      <Checkbox
+                        id={type.value}
+                        checked={formData.sealTypes.includes(type.value)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFormData({
+                              ...formData,
+                              sealTypes: [...formData.sealTypes, type.value],
+                            })
+                          } else {
+                            setFormData({
+                              ...formData,
+                              sealTypes: formData.sealTypes.filter((t) => t !== type.value),
+                            })
+                          }
+                        }}
+                      />
+                      <div className="grid gap-1 leading-none">
+                        <label
+                          htmlFor={type.value}
+                          className="text-sm font-medium cursor-pointer"
+                        >
+                          {type.label}
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          {type.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {errors.sealTypes && (
+                  <p className="text-sm text-red-500">{errors.sealTypes}</p>
                 )}
               </div>
 

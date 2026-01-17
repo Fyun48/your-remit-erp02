@@ -1692,12 +1692,12 @@ model AccountPayable {
 
 // 用印類型
 enum SealType {
-  COMPANY_SEAL // 公司大章
-  COMPANY_SMALL_SEAL // 公司小章
+  COMPANY_SEAL // 公司章 (合併原公司大章與公司小章)
   CONTRACT_SEAL // 合約用印
   INVOICE_SEAL // 發票章
   BOARD_SEAL // 董事會印鑑
   BANK_SEAL // 銀行印鑑
+  PERFORATION_SEAL // 騎縫章
 }
 
 // 用印申請狀態
@@ -1720,7 +1720,7 @@ model SealRequest {
   applicantId String
   applicant   Employee @relation("SealApplicant", fields: [applicantId], references: [id])
 
-  sealType      SealType
+  sealTypes     Json // 印章類型陣列 e.g., ["COMPANY_SEAL", "PERFORATION_SEAL"]
   purpose       String // 用途說明
   documentName  String? // 文件名稱
   documentCount Int      @default(1) // 用印份數
