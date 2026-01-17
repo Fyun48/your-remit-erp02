@@ -32,6 +32,7 @@ import { orgChartRouter } from './orgChart'
 import { workflowRouter } from './workflow'
 import { delegateRouter } from './delegate'
 import { userPreferenceRouter } from './userPreference'
+import { searchRouter } from './search'
 
 export const appRouter = router({
   health: healthRouter,
@@ -67,6 +68,7 @@ export const appRouter = router({
   workflow: workflowRouter,
   delegate: delegateRouter,
   userPreference: userPreferenceRouter,
+  search: searchRouter,
 })
 
 export type AppRouter = typeof appRouter
