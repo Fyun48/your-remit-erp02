@@ -1723,7 +1723,7 @@ model SealRequest {
   applicantId String
   applicant   Employee @relation("SealApplicant", fields: [applicantId], references: [id])
 
-  sealTypes     Json // 印章類型陣列 e.g., ["COMPANY_SEAL", "PERFORATION_SEAL"]
+  sealTypes     Json @default("[]") // 印章類型陣列 e.g., ["COMPANY_SEAL", "PERFORATION_SEAL"]
   purpose       String // 用途說明
   documentName  String? // 文件名稱
   documentCount Int      @default(1) // 用印份數
