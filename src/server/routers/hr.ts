@@ -15,15 +15,24 @@ export const hrRouter = router({
       excludeEmployeeId: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const where: Record<string, unknown> = {
-        companyId: input.companyId,
-      }
-      if (input.departmentId) where.departmentId = input.departmentId
-      if (input.status) where.status = input.status
-      if (input.excludeEmployeeId) where.employeeId = { not: input.excludeEmployeeId }
-
-      const assignments = await ctx.prisma.employeeAssignment.findMany({
-        where,
+      // 使用 Prisma 在資料庫層進行搜尋（效能優化）
+      return ctx.prisma.employeeAssignment.findMany({
+        where: {
+          companyId: input.companyId,
+          ...(input.departmentId && { departmentId: input.departmentId }),
+          ...(input.status && { status: input.status }),
+          ...(input.excludeEmployeeId && { employeeId: { not: input.excludeEmployeeId } }),
+          // 搜尋條件移至資料庫層
+          ...(input.search && {
+            employee: {
+              OR: [
+                { name: { contains: input.search, mode: 'insensitive' as const } },
+                { employeeNo: { contains: input.search, mode: 'insensitive' as const } },
+                { email: { contains: input.search, mode: 'insensitive' as const } },
+              ],
+            },
+          }),
+        },
         include: {
           employee: true,
           department: true,
@@ -36,18 +45,6 @@ export const hrRouter = router({
         },
         orderBy: { employee: { employeeNo: 'asc' } },
       })
-
-      // 搜尋過濾
-      if (input.search) {
-        const search = input.search.toLowerCase()
-        return assignments.filter((a) =>
-          a.employee.name.toLowerCase().includes(search) ||
-          a.employee.employeeNo.toLowerCase().includes(search) ||
-          a.employee.email.toLowerCase().includes(search)
-        )
-      }
-
-      return assignments
     }),
 
   // 取得員工詳細資料

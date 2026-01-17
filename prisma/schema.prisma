@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // Neon: 用於 migrations（非 pooler）
 }
 
 // ==================== 稽核日誌 ====================
@@ -269,6 +270,8 @@ model EmployeeAssignment {
   subordinates EmployeeAssignment[] @relation("Supervision")
 
   @@unique([employeeId, companyId])
+  @@index([supervisorId]) // 查詢下屬效能優化
+  @@index([companyId, departmentId, status]) // 部門查詢效能優化
   @@map("employee_assignments")
 }
 
@@ -543,6 +546,7 @@ model AttendanceRecord {
   company Company @relation(fields: [companyId], references: [id])
 
   @@unique([employeeId, companyId, date])
+  @@index([companyId, date]) // 報表查詢效能優化
   @@map("attendance_records")
 }
 
@@ -641,6 +645,7 @@ model LeaveRequest {
 
   @@index([employeeId, companyId])
   @@index([status])
+  @@index([employeeId, companyId, status]) // 複合索引優化查詢效能
   @@map("leave_requests")
 }
 
@@ -1325,6 +1330,7 @@ model ExpenseRequest {
 
   @@index([employeeId, companyId])
   @@index([status])
+  @@index([employeeId, companyId, status]) // 複合索引優化查詢效能
   @@map("expense_requests")
 }
 

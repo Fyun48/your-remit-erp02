@@ -13,11 +13,16 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // 取得員工資訊
-  const employee = await prisma.employee.findUnique({
-    where: { id: session.user.id },
-    select: { id: true, name: true },
-  })
+  const userId = session.user.id
+
+  // === Batch 1: 並行取得員工和公司資訊 ===
+  const [employee, currentCompany] = await Promise.all([
+    prisma.employee.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true },
+    }),
+    getCurrentCompany(userId),
+  ])
 
   if (!employee) {
     return (
@@ -28,8 +33,6 @@ export default async function DashboardPage() {
     )
   }
 
-  // 取得當前選擇的公司（集團管理員可切換）
-  const currentCompany = await getCurrentCompany(session.user.id)
   if (!currentCompany) {
     return (
       <div className="p-6">
@@ -39,18 +42,6 @@ export default async function DashboardPage() {
     )
   }
 
-  // 取得在當前公司的任職資訊
-  const assignment = await prisma.employeeAssignment.findFirst({
-    where: {
-      employeeId: session.user.id,
-      companyId: currentCompany.id,
-      status: 'ACTIVE',
-    },
-    include: { company: true, department: true },
-  })
-
-  // 如果該員工在選擇的公司沒有任職，顯示提示（集團管理員可能切換到沒有任職的公司）
-  const displayDepartment = assignment?.department?.name || '（無部門資訊）'
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
@@ -58,90 +49,121 @@ export default async function DashboardPage() {
   const startOfNextMonth = new Date(year, month + 1, 1)
   const startOfYear = new Date(year, 0, 1)
 
-  // 本月出勤天數
-  const attendanceCount = await prisma.attendanceRecord.count({
-    where: {
-      employeeId: employee.id,
-      companyId: currentCompany.id,
-      date: { gte: startOfMonth, lt: startOfNextMonth },
-      status: { in: ['NORMAL', 'LATE', 'EARLY_LEAVE'] },
-    },
-  })
-
-  // 待審核申請
-  const pendingLeave = await prisma.leaveRequest.count({
-    where: { employeeId: employee.id, status: 'PENDING' },
-  })
-  const pendingExpense = await prisma.expenseRequest.count({
-    where: { employeeId: employee.id, status: 'PENDING' },
-  })
-
-  // 待我審核（主管）- 只有在該公司有任職時才查詢
-  const subordinates = assignment ? await prisma.employeeAssignment.findMany({
-    where: { supervisorId: assignment.id, status: 'ACTIVE' },
-    select: { employeeId: true, companyId: true },
-  }) : []
-
-  let pendingForMe = 0
-  if (subordinates.length > 0) {
-    const pendingLeaveForMe = await prisma.leaveRequest.count({
+  // === Batch 2: 並行取得所有統計資料 ===
+  const [
+    assignment,
+    attendanceCount,
+    pendingLeave,
+    pendingExpense,
+    annualLeaveType,
+    expenseTotal,
+    recentLeave,
+    recentExpense,
+  ] = await Promise.all([
+    // 任職資訊
+    prisma.employeeAssignment.findFirst({
       where: {
-        status: 'PENDING',
-        OR: subordinates.map(s => ({ employeeId: s.employeeId, companyId: s.companyId })),
+        employeeId: userId,
+        companyId: currentCompany.id,
+        status: 'ACTIVE',
       },
-    })
-    const pendingExpenseForMe = await prisma.expenseRequest.count({
-      where: {
-        status: 'PENDING',
-        OR: subordinates.map(s => ({ employeeId: s.employeeId, companyId: s.companyId })),
-      },
-    })
-    pendingForMe = pendingLeaveForMe + pendingExpenseForMe
-  }
-
-  // 剩餘特休
-  const annualLeaveType = await prisma.leaveType.findFirst({ where: { code: 'ANNUAL' } })
-  let remainingAnnualDays = 0
-  if (annualLeaveType) {
-    const balance = await prisma.leaveBalance.findFirst({
+      include: { company: true, department: true },
+    }),
+    // 本月出勤天數
+    prisma.attendanceRecord.count({
       where: {
         employeeId: employee.id,
         companyId: currentCompany.id,
-        leaveTypeId: annualLeaveType.id,
-        year,
+        date: { gte: startOfMonth, lt: startOfNextMonth },
+        status: { in: ['NORMAL', 'LATE', 'EARLY_LEAVE'] },
       },
-    })
-    if (balance) {
-      const totalHours = balance.entitledHours + balance.carriedHours + balance.adjustedHours
-      const usedHours = balance.usedHours + balance.pendingHours
-      remainingAnnualDays = Math.floor((totalHours - usedHours) / 8)
-    }
+    }),
+    // 待審核請假
+    prisma.leaveRequest.count({
+      where: { employeeId: employee.id, status: 'PENDING' },
+    }),
+    // 待審核費用
+    prisma.expenseRequest.count({
+      where: { employeeId: employee.id, status: 'PENDING' },
+    }),
+    // 特休假別
+    prisma.leaveType.findFirst({ where: { code: 'ANNUAL' } }),
+    // 本年度費用報銷
+    prisma.expenseRequest.aggregate({
+      where: {
+        employeeId: employee.id,
+        companyId: currentCompany.id,
+        status: 'APPROVED',
+        periodStart: { gte: startOfYear },
+      },
+      _sum: { totalAmount: true },
+    }),
+    // 近期請假
+    prisma.leaveRequest.findMany({
+      where: { employeeId: employee.id },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+      include: { leaveType: true },
+    }),
+    // 近期費用
+    prisma.expenseRequest.findMany({
+      where: { employeeId: employee.id },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+    }),
+  ])
+
+  const displayDepartment = assignment?.department?.name || '（無部門資訊）'
+
+  // === Batch 3: 並行取得需要 assignment 的資料 ===
+  const [subordinates, leaveBalance] = await Promise.all([
+    // 下屬
+    assignment
+      ? prisma.employeeAssignment.findMany({
+          where: { supervisorId: assignment.id, status: 'ACTIVE' },
+          select: { employeeId: true, companyId: true },
+        })
+      : Promise.resolve([]),
+    // 特休餘額
+    annualLeaveType
+      ? prisma.leaveBalance.findFirst({
+          where: {
+            employeeId: employee.id,
+            companyId: currentCompany.id,
+            leaveTypeId: annualLeaveType.id,
+            year,
+          },
+        })
+      : Promise.resolve(null),
+  ])
+
+  // 計算剩餘特休
+  let remainingAnnualDays = 0
+  if (leaveBalance) {
+    const totalHours = leaveBalance.entitledHours + leaveBalance.carriedHours + leaveBalance.adjustedHours
+    const usedHours = leaveBalance.usedHours + leaveBalance.pendingHours
+    remainingAnnualDays = Math.floor((totalHours - usedHours) / 8)
   }
 
-  // 本年度費用報銷
-  const expenseTotal = await prisma.expenseRequest.aggregate({
-    where: {
-      employeeId: employee.id,
-      companyId: currentCompany.id,
-      status: 'APPROVED',
-      periodStart: { gte: startOfYear },
-    },
-    _sum: { totalAmount: true },
-  })
-
-  // 近期活動
-  const recentLeave = await prisma.leaveRequest.findMany({
-    where: { employeeId: employee.id },
-    orderBy: { createdAt: 'desc' },
-    take: 3,
-    include: { leaveType: true },
-  })
-
-  const recentExpense = await prisma.expenseRequest.findMany({
-    where: { employeeId: employee.id },
-    orderBy: { createdAt: 'desc' },
-    take: 3,
-  })
+  // === Batch 4: 待我審核（主管）===
+  let pendingForMe = 0
+  if (subordinates.length > 0) {
+    const [pendingLeaveForMe, pendingExpenseForMe] = await Promise.all([
+      prisma.leaveRequest.count({
+        where: {
+          status: 'PENDING',
+          OR: subordinates.map(s => ({ employeeId: s.employeeId, companyId: s.companyId })),
+        },
+      }),
+      prisma.expenseRequest.count({
+        where: {
+          status: 'PENDING',
+          OR: subordinates.map(s => ({ employeeId: s.employeeId, companyId: s.companyId })),
+        },
+      }),
+    ])
+    pendingForMe = pendingLeaveForMe + pendingExpenseForMe
+  }
 
   const stats = [
     {

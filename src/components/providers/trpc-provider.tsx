@@ -16,8 +16,10 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 5 * 1000,
+        staleTime: 30 * 1000, // 30 秒內不重新查詢
+        cacheTime: 5 * 60 * 1000, // 快取保留 5 分鐘 (React Query v4)
         refetchOnWindowFocus: false,
+        retry: 1, // 只重試 1 次
       },
     },
   }))
