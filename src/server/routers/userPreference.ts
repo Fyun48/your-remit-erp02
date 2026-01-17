@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { router, publicProcedure } from '../trpc'
 import { getDefaultMenuOrder } from '@/lib/sidebar-menu'
+import { defaultTheme } from '@/lib/themes'
 
 // 側邊欄設定 schema
 const sidebarConfigSchema = z.object({
@@ -25,7 +26,7 @@ export const userPreferenceRouter = router({
             hiddenMenus: [],
           },
           themeConfig: {
-            theme: 'classic',
+            theme: defaultTheme,
           },
         }
       }
@@ -39,7 +40,7 @@ export const userPreferenceRouter = router({
           hiddenMenus: [],
         },
         themeConfig: preference.themeConfig as { theme: string } || {
-          theme: 'classic',
+          theme: defaultTheme,
         },
       }
     }),
@@ -80,6 +81,25 @@ export const userPreferenceRouter = router({
         create: {
           employeeId: input.employeeId,
           sidebarConfig: defaultConfig,
+        },
+      })
+    }),
+
+  // 更新主題設定
+  updateTheme: publicProcedure
+    .input(z.object({
+      employeeId: z.string(),
+      theme: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.userPreference.upsert({
+        where: { employeeId: input.employeeId },
+        update: {
+          themeConfig: { theme: input.theme },
+        },
+        create: {
+          employeeId: input.employeeId,
+          themeConfig: { theme: input.theme },
         },
       })
     }),
