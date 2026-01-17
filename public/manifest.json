@@ -1,6 +1,6 @@
 {
-  "name": "集團企業 ERP 系統",
-  "short_name": "ERP",
+  "name": "MY-ERP 集團企業系統",
+  "short_name": "MY-ERP",
   "description": "多公司 ERP 系統 - 人事管理、考勤、請假、報銷、財務會計",
   "start_url": "/dashboard",
   "display": "standalone",

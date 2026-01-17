@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,15 +13,9 @@ import {
 } from '@/components/ui/dialog'
 import { Download, Smartphone, X } from 'lucide-react'
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
-
 export function PWAInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [showPrompt, setShowPrompt] = useState(false)
-  const [isIOS, setIsIOS] = useState(false)
+  const [showQRCode, setShowQRCode] = useState(false)
+  const [installUrl, setInstallUrl] = useState('')
   const [isStandalone, setIsStandalone] = useState(false)
 
   useEffect(() => {
@@ -28,109 +23,71 @@ export function PWAInstallPrompt() {
     const checkStandalone = window.matchMedia('(display-mode: standalone)').matches
     setIsStandalone(checkStandalone)
 
-    // 檢查是否為 iOS
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent)
-    setIsIOS(isIOSDevice)
-
-    // 監聽安裝提示事件
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e as BeforeInstallPromptEvent)
-    }
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    // 設定安裝 URL（使用當前網站的根路徑）
+    if (typeof window !== 'undefined') {
+      setInstallUrl(window.location.origin)
     }
   }, [])
 
-  const handleInstallClick = async () => {
-    if (isIOS) {
-      setShowPrompt(true)
-      return
-    }
-
-    if (!deferredPrompt) return
-
-    deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-
-    if (outcome === 'accepted') {
-      console.log('User accepted the install prompt')
-    }
-
-    setDeferredPrompt(null)
-  }
-
-  const canInstall = deferredPrompt !== null || isIOS
-
-  // 如果已安裝，不顯示按鈕
+  // 如果已安裝（在 App 內），不顯示按鈕
   if (isStandalone) return null
 
   return (
     <>
-      {canInstall && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleInstallClick}
-          className="gap-2"
-        >
-          <Download className="h-4 w-4" />
-          安裝 App
-        </Button>
-      )}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setShowQRCode(true)}
+        className="gap-2 w-full justify-start text-gray-300 border-gray-700 hover:bg-gray-800 hover:text-white"
+      >
+        <Download className="h-4 w-4" />
+        安裝 App
+      </Button>
 
-      {/* iOS 安裝說明對話框 */}
-      <Dialog open={showPrompt} onOpenChange={setShowPrompt}>
+      {/* QR Code 對話框 */}
+      <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Smartphone className="h-5 w-5" />
-              安裝到手機
+              安裝 MY-ERP App
             </DialogTitle>
             <DialogDescription>
-              將 ERP 系統安裝到您的 iPhone/iPad 主畫面
+              使用手機掃描 QR Code 安裝應用程式
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 font-medium">
-                1
-              </div>
-              <div>
-                <p className="font-medium">點選分享按鈕</p>
-                <p className="text-sm text-muted-foreground">
-                  在 Safari 瀏覽器底部找到分享圖示（方形加箭頭）
-                </p>
-              </div>
+          <div className="flex flex-col items-center py-6">
+            {/* QR Code */}
+            <div className="bg-white p-4 rounded-lg shadow-inner">
+              <QRCodeSVG
+                value={installUrl}
+                size={200}
+                level="H"
+                includeMargin={false}
+              />
             </div>
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 font-medium">
-                2
+            <p className="mt-4 text-sm text-muted-foreground text-center">
+              掃描後請依照提示將網頁加入主畫面
+            </p>
+          </div>
+
+          {/* 安裝說明 */}
+          <div className="border-t pt-4 space-y-3">
+            <p className="text-sm font-medium">掃描後安裝步驟：</p>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <span className="bg-blue-100 text-blue-600 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium flex-shrink-0">1</span>
+                <span><strong>Android：</strong>點選「安裝應用程式」或選單中的「新增至主畫面」</span>
               </div>
-              <div>
-                <p className="font-medium">選擇「加入主畫面」</p>
-                <p className="text-sm text-muted-foreground">
-                  向下滑動找到「加入主畫面」選項並點選
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 font-medium">
-                3
-              </div>
-              <div>
-                <p className="font-medium">確認新增</p>
-                <p className="text-sm text-muted-foreground">
-                  點選右上角的「新增」完成安裝
-                </p>
+              <div className="flex items-start gap-2">
+                <span className="bg-blue-100 text-blue-600 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium flex-shrink-0">2</span>
+                <span><strong>iOS：</strong>點選分享按鈕 → 「加入主畫面」</span>
               </div>
             </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPrompt(false)}>
+            <Button variant="outline" onClick={() => setShowQRCode(false)} className="w-full">
               <X className="h-4 w-4 mr-2" />
               關閉
             </Button>
