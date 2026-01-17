@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getCurrentCompany } from '@/lib/use-current-company'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,16 +16,10 @@ export default async function ExpensePage() {
 
   const employeeId = session.user.id
 
-  const assignment = await prisma.employeeAssignment.findFirst({
-    where: {
-      employeeId,
-      isPrimary: true,
-      status: 'ACTIVE',
-    },
-    include: { company: true },
-  })
+  // Use getCurrentCompany to respect the user's selected company from header switcher
+  const currentCompany = await getCurrentCompany(employeeId)
 
-  if (!assignment) {
+  if (!currentCompany) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">費用報銷</h1>
@@ -37,7 +32,7 @@ export default async function ExpensePage() {
     )
   }
 
-  const companyId = assignment.companyId
+  const companyId = currentCompany.id
 
   // 取得今年費用報銷紀錄
   const year = new Date().getFullYear()
@@ -78,7 +73,7 @@ export default async function ExpensePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">費用報銷</h1>
         <div className="flex items-center gap-4">
-          <p className="text-sm text-muted-foreground">{assignment.company.name}</p>
+          <p className="text-sm text-muted-foreground">{currentCompany.name}</p>
           <Link href="/dashboard/expense/new">
             <Button>
               <Plus className="h-4 w-4 mr-2" />

@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import { FileUpload, UploadedFile } from '@/components/ui/file-upload'
 import { trpc } from '@/lib/trpc'
 import { Receipt, Plus, Trash2, ArrowLeft, Save, Send } from 'lucide-react'
 
@@ -18,6 +20,8 @@ interface ExpenseItem {
   amount: string
   vendorName: string
   receiptNo: string
+  attachments: UploadedFile[]
+  noReceipt: boolean
 }
 
 interface ExpenseFormProps {
@@ -66,6 +70,8 @@ export function ExpenseForm({ employeeId, companyId, companyName, canSelectCompa
       amount: '',
       vendorName: '',
       receiptNo: '',
+      attachments: [],
+      noReceipt: false,
     },
   ])
 
@@ -98,6 +104,8 @@ export function ExpenseForm({ employeeId, companyId, companyName, canSelectCompa
         amount: '',
         vendorName: '',
         receiptNo: '',
+        attachments: [],
+        noReceipt: false,
       },
     ])
   }
@@ -110,11 +118,29 @@ export function ExpenseForm({ employeeId, companyId, companyName, canSelectCompa
   }
 
   // 更新明細項目
-  const updateItem = (id: string, field: keyof ExpenseItem, value: string) => {
+  const updateItem = (id: string, field: keyof ExpenseItem, value: string | boolean | UploadedFile[]) => {
     setItems(items.map(item =>
       item.id === id ? { ...item, [field]: value } : item
     ))
   }
+
+  // 處理附件上傳完成
+  const handleAttachmentUpload = useCallback((itemId: string, files: UploadedFile[]) => {
+    setItems(prev => prev.map(item =>
+      item.id === itemId
+        ? { ...item, attachments: [...item.attachments, ...files] }
+        : item
+    ))
+  }, [])
+
+  // 處理附件移除
+  const handleAttachmentRemove = useCallback((itemId: string, file: UploadedFile) => {
+    setItems(prev => prev.map(item =>
+      item.id === itemId
+        ? { ...item, attachments: item.attachments.filter(a => a.url !== file.url) }
+        : item
+    ))
+  }, [])
 
   // 驗證表單
   const validateForm = (): boolean => {
@@ -175,6 +201,8 @@ export function ExpenseForm({ employeeId, companyId, companyName, canSelectCompa
           amount: parseFloat(item.amount),
           vendorName: item.vendorName || undefined,
           receiptNo: item.receiptNo || undefined,
+          attachments: item.attachments.length > 0 ? JSON.stringify(item.attachments) : undefined,
+          notes: item.noReceipt ? '無發票/僅收據' : undefined,
         })),
       })
 
@@ -210,6 +238,8 @@ export function ExpenseForm({ employeeId, companyId, companyName, canSelectCompa
           amount: parseFloat(item.amount),
           vendorName: item.vendorName || undefined,
           receiptNo: item.receiptNo || undefined,
+          attachments: item.attachments.length > 0 ? JSON.stringify(item.attachments) : undefined,
+          notes: item.noReceipt ? '無發票/僅收據' : undefined,
         })),
       })
 
@@ -336,6 +366,9 @@ export function ExpenseForm({ employeeId, companyId, companyName, canSelectCompa
               />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            報銷期間說明：此期間內的消費才能列入本次報銷，例如：差旅期間 1/1~1/5，則報銷期間填寫 2025/01/01 ~ 2025/01/05
+          </p>
         </CardContent>
       </Card>
 
@@ -444,6 +477,44 @@ export function ExpenseForm({ employeeId, companyId, companyName, canSelectCompa
                     onChange={(e) => updateItem(item.id, 'receiptNo', e.target.value)}
                   />
                 </div>
+              </div>
+
+              {/* 發票/收據附件 */}
+              <div className="space-y-3 pt-3 border-t">
+                <div className="flex items-center justify-between">
+                  <Label>發票/收據附件</Label>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`noReceipt-${item.id}`}
+                      checked={item.noReceipt}
+                      onCheckedChange={(checked) => updateItem(item.id, 'noReceipt', checked as boolean)}
+                    />
+                    <label
+                      htmlFor={`noReceipt-${item.id}`}
+                      className="text-sm text-muted-foreground cursor-pointer"
+                    >
+                      無發票/僅收據
+                    </label>
+                  </div>
+                </div>
+                {!item.noReceipt && (
+                  <FileUpload
+                    uploadUrl="/api/expense/upload"
+                    requestNo={item.id}
+                    value={item.attachments}
+                    onUploadComplete={(files) => handleAttachmentUpload(item.id, files)}
+                    onRemove={(file) => handleAttachmentRemove(item.id, file)}
+                    maxFiles={5}
+                    maxSize={10 * 1024 * 1024}
+                    accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
+                    hint={`支援 PDF、圖片格式，單檔最大 10MB，最多 5 個檔案`}
+                  />
+                )}
+                {item.noReceipt && (
+                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                    已勾選「無發票/僅收據」，此明細將不需要上傳附件。若有紙本收據請於送出後補交。
+                  </p>
+                )}
               </div>
             </div>
           ))}
