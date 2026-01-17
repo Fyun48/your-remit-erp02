@@ -199,6 +199,7 @@ model Employee {
   permissions EmployeePermission[]
   sessions    Session[]
   accounts    Account[]
+  preference  UserPreference?
 
   // 財務會計關聯
   vouchersCreated  Voucher[] @relation("VoucherCreator")
@@ -1869,4 +1870,23 @@ model StationeryRequest {
   @@index([applicantId])
   @@index([status])
   @@map("stationery_requests")
+}
+
+// ==================== 使用者偏好設定 ====================
+
+model UserPreference {
+  id         String   @id @default(cuid())
+  employeeId String   @unique
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // 側邊欄設定 JSON: { menuOrder: string[], hiddenMenus: string[] }
+  sidebarConfig Json?
+
+  // 主題設定 JSON: { theme: string }
+  themeConfig Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_preferences")
 }
