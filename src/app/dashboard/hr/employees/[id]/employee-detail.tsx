@@ -153,13 +153,18 @@ export function EmployeeDetail({
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState(employee.avatarUrl)
 
+  // 主要任職：優先找 ACTIVE + isPrimary，若無則找任何 ACTIVE
   const currentAssignment = employee.assignments.find(
     (a) => a.status === 'ACTIVE' && a.isPrimary
+  ) || employee.assignments.find(
+    (a) => a.status === 'ACTIVE'
   )
   const secondaryAssignments = employee.assignments.filter(
-    (a) => a.status === 'ACTIVE' && !a.isPrimary
+    (a) => a.status === 'ACTIVE' && !a.isPrimary && a.id !== currentAssignment?.id
   )
-  const isResigned = !currentAssignment || currentAssignment.status === 'RESIGNED'
+  // 只有當沒有任何 ACTIVE 任職時才視為離職
+  const hasAnyActiveAssignment = employee.assignments.some((a) => a.status === 'ACTIVE')
+  const isResigned = !hasAnyActiveAssignment
 
   // 新增兼任表單資料
   const [addAssignmentData, setAddAssignmentData] = useState({
