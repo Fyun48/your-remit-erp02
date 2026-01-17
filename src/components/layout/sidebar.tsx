@@ -1,42 +1,17 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
-import {
-  LayoutDashboard,
-  Users,
-  Clock,
-  Calendar,
-  FileText,
-  Settings,
-  Receipt,
-  BarChart3,
-  BookOpen,
-  Building2,
-  Stamp,
-  Network,
-  Workflow,
-  X,
-} from 'lucide-react'
+import { Settings2, X } from 'lucide-react'
 import { PWAInstallPrompt } from '@/components/pwa/pwa-install-prompt'
 import { useMobileSidebar } from './mobile-sidebar-context'
-
-const navigation = [
-  { name: '儀表板', href: '/dashboard', icon: LayoutDashboard },
-  { name: '人事管理', href: '/dashboard/hr', icon: Users },
-  { name: '組織圖', href: '/dashboard/organization', icon: Network },
-  { name: '流程管理', href: '/dashboard/workflow', icon: Workflow },
-  { name: '出勤管理', href: '/dashboard/attendance', icon: Clock },
-  { name: '請假管理', href: '/dashboard/leave', icon: Calendar },
-  { name: '費用報銷', href: '/dashboard/expense', icon: Receipt },
-  { name: '審核中心', href: '/dashboard/approval', icon: FileText },
-  { name: '財務會計', href: '/dashboard/finance', icon: BookOpen },
-  { name: '行政管理', href: '/dashboard/admin', icon: Stamp },
-  { name: '報表中心', href: '/dashboard/reports', icon: BarChart3 },
-  { name: '系統管理', href: '/dashboard/system', icon: Building2 },
-  { name: '系統設定', href: '/dashboard/settings', icon: Settings },
-]
+import { PersonalizationModal } from '@/components/personalization'
+import { defaultMenuItems, getMenuItemById } from '@/lib/sidebar-menu'
+import { useSidebarStore } from '@/stores/use-sidebar-store'
+import { trpc } from '@/lib/trpc'
 
 interface SidebarProps {
   groupName?: string
@@ -44,15 +19,39 @@ interface SidebarProps {
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const { config, isLoaded, setConfig, setLoaded } = useSidebarStore()
+  const [showSettings, setShowSettings] = useState(false)
+
+  const employeeId = (session?.user as { id?: string })?.id || ''
+
+  // 載入使用者偏好設定
+  const { data: preference } = trpc.userPreference.get.useQuery(
+    { employeeId },
+    { enabled: !!employeeId }
+  )
+
+  useEffect(() => {
+    if (preference && !isLoaded) {
+      setConfig(preference.sidebarConfig)
+      setLoaded(true)
+    }
+  }, [preference, isLoaded, setConfig, setLoaded])
+
+  // 根據設定過濾並排序選單
+  const visibleMenuItems = config.menuOrder
+    .filter((id) => !config.hiddenMenus.includes(id))
+    .map((id) => getMenuItemById(id))
+    .filter((item): item is NonNullable<typeof item> => item !== undefined)
 
   return (
     <>
       <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">
-        {navigation.map((item) => {
+        {visibleMenuItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <Link
-              key={item.name}
+              key={item.id}
               href={item.href}
               onClick={onNavigate}
               className={cn(
@@ -73,10 +72,25 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           )
         })}
       </nav>
-      {/* PWA 安裝按鈕 */}
-      <div className="border-t border-gray-800 p-4">
+
+      {/* 底部按鈕區 */}
+      <div className="border-t border-gray-800 p-4 space-y-2">
+        <button
+          onClick={() => setShowSettings(true)}
+          className="flex items-center gap-2 w-full px-2 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors"
+        >
+          <Settings2 className="h-5 w-5" />
+          個人化設定
+        </button>
         <PWAInstallPrompt />
       </div>
+
+      {/* 個人化設定彈窗 */}
+      <PersonalizationModal
+        open={showSettings}
+        onOpenChange={setShowSettings}
+        employeeId={employeeId}
+      />
     </>
   )
 }
