@@ -34,6 +34,7 @@ import { delegateRouter } from './delegate'
 import { userPreferenceRouter } from './userPreference'
 import { searchRouter } from './search'
 import { aiRouter } from './ai'
+import { notificationRouter } from './notification'
 
 export const appRouter = router({
   health: healthRouter,
@@ -71,6 +72,7 @@ export const appRouter = router({
   userPreference: userPreferenceRouter,
   search: searchRouter,
   ai: aiRouter,
+  notification: notificationRouter,
 })
 
 export type AppRouter = typeof appRouter

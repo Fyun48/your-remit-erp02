@@ -228,6 +228,9 @@ model Employee {
   // QR Code 登入
   qrLoginTokens QrLoginToken[]
 
+  // 系統通知
+  notifications    Notification[] @relation("UserNotifications")
+
   // 工作流程
   workflowDefinitions        WorkflowDefinition[]       @relation("EmployeeWorkflows")
   workflowDefinitionsCreated WorkflowDefinition[]       @relation("WorkflowCreator")
@@ -1907,4 +1910,29 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 
   @@map("system_settings")
+}
+
+// ==================== 系統通知 ====================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      Employee @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  type      String   // REQUEST_APPROVED, REQUEST_REJECTED, REVISION_REQUIRED, APPROVAL_NEEDED
+  title     String
+  message   String
+  link      String?  // URL to navigate to when clicked
+
+  refType   String   // LeaveRequest, ExpenseRequest, SealRequest, etc.
+  refId     String
+
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
 }
