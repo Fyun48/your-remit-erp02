@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, Stamp, Save, Send } from 'lucide-react'
+import { FileUpload, type UploadedFile } from '@/components/ui/file-upload'
+import { ArrowLeft, Stamp, Save, Send, Paperclip } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 
 interface SealRequestFormProps {
@@ -45,6 +46,7 @@ export function SealRequestForm({
     documentCount: 1,
     isCarryOut: false,
     expectedReturn: '',
+    attachments: [] as UploadedFile[],
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -91,6 +93,20 @@ export function SealRequestForm({
     return Object.keys(newErrors).length === 0
   }
 
+  const handleUploadComplete = useCallback((files: UploadedFile[]) => {
+    setFormData((prev) => ({
+      ...prev,
+      attachments: [...prev.attachments, ...files],
+    }))
+  }, [])
+
+  const handleRemoveFile = useCallback((file: UploadedFile) => {
+    setFormData((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((f) => f.url !== file.url),
+    }))
+  }, [])
+
   const handleSave = async () => {
     if (!validate()) return
 
@@ -104,6 +120,9 @@ export function SealRequestForm({
       documentCount: formData.documentCount,
       isCarryOut: formData.isCarryOut,
       expectedReturn: formData.expectedReturn ? new Date(formData.expectedReturn) : undefined,
+      attachments: formData.attachments.length > 0
+        ? formData.attachments.map(({ name, url }) => ({ name, url }))
+        : undefined,
     })
   }
 
@@ -123,6 +142,9 @@ export function SealRequestForm({
         documentCount: formData.documentCount,
         isCarryOut: formData.isCarryOut,
         expectedReturn: formData.expectedReturn ? new Date(formData.expectedReturn) : undefined,
+        attachments: formData.attachments.length > 0
+          ? formData.attachments.map(({ name, url }) => ({ name, url }))
+          : undefined,
       },
       {
         onSuccess: async (data) => {
@@ -266,6 +288,29 @@ export function SealRequestForm({
                   )}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Paperclip className="h-5 w-5" />
+                附件上傳
+              </CardTitle>
+              <CardDescription>上傳需要用印的文件</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FileUpload
+                uploadUrl="/api/seal/upload"
+                value={formData.attachments}
+                onUploadComplete={handleUploadComplete}
+                onRemove={handleRemoveFile}
+                maxFiles={5}
+                maxSize={5 * 1024 * 1024}
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                hint={"支援格式：PDF、Word、PNG、JPG\n單檔最大：5MB，最多可上傳 5 個檔案"}
+                disabled={isSubmitting}
+              />
             </CardContent>
           </Card>
 
