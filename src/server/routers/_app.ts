@@ -31,6 +31,7 @@ import { permissionRouter } from './permission'
 import { orgChartRouter } from './orgChart'
 import { workflowRouter } from './workflow'
 import { delegateRouter } from './delegate'
+import { userPreferenceRouter } from './userPreference'
 
 export const appRouter = router({
   health: healthRouter,
@@ -65,6 +66,7 @@ export const appRouter = router({
   orgChart: orgChartRouter,
   workflow: workflowRouter,
   delegate: delegateRouter,
+  userPreference: userPreferenceRouter,
 })
 
 export type AppRouter = typeof appRouter
