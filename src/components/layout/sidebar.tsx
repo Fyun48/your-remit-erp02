@@ -18,6 +18,7 @@ import {
   Network,
   Workflow,
 } from 'lucide-react'
+import { PWAInstallPrompt } from '@/components/pwa/pwa-install-prompt'
 
 const navigation = [
   { name: '儀表板', href: '/dashboard', icon: LayoutDashboard },
@@ -72,6 +73,10 @@ export function Sidebar({ groupName = '集團' }: SidebarProps) {
           )
         })}
       </nav>
+      {/* PWA 安裝按鈕 */}
+      <div className="border-t border-gray-800 p-4">
+        <PWAInstallPrompt />
+      </div>
     </div>
   )
 }
