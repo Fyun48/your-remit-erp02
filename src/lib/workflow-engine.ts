@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { TRPCError } from '@trpc/server'
+import { createNotification } from '@/lib/notification-service'
 
 // 類型定義
 export interface StartWorkflowInput {
@@ -186,6 +187,35 @@ export async function advanceWorkflow(
         where: { id: instanceId },
         data: { status: 'APPROVED', completedAt: new Date() },
       })
+
+      // 通知申請人流程已完成核准
+      {
+        const requestTypeMap: Record<string, { title: string; linkPrefix: string; refType: string }> = {
+          leave: { title: '請假申請已核准', linkPrefix: '/dashboard/leave/', refType: 'LeaveRequest' },
+          expense: { title: '費用報銷已核准', linkPrefix: '/dashboard/expense/', refType: 'ExpenseRequest' },
+          seal: { title: '用印申請已核准', linkPrefix: '/dashboard/admin/seal/', refType: 'SealRequest' },
+        }
+
+        const typeConfig = requestTypeMap[instance.requestType] || {
+          title: '申請已核准',
+          linkPrefix: '/dashboard/',
+          refType: instance.requestType,
+        }
+
+        try {
+          await createNotification({
+            userId: instance.applicantId,
+            type: 'REQUEST_APPROVED',
+            title: typeConfig.title,
+            message: `您的申請已核准`,
+            link: `${typeConfig.linkPrefix}${instance.requestId}`,
+            refType: typeConfig.refType,
+            refId: instance.requestId,
+          })
+        } catch (error) {
+          console.error('Failed to create notification for workflow completion:', error)
+        }
+      }
       break
     case 'CONDITION':
       // 條件節點直接推進
@@ -256,6 +286,41 @@ async function createApprovalRecord(
       where: { id: instance.id },
       data: { status: 'IN_PROGRESS' },
     })
+
+    // 通知審核者有新的申請待審核
+    const applicantName = instance.applicant?.assignments?.[0]
+      ? (await prisma.employee.findUnique({
+          where: { id: instance.applicantId },
+          select: { name: true },
+        }))?.name
+      : '員工'
+
+    // 根據申請類型決定通知內容和連結
+    const requestTypeMap: Record<string, { title: string; linkPrefix: string; refType: string }> = {
+      leave: { title: '有新的請假申請待審核', linkPrefix: '/dashboard/leave/', refType: 'LeaveRequest' },
+      expense: { title: '有新的費用報銷待審核', linkPrefix: '/dashboard/expense/', refType: 'ExpenseRequest' },
+      seal: { title: '有新的用印申請待審核', linkPrefix: '/dashboard/admin/seal/', refType: 'SealRequest' },
+    }
+
+    const typeConfig = requestTypeMap[instance.requestType] || {
+      title: '有新的申請待審核',
+      linkPrefix: '/dashboard/',
+      refType: instance.requestType,
+    }
+
+    try {
+      await createNotification({
+        userId: approverId,
+        type: 'APPROVAL_NEEDED',
+        title: typeConfig.title,
+        message: `${applicantName || '員工'} 提出了申請`,
+        link: `${typeConfig.linkPrefix}${instance.requestId}`,
+        refType: typeConfig.refType,
+        refId: instance.requestId,
+      })
+    } catch (error) {
+      console.error('Failed to create notification for workflow approver:', error)
+    }
   }
 }
 
@@ -394,6 +459,33 @@ export async function processApproval(input: ProcessApprovalInput) {
       where: { id: instanceId },
       data: { status: 'REJECTED', completedAt: new Date() },
     })
+
+    // 通知申請人申請已駁回
+    const requestTypeMap: Record<string, { title: string; linkPrefix: string; refType: string }> = {
+      leave: { title: '請假申請已駁回', linkPrefix: '/dashboard/leave/', refType: 'LeaveRequest' },
+      expense: { title: '費用報銷已駁回', linkPrefix: '/dashboard/expense/', refType: 'ExpenseRequest' },
+      seal: { title: '用印申請已駁回', linkPrefix: '/dashboard/admin/seal/', refType: 'SealRequest' },
+    }
+
+    const typeConfig = requestTypeMap[record.instance.requestType] || {
+      title: '申請已駁回',
+      linkPrefix: '/dashboard/',
+      refType: record.instance.requestType,
+    }
+
+    try {
+      await createNotification({
+        userId: record.instance.applicantId,
+        type: 'REQUEST_REJECTED',
+        title: typeConfig.title,
+        message: `您的申請已被駁回`,
+        link: `${typeConfig.linkPrefix}${record.instance.requestId}`,
+        refType: typeConfig.refType,
+        refId: record.instance.requestId,
+      })
+    } catch (error) {
+      console.error('Failed to create notification for workflow rejection:', error)
+    }
   }
 
   return { success: true }

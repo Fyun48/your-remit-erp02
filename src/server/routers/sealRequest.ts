@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
+import { createNotification } from '@/lib/notification-service'
 
 export const sealRequestRouter = router({
   // 取得用印申請列表
@@ -241,13 +242,42 @@ export const sealRequestRouter = router({
         approvalInstanceId = instance.id
       }
 
-      return ctx.prisma.sealRequest.update({
+      const updatedRequest = await ctx.prisma.sealRequest.update({
         where: { id: input.id },
         data: {
           status: 'PENDING',
           approvalInstanceId,
         },
       })
+
+      // 通知審核者有新的用印申請待審核
+      // 取得申請人的直屬主管作為審核者
+      const assignment = await ctx.prisma.employeeAssignment.findFirst({
+        where: { employeeId: request.applicantId, companyId: request.companyId, status: 'ACTIVE' },
+      })
+
+      if (assignment?.supervisorId) {
+        const applicant = await ctx.prisma.employee.findUnique({
+          where: { id: request.applicantId },
+          select: { name: true },
+        })
+
+        try {
+          await createNotification({
+            userId: assignment.supervisorId,
+            type: 'APPROVAL_NEEDED',
+            title: '有新的用印申請待審核',
+            message: `${applicant?.name || '員工'} 提出了用印申請`,
+            link: `/dashboard/admin/seal/${request.id}`,
+            refType: 'SealRequest',
+            refId: request.id,
+          })
+        } catch (error) {
+          console.error('Failed to create notification for seal request approvers:', error)
+        }
+      }
+
+      return updatedRequest
     }),
 
   // 取消申請
@@ -299,10 +329,27 @@ export const sealRequestRouter = router({
         })
       }
 
-      return ctx.prisma.sealRequest.update({
+      const approvedRequest = await ctx.prisma.sealRequest.update({
         where: { id: input.id },
         data: { status: 'APPROVED' },
       })
+
+      // 通知申請人申請已核准
+      try {
+        await createNotification({
+          userId: request.applicantId,
+          type: 'REQUEST_APPROVED',
+          title: '用印申請已核准',
+          message: `您的用印申請 ${request.requestNo} 已核准`,
+          link: `/dashboard/admin/seal/${request.id}`,
+          refType: 'SealRequest',
+          refId: request.id,
+        })
+      } catch (error) {
+        console.error('Failed to create notification for approved seal request:', error)
+      }
+
+      return approvedRequest
     }),
 
   // 駁回
@@ -334,10 +381,27 @@ export const sealRequestRouter = router({
         })
       }
 
-      return ctx.prisma.sealRequest.update({
+      const rejectedRequest = await ctx.prisma.sealRequest.update({
         where: { id: input.id },
         data: { status: 'REJECTED' },
       })
+
+      // 通知申請人申請已駁回
+      try {
+        await createNotification({
+          userId: request.applicantId,
+          type: 'REQUEST_REJECTED',
+          title: '用印申請已駁回',
+          message: `您的用印申請 ${request.requestNo} 已被駁回`,
+          link: `/dashboard/admin/seal/${request.id}`,
+          refType: 'SealRequest',
+          refId: request.id,
+        })
+      } catch (error) {
+        console.error('Failed to create notification for rejected seal request:', error)
+      }
+
+      return rejectedRequest
     }),
 
   // 開始用印處理

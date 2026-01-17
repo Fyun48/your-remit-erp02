@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
+import { createNotification, createNotifications } from '@/lib/notification-service'
 
 // 產生申請單號
 function generateRequestNo(): string {
@@ -381,6 +382,30 @@ export const expenseRequestRouter = router({
           where: { id: input.id },
           data: { currentApproverId: approvers[0] || null },
         })
+
+        // 通知審核者有新的費用報銷待審核
+        if (approvers.length > 0) {
+          const employee = await ctx.prisma.employee.findUnique({
+            where: { id: request.employeeId },
+            select: { name: true },
+          })
+
+          try {
+            await createNotifications(
+              approvers.map(approverId => ({
+                userId: approverId,
+                type: 'APPROVAL_NEEDED' as const,
+                title: '有新的費用報銷待審核',
+                message: `${employee?.name || '員工'} 提出了費用報銷申請`,
+                link: `/dashboard/expense/${request.id}`,
+                refType: 'ExpenseRequest',
+                refId: request.id,
+              }))
+            )
+          } catch (error) {
+            console.error('Failed to create notification for expense request approvers:', error)
+          }
+        }
       }
 
       return updatedRequest
@@ -455,7 +480,7 @@ export const expenseRequestRouter = router({
             data: { status: 'REJECTED', completedAt: new Date() },
           })
 
-          return ctx.prisma.expenseRequest.update({
+          const rejectedRequest = await ctx.prisma.expenseRequest.update({
             where: { id: input.id },
             data: {
               status: 'REJECTED',
@@ -464,6 +489,23 @@ export const expenseRequestRouter = router({
               approvalComment: input.comment,
             },
           })
+
+          // 通知申請人申請已駁回
+          try {
+            await createNotification({
+              userId: request.employeeId,
+              type: 'REQUEST_REJECTED',
+              title: '費用報銷已駁回',
+              message: `您的費用報銷 ${request.requestNo} 已被駁回`,
+              link: `/dashboard/expense/${request.id}`,
+              refType: 'ExpenseRequest',
+              refId: request.id,
+            })
+          } catch (error) {
+            console.error('Failed to create notification for rejected expense request:', error)
+          }
+
+          return rejectedRequest
         }
 
         // 核准當前關卡
@@ -507,6 +549,30 @@ export const expenseRequestRouter = router({
             data: { currentStep: nextStep.stepOrder },
           })
 
+          // 通知下一關審核者
+          if (nextApprovers.length > 0) {
+            const employee = await ctx.prisma.employee.findUnique({
+              where: { id: request.employeeId },
+              select: { name: true },
+            })
+
+            try {
+              await createNotifications(
+                nextApprovers.map(approverId => ({
+                  userId: approverId,
+                  type: 'APPROVAL_NEEDED' as const,
+                  title: '有新的費用報銷待審核',
+                  message: `${employee?.name || '員工'} 提出了費用報銷申請`,
+                  link: `/dashboard/expense/${request.id}`,
+                  refType: 'ExpenseRequest',
+                  refId: request.id,
+                }))
+              )
+            } catch (error) {
+              console.error('Failed to create notification for next expense request approvers:', error)
+            }
+          }
+
           // 更新費用報銷申請的當前審核者
           return ctx.prisma.expenseRequest.update({
             where: { id: input.id },
@@ -522,7 +588,7 @@ export const expenseRequestRouter = router({
       }
 
       // 更新費用報銷申請為已核准
-      return ctx.prisma.expenseRequest.update({
+      const approvedRequest = await ctx.prisma.expenseRequest.update({
         where: { id: input.id },
         data: {
           status: 'APPROVED',
@@ -532,6 +598,23 @@ export const expenseRequestRouter = router({
           // 付款狀態維持 UNPAID，等待後續付款流程處理
         },
       })
+
+      // 通知申請人申請已核准
+      try {
+        await createNotification({
+          userId: request.employeeId,
+          type: 'REQUEST_APPROVED',
+          title: '費用報銷已核准',
+          message: `您的費用報銷 ${request.requestNo} 已核准`,
+          link: `/dashboard/expense/${request.id}`,
+          refType: 'ExpenseRequest',
+          refId: request.id,
+        })
+      } catch (error) {
+        console.error('Failed to create notification for approved expense request:', error)
+      }
+
+      return approvedRequest
     }),
 
   // 取消申請

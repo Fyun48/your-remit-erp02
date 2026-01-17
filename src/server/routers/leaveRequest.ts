@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
+import { createNotification, createNotifications } from '@/lib/notification-service'
 
 // 產生申請單號
 function generateRequestNo(): string {
@@ -231,6 +232,30 @@ export const leaveRequestRouter = router({
           where: { id: input.id },
           data: { currentApproverId: approvers[0] || null },
         })
+
+        // 通知審核者有新的請假申請待審核
+        if (approvers.length > 0) {
+          const employee = await ctx.prisma.employee.findUnique({
+            where: { id: request.employeeId },
+            select: { name: true },
+          })
+
+          try {
+            await createNotifications(
+              approvers.map(approverId => ({
+                userId: approverId,
+                type: 'APPROVAL_NEEDED' as const,
+                title: '有新的請假申請待審核',
+                message: `${employee?.name || '員工'} 提出了請假申請`,
+                link: `/dashboard/leave/${request.id}`,
+                refType: 'LeaveRequest',
+                refId: request.id,
+              }))
+            )
+          } catch (error) {
+            console.error('Failed to create notification for leave request approvers:', error)
+          }
+        }
       }
 
       return updatedRequest
@@ -305,7 +330,7 @@ export const leaveRequestRouter = router({
             data: { status: 'REJECTED', completedAt: new Date() },
           })
 
-          return ctx.prisma.leaveRequest.update({
+          const rejectedRequest = await ctx.prisma.leaveRequest.update({
             where: { id: input.id },
             data: {
               status: 'REJECTED',
@@ -314,6 +339,23 @@ export const leaveRequestRouter = router({
               approvalComment: input.comment,
             },
           })
+
+          // 通知申請人申請已駁回
+          try {
+            await createNotification({
+              userId: request.employeeId,
+              type: 'REQUEST_REJECTED',
+              title: '請假申請已駁回',
+              message: `您的請假申請 ${request.requestNo} 已被駁回`,
+              link: `/dashboard/leave/${request.id}`,
+              refType: 'LeaveRequest',
+              refId: request.id,
+            })
+          } catch (error) {
+            console.error('Failed to create notification for rejected leave request:', error)
+          }
+
+          return rejectedRequest
         }
 
         // 核准當前關卡
@@ -356,6 +398,30 @@ export const leaveRequestRouter = router({
             where: { id: instance.id },
             data: { currentStep: nextStep.stepOrder },
           })
+
+          // 通知下一關審核者
+          if (nextApprovers.length > 0) {
+            const employee = await ctx.prisma.employee.findUnique({
+              where: { id: request.employeeId },
+              select: { name: true },
+            })
+
+            try {
+              await createNotifications(
+                nextApprovers.map(approverId => ({
+                  userId: approverId,
+                  type: 'APPROVAL_NEEDED' as const,
+                  title: '有新的請假申請待審核',
+                  message: `${employee?.name || '員工'} 提出了請假申請`,
+                  link: `/dashboard/leave/${request.id}`,
+                  refType: 'LeaveRequest',
+                  refId: request.id,
+                }))
+              )
+            } catch (error) {
+              console.error('Failed to create notification for next leave request approvers:', error)
+            }
+          }
 
           // 更新請假申請的當前審核者
           return ctx.prisma.leaveRequest.update({
@@ -404,6 +470,21 @@ export const leaveRequestRouter = router({
           usedHours: request.totalHours,
         },
       })
+
+      // 通知申請人申請已核准
+      try {
+        await createNotification({
+          userId: request.employeeId,
+          type: 'REQUEST_APPROVED',
+          title: '請假申請已核准',
+          message: `您的請假申請 ${request.requestNo} 已核准`,
+          link: `/dashboard/leave/${request.id}`,
+          refType: 'LeaveRequest',
+          refId: request.id,
+        })
+      } catch (error) {
+        console.error('Failed to create notification for approved leave request:', error)
+      }
 
       return updated
     }),
