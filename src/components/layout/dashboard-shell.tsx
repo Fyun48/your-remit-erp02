@@ -4,6 +4,7 @@ import { ReactNode } from 'react'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { MobileSidebarProvider } from './mobile-sidebar-context'
+import { AIChatButton } from '@/components/ai'
 
 interface DashboardShellProps {
   children: ReactNode
@@ -35,6 +36,9 @@ export function DashboardShell({
           </main>
         </div>
       </div>
+
+      {/* AI 智慧助理 */}
+      <AIChatButton />
     </MobileSidebarProvider>
   )
 }
