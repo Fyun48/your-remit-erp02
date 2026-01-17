@@ -1890,3 +1890,15 @@ model UserPreference {
 
   @@map("user_preferences")
 }
+
+// ==================== 系統設定 ====================
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}

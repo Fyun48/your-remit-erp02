@@ -33,6 +33,7 @@ import { workflowRouter } from './workflow'
 import { delegateRouter } from './delegate'
 import { userPreferenceRouter } from './userPreference'
 import { searchRouter } from './search'
+import { aiRouter } from './ai'
 
 export const appRouter = router({
   health: healthRouter,
@@ -69,6 +70,7 @@ export const appRouter = router({
   delegate: delegateRouter,
   userPreference: userPreferenceRouter,
   search: searchRouter,
+  ai: aiRouter,
 })
 
 export type AppRouter = typeof appRouter
