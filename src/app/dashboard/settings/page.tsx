@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Clock, GitBranch, Receipt, Shield, Users, User, Sparkles } from 'lucide-react'
+import { Clock, GitBranch, Receipt, Shield, Users, User, Sparkles, Plug } from 'lucide-react'
 
 export default function SettingsPage() {
   const settingsItems = [
@@ -15,6 +15,12 @@ export default function SettingsPage() {
       description: '設定 AI 助手的行為與偏好',
       href: '/dashboard/settings/ai',
       icon: Sparkles,
+    },
+    {
+      title: '外部整合',
+      description: '設定 LINE、API 等外部服務整合',
+      href: '/dashboard/settings/integrations',
+      icon: Plug,
     },
     {
       title: '班別設定',

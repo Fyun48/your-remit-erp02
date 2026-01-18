@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3, FileText, Scale } from 'lucide-react'
+import { BarChart3, FileText, Scale, Wallet, Receipt } from 'lucide-react'
 import Link from 'next/link'
 
 export default async function AccountingReportsPage() {
@@ -45,6 +45,18 @@ export default async function AccountingReportsPage() {
       href: '/dashboard/finance/accounting/reports/income-statement',
       icon: FileText,
     },
+    {
+      title: '現金流量表',
+      description: '營業、投資、籌資活動現金流',
+      href: '/dashboard/finance/accounting/reports/cash-flow',
+      icon: Wallet,
+    },
+    {
+      title: '401 營業稅申報書',
+      description: '營業人銷售額與稅額申報',
+      href: '/dashboard/finance/accounting/reports/vat-401',
+      icon: Receipt,
+    },
   ]
 
   return (
@@ -54,7 +66,7 @@ export default async function AccountingReportsPage() {
         <p className="text-muted-foreground">{employee.assignments[0].company.name}</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {reportItems.map((item) => (
           <Link key={item.href} href={item.href}>
             <Card className="h-full hover:bg-accent transition-colors cursor-pointer">

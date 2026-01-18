@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -12,6 +12,7 @@ import { PersonalizationModal } from '@/components/personalization'
 import { getMenuItemById } from '@/lib/sidebar-menu'
 import { useSidebarStore } from '@/stores/use-sidebar-store'
 import { trpc } from '@/lib/trpc'
+import { checkMenuVisibility } from '@/hooks/use-permissions'
 
 interface SidebarProps {
   groupName?: string
@@ -31,6 +32,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     { enabled: !!employeeId }
   )
 
+  // 取得使用者主要公司
+  const { data: assignments } = trpc.employee.getAssignments.useQuery(
+    { employeeId },
+    { enabled: !!employeeId }
+  )
+  const primaryCompanyId = assignments?.find(a => a.isPrimary)?.companyId
+
+  // 取得使用者權限
+  const { data: permissionData } = trpc.permission.getEmployeePermissions.useQuery(
+    { employeeId, companyId: primaryCompanyId! },
+    { enabled: !!employeeId && !!primaryCompanyId }
+  )
+
   useEffect(() => {
     if (preference && !isLoaded) {
       setConfig(preference.sidebarConfig)
@@ -38,11 +52,21 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     }
   }, [preference, isLoaded, setConfig, setLoaded])
 
-  // 根據設定過濾並排序選單
-  const visibleMenuItems = config.menuOrder
-    .filter((id) => !config.hiddenMenus.includes(id))
-    .map((id) => getMenuItemById(id))
-    .filter((item): item is NonNullable<typeof item> => item !== undefined)
+  // 根據設定和權限過濾並排序選單
+  const visibleMenuItems = useMemo(() => {
+    const userPermissions = permissionData?.permissions || []
+    const isAdmin = permissionData?.isGroupAdmin || permissionData?.isCompanyManager || false
+
+    return config.menuOrder
+      .filter((id) => !config.hiddenMenus.includes(id))
+      .map((id) => getMenuItemById(id))
+      .filter((item): item is NonNullable<typeof item> => item !== undefined)
+      .filter((item) => {
+        // 檢查權限可見性
+        const { visible } = checkMenuVisibility(item.permission, userPermissions, isAdmin)
+        return visible
+      })
+  }, [config.menuOrder, config.hiddenMenus, permissionData])
 
   return (
     <>

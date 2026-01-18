@@ -39,6 +39,8 @@ import { changeLogRouter } from './changeLog'
 import { auditSettingRouter } from './auditSetting'
 import { messagingRouter } from './messaging'
 import { lineRouter } from './line'
+import { employeeRouter } from './employee'
+import { systemSettingRouter } from './systemSetting'
 
 export const appRouter = router({
   health: healthRouter,
@@ -81,6 +83,8 @@ export const appRouter = router({
   auditSetting: auditSettingRouter,
   messaging: messagingRouter,
   line: lineRouter,
+  employee: employeeRouter,
+  systemSetting: systemSettingRouter,
 })
 
 export type AppRouter = typeof appRouter

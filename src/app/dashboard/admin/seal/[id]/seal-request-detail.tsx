@@ -38,6 +38,7 @@ import {
   User,
   FileText,
   Calendar,
+  Printer,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import { WorkflowStatus } from '@/components/workflow/workflow-status'
@@ -150,6 +151,284 @@ export function SealRequestDetail({ request, currentUserId }: SealRequestDetailP
     return new Date(dateStr).toLocaleDateString('zh-TW')
   }
 
+  // 列印功能
+  const handlePrint = () => {
+    const statusText = statusConfig[request.status]?.label || request.status
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>用印申請單 - ${request.requestNo}</title>
+        <style>
+          @page { size: A4; margin: 20mm; }
+          body {
+            font-family: 'Microsoft JhengHei', 'SimHei', sans-serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #333;
+          }
+          .container {
+            max-width: 700px;
+            margin: 0 auto;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 3px double #333;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+          }
+          .company-name {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+          }
+          .form-title {
+            font-size: 22pt;
+            font-weight: bold;
+            letter-spacing: 10px;
+          }
+          .form-no {
+            font-size: 10pt;
+            color: #666;
+            margin-top: 5px;
+          }
+          .section {
+            margin: 20px 0;
+          }
+          .section-title {
+            font-weight: bold;
+            background: #f5f5f5;
+            padding: 8px 12px;
+            border-left: 4px solid #333;
+            margin-bottom: 10px;
+          }
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 20px;
+          }
+          .info-item {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            padding: 8px 0;
+          }
+          .info-label {
+            width: 100px;
+            color: #666;
+            flex-shrink: 0;
+          }
+          .info-value {
+            font-weight: 500;
+          }
+          .full-width {
+            grid-column: 1 / -1;
+          }
+          .purpose-box {
+            border: 1px solid #ddd;
+            padding: 15px;
+            min-height: 80px;
+            background: #fafafa;
+            white-space: pre-wrap;
+          }
+          .seal-types {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+          }
+          .seal-type {
+            border: 1px solid #333;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11pt;
+          }
+          .status-badge {
+            display: inline-block;
+            padding: 4px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            ${request.status === 'COMPLETED' ? 'background: #d1fae5; color: #065f46;' :
+              request.status === 'APPROVED' ? 'background: #dcfce7; color: #166534;' :
+              request.status === 'REJECTED' ? 'background: #fee2e2; color: #991b1b;' :
+              request.status === 'PROCESSING' ? 'background: #ffedd5; color: #9a3412;' :
+              'background: #e5e7eb; color: #374151;'}
+          }
+          .signature-section {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-top: 40px;
+            border-top: 2px solid #333;
+            padding-top: 20px;
+          }
+          .signature-box {
+            text-align: center;
+          }
+          .signature-line {
+            height: 60px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 5px;
+          }
+          .signature-label {
+            font-size: 10pt;
+            color: #666;
+          }
+          .footer {
+            margin-top: 30px;
+            text-align: right;
+            font-size: 9pt;
+            color: #999;
+          }
+          .carry-out-warning {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+          }
+          @media print {
+            body { -webkit-print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="company-name">${request.company.name}</div>
+            <div class="form-title">用 印 申 請 單</div>
+            <div class="form-no">單號：${request.requestNo}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">申請人資訊</div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">申請人</span>
+                <span class="info-value">${request.applicant.name}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">員工編號</span>
+                <span class="info-value">${request.applicant.employeeNo}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">申請日期</span>
+                <span class="info-value">${formatDate(request.createdAt)}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">申請狀態</span>
+                <span class="status-badge">${statusText}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">用印資訊</div>
+            <div class="info-grid">
+              <div class="info-item full-width">
+                <span class="info-label">印章類型</span>
+                <div class="seal-types">
+                  ${((request.sealTypes as string[] | null) || [])
+                    .map(type => `<span class="seal-type">${sealTypeLabels[type] || type}</span>`)
+                    .join('')}
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="info-label">用印份數</span>
+                <span class="info-value">${request.documentCount} 份</span>
+              </div>
+              ${request.documentName ? `
+              <div class="info-item">
+                <span class="info-label">文件名稱</span>
+                <span class="info-value">${request.documentName}</span>
+              </div>
+              ` : ''}
+              <div class="info-item full-width">
+                <span class="info-label">用途說明</span>
+              </div>
+              <div class="full-width purpose-box">${request.purpose}</div>
+            </div>
+          </div>
+
+          ${request.isCarryOut ? `
+          <div class="section">
+            <div class="section-title">攜出資訊</div>
+            <div class="carry-out-warning">
+              ⚠️ 此申請需攜出印章，請務必於預計時間內歸還
+            </div>
+            <div class="info-grid" style="margin-top: 15px;">
+              <div class="info-item">
+                <span class="info-label">預計歸還</span>
+                <span class="info-value">${formatDateTime(request.expectedReturn)}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">實際歸還</span>
+                <span class="info-value">${request.actualReturn ? formatDateTime(request.actualReturn) : '尚未歸還'}</span>
+              </div>
+              ${request.returnNote ? `
+              <div class="info-item full-width">
+                <span class="info-label">歸還備註</span>
+                <span class="info-value">${request.returnNote}</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+          ` : ''}
+
+          ${request.processedBy ? `
+          <div class="section">
+            <div class="section-title">處理紀錄</div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">處理人員</span>
+                <span class="info-value">${request.processedBy.name}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">處理時間</span>
+                <span class="info-value">${formatDateTime(request.processedAt)}</span>
+              </div>
+              ${request.completedAt ? `
+              <div class="info-item">
+                <span class="info-label">完成時間</span>
+                <span class="info-value">${formatDateTime(request.completedAt)}</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+          ` : ''}
+
+          <div class="signature-section">
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div class="signature-label">申請人</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div class="signature-label">部門主管</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div class="signature-label">印信管理員</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div class="signature-label">核准人</div>
+            </div>
+          </div>
+
+          <div class="footer">
+            列印時間：${new Date().toLocaleString('zh-TW')}
+          </div>
+        </div>
+      </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.print()
+  }
+
   const status = statusConfig[request.status]
   const StatusIcon = status.icon
   const isApplicant = request.applicantId === currentUserId
@@ -186,6 +465,12 @@ export function SealRequestDetail({ request, currentUserId }: SealRequestDetailP
 
         {/* 操作按鈕 */}
         <div className="flex gap-2">
+          {/* 列印按鈕 - 任何狀態都可以列印 */}
+          <Button variant="outline" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-2" />
+            列印
+          </Button>
+
           {request.status === 'DRAFT' && isApplicant && (
             <>
               <Button onClick={() => submit.mutate({ id: request.id })} disabled={submit.isPending}>
