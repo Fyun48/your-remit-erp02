@@ -61,6 +61,8 @@ export function PersonalizationModal({
   const updateTheme = trpc.userPreference.updateTheme.useMutation({
     onSuccess: () => {
       setOriginalTheme(selectedTheme)
+      // 同時寫入 cookie，讓 Server 端可以讀取，避免主題閃爍
+      document.cookie = `theme=${selectedTheme}; path=/; max-age=31536000; SameSite=Lax`
       onOpenChange(false)
     },
   })

@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import { cookies } from 'next/headers'
 import './globals.css'
 import { TRPCProvider } from '@/components/providers/trpc-provider'
 import { SessionProvider } from '@/components/providers/session-provider'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { PWARegister } from '@/components/pwa/pwa-register'
+import { defaultTheme, isValidTheme } from '@/lib/themes'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -30,13 +32,18 @@ export const viewport: Viewport = {
   userScalable: false,
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // 從 cookie 讀取主題，避免頁面閃爍
+  const cookieStore = await cookies()
+  const themeCookie = cookieStore.get('theme')?.value
+  const theme = themeCookie && isValidTheme(themeCookie) ? themeCookie : defaultTheme
+
   return (
-    <html lang="zh-TW" data-theme="classic">
+    <html lang="zh-TW" data-theme={theme}>
       <head>
         <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icons/icon.svg" />

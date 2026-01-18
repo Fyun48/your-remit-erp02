@@ -97,6 +97,7 @@ export const hrRouter = router({
       supervisorId: z.string().optional(),
       hireDate: z.date(),
       roleId: z.string().optional(),
+      operatorId: z.string().optional(), // 操作人 ID（用於異動紀錄）
     }))
     .mutation(async ({ ctx, input }) => {
       // 檢查員工編號是否重複
@@ -206,6 +207,21 @@ export const hrRouter = router({
         })
       }
 
+      // 新增入職異動紀錄
+      if (input.operatorId) {
+        await ctx.prisma.employeeChangeLog.create({
+          data: {
+            employeeId: employee.id,
+            changeType: 'ONBOARD',
+            changeDate: input.hireDate,
+            toCompanyId: input.companyId,
+            toDepartmentId: input.departmentId,
+            toPositionId: input.positionId,
+            createdById: input.operatorId,
+          },
+        })
+      }
+
       return employee
     }),
 
@@ -232,14 +248,67 @@ export const hrRouter = router({
       })
     }),
 
+  // 更新員工登入資訊（Email 和密碼）- 限管理員使用
+  updateEmployeeCredentials: publicProcedure
+    .input(z.object({
+      employeeId: z.string(),
+      email: z.string().email().optional(),
+      password: z.string().min(6).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { employeeId, email, password } = input
+
+      // 檢查是否有要更新的內容
+      if (!email && !password) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: '請提供要更新的 Email 或密碼',
+        })
+      }
+
+      // 如果要更新 email，檢查是否已被使用
+      if (email) {
+        const existing = await ctx.prisma.employee.findFirst({
+          where: { email, id: { not: employeeId } },
+        })
+        if (existing) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: '此 Email 已被其他員工使用',
+          })
+        }
+      }
+
+      // 準備更新資料
+      const updateData: { email?: string; passwordHash?: string } = {}
+      if (email) {
+        updateData.email = email
+      }
+      if (password) {
+        updateData.passwordHash = await bcrypt.hash(password, 10)
+      }
+
+      return ctx.prisma.employee.update({
+        where: { id: employeeId },
+        data: updateData,
+      })
+    }),
+
   // 離職作業
   offboard: publicProcedure
     .input(z.object({
       employeeId: z.string(),
       resignDate: z.date(),
       reason: z.string().optional(),
+      operatorId: z.string().optional(), // 操作人 ID（用於異動紀錄）
     }))
     .mutation(async ({ ctx, input }) => {
+      // 取得離職前的任職資料（用於異動紀錄）
+      const lastAssignment = await ctx.prisma.employeeAssignment.findFirst({
+        where: { employeeId: input.employeeId, status: 'ACTIVE', isPrimary: true },
+        select: { companyId: true, departmentId: true, positionId: true },
+      })
+
       // 更新員工離職日期與停用帳號
       await ctx.prisma.employee.update({
         where: { id: input.employeeId },
@@ -258,7 +327,131 @@ export const hrRouter = router({
         },
       })
 
+      // 新增異動紀錄
+      if (input.operatorId && lastAssignment) {
+        await ctx.prisma.employeeChangeLog.create({
+          data: {
+            employeeId: input.employeeId,
+            changeType: 'OFFBOARD',
+            changeDate: input.resignDate,
+            fromCompanyId: lastAssignment.companyId,
+            fromDepartmentId: lastAssignment.departmentId,
+            fromPositionId: lastAssignment.positionId,
+            reason: input.reason,
+            createdById: input.operatorId,
+          },
+        })
+      }
+
       return { success: true }
+    }),
+
+  // 復職作業
+  reinstate: publicProcedure
+    .input(z.object({
+      employeeId: z.string(),
+      reinstateDate: z.date(),
+      companyId: z.string(),
+      departmentId: z.string(),
+      positionId: z.string(),
+      supervisorId: z.string().optional(),
+      roleId: z.string().optional(),
+      note: z.string().optional(),
+      operatorId: z.string(), // 操作人 ID
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // 取得員工資料
+      const employee = await ctx.prisma.employee.findUnique({
+        where: { id: input.employeeId },
+        include: {
+          assignments: {
+            where: { status: 'RESIGNED' },
+            orderBy: { endDate: 'desc' },
+            take: 1,
+            select: { companyId: true, departmentId: true, positionId: true },
+          },
+        },
+      })
+
+      if (!employee) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '員工不存在' })
+      }
+
+      // 檢查是否有有效任職（不可重複復職）
+      const activeAssignment = await ctx.prisma.employeeAssignment.findFirst({
+        where: { employeeId: input.employeeId, status: 'ACTIVE' },
+      })
+
+      if (activeAssignment) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '該員工已有有效任職記錄，無需復職' })
+      }
+
+      // 取得離職前的最後任職資料
+      const lastResignedAssignment = employee.assignments[0]
+
+      // 建立新的任職記錄
+      await ctx.prisma.employeeAssignment.create({
+        data: {
+          employeeId: input.employeeId,
+          companyId: input.companyId,
+          departmentId: input.departmentId,
+          positionId: input.positionId,
+          supervisorId: input.supervisorId,
+          roleId: input.roleId,
+          isPrimary: true,
+          startDate: input.reinstateDate,
+          status: 'ACTIVE',
+        },
+      })
+
+      // 更新員工狀態
+      await ctx.prisma.employee.update({
+        where: { id: input.employeeId },
+        data: {
+          isActive: true,
+          resignDate: null, // 清除離職日期
+        },
+      })
+
+      // 新增復職異動紀錄
+      await ctx.prisma.employeeChangeLog.create({
+        data: {
+          employeeId: input.employeeId,
+          changeType: 'REINSTATE',
+          changeDate: input.reinstateDate,
+          fromCompanyId: lastResignedAssignment?.companyId,
+          fromDepartmentId: lastResignedAssignment?.departmentId,
+          fromPositionId: lastResignedAssignment?.positionId,
+          toCompanyId: input.companyId,
+          toDepartmentId: input.departmentId,
+          toPositionId: input.positionId,
+          note: input.note,
+          createdById: input.operatorId,
+        },
+      })
+
+      return { success: true }
+    }),
+
+  // 取得離職員工的最後任職資料（用於復職預設值）
+  getLastAssignment: publicProcedure
+    .input(z.object({ employeeId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const lastAssignment = await ctx.prisma.employeeAssignment.findFirst({
+        where: {
+          employeeId: input.employeeId,
+          status: 'RESIGNED',
+          isPrimary: true,
+        },
+        orderBy: { endDate: 'desc' },
+        include: {
+          company: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true, code: true } },
+          position: { select: { id: true, name: true } },
+        },
+      })
+
+      return lastAssignment
     }),
 
   // 調動作業
@@ -270,6 +463,7 @@ export const hrRouter = router({
       positionId: z.string(),
       supervisorId: z.string().optional(),
       effectiveDate: z.date(),
+      operatorId: z.string().optional(), // 操作人 ID（用於異動紀錄）
     }))
     .mutation(async ({ ctx, input }) => {
       // 取得現有主要任職記錄
@@ -286,6 +480,24 @@ export const hrRouter = router({
 
       // 檢查是否為同公司內調動
       const isSameCompany = currentAssignment.companyId === input.companyId
+
+      // 新增調動異動紀錄
+      if (input.operatorId) {
+        await ctx.prisma.employeeChangeLog.create({
+          data: {
+            employeeId: input.employeeId,
+            changeType: 'TRANSFER',
+            changeDate: input.effectiveDate,
+            fromCompanyId: currentAssignment.companyId,
+            fromDepartmentId: currentAssignment.departmentId,
+            fromPositionId: currentAssignment.positionId,
+            toCompanyId: input.companyId,
+            toDepartmentId: input.departmentId,
+            toPositionId: input.positionId,
+            createdById: input.operatorId,
+          },
+        })
+      }
 
       if (isSameCompany) {
         // 同公司內調動：直接更新現有記錄的部門和職位

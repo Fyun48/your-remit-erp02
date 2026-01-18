@@ -28,9 +28,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
     if (theme && isValidTheme(theme)) {
       document.documentElement.setAttribute('data-theme', theme)
+      // 同步更新 cookie，確保下次訪問時 Server 端能讀取正確主題
+      document.cookie = `theme=${theme}; path=/; max-age=31536000; SameSite=Lax`
     } else {
       // Set default theme if not authenticated or no preference
       document.documentElement.setAttribute('data-theme', defaultTheme)
+      document.cookie = `theme=${defaultTheme}; path=/; max-age=31536000; SameSite=Lax`
     }
   }, [preference])
 

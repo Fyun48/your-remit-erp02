@@ -8,6 +8,7 @@ import { LogOut, User, Lock, ChevronDown, Menu, Search } from 'lucide-react'
 import { CompanySwitcher } from './company-switcher'
 import { useMobileSidebar } from './mobile-sidebar-context'
 import { SearchDialog } from '@/components/search'
+import { MessageBell } from './message-bell'
 import { NotificationBell } from './notification-bell'
 
 interface HeaderProps {
@@ -79,6 +80,9 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
             <span className="hidden md:inline text-xs text-muted-foreground">Ctrl+K</span>
           </button>
         )}
+
+        {/* 訊息通知 */}
+        <MessageBell />
 
         {/* 通知鈴鐺 */}
         <NotificationBell />

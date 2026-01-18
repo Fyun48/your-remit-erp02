@@ -94,22 +94,32 @@ export function OnboardForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedCompanyId, setSelectedCompanyId] = useState(defaultCompanyId)
 
+  // 是否需要載入其他公司的資料
+  const needsCompanyData = isGroupAdmin && selectedCompanyId !== defaultCompanyId
+
   // 動態載入選定公司的部門、職位、主管
-  const { data: companyData, isLoading: isLoadingCompanyData } = trpc.hr.getCompanyData.useQuery(
+  const { data: companyData, isLoading, isFetching, isError } = trpc.hr.getCompanyData.useQuery(
     { companyId: selectedCompanyId },
-    { enabled: isGroupAdmin && selectedCompanyId !== defaultCompanyId }
+    {
+      enabled: needsCompanyData,
+      retry: 1,
+      staleTime: 30 * 1000, // 30 秒內不重新查詢
+    }
   )
 
+  // 只有在需要載入且尚未完成時才顯示載入中
+  const isLoadingCompanyData = needsCompanyData && (isLoading || (isFetching && !companyData))
+
   // 根據是否為集團管理員和選定的公司來決定使用哪組數據
-  const currentDepartments = (isGroupAdmin && selectedCompanyId !== defaultCompanyId && companyData)
+  const currentDepartments = (needsCompanyData && companyData)
     ? companyData.departments
     : defaultDepartments
 
-  const currentPositions = (isGroupAdmin && selectedCompanyId !== defaultCompanyId && companyData)
+  const currentPositions = (needsCompanyData && companyData)
     ? companyData.positions
     : defaultPositions
 
-  const currentSupervisors = (isGroupAdmin && selectedCompanyId !== defaultCompanyId && companyData)
+  const currentSupervisors = (needsCompanyData && companyData)
     ? companyData.supervisors
     : defaultSupervisors
 
@@ -272,12 +282,19 @@ export function OnboardForm({
               />
             </div>
 
+            {/* 載入錯誤提示 */}
+            {isError && (
+              <div className="text-sm text-red-500 bg-red-50 p-2 rounded">
+                載入公司資料失敗，請重新整理頁面或選擇其他公司
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>部門 *</Label>
               <Select
                 value={formData.departmentId}
                 onValueChange={(v) => update('departmentId', v)}
-                disabled={isLoadingCompanyData}
+                disabled={isLoadingCompanyData || isError}
               >
                 <SelectTrigger>
                   {isLoadingCompanyData ? (
@@ -295,7 +312,9 @@ export function OnboardForm({
                   )}
                 </SelectTrigger>
                 <SelectContent>
-                  {currentDepartments.map((d) => (
+                  {currentDepartments.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">無可用部門</div>
+                  ) : currentDepartments.map((d) => (
                     <SelectItem key={d.id} value={d.id}>
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4" />
@@ -312,7 +331,7 @@ export function OnboardForm({
               <Select
                 value={formData.positionId}
                 onValueChange={(v) => update('positionId', v)}
-                disabled={isLoadingCompanyData}
+                disabled={isLoadingCompanyData || isError}
               >
                 <SelectTrigger>
                   {isLoadingCompanyData ? (
@@ -327,7 +346,9 @@ export function OnboardForm({
                   )}
                 </SelectTrigger>
                 <SelectContent>
-                  {currentPositions.map((p) => (
+                  {currentPositions.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">無可用職位</div>
+                  ) : currentPositions.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
                     </SelectItem>
@@ -341,7 +362,7 @@ export function OnboardForm({
               <Select
                 value={formData.supervisorId}
                 onValueChange={(v) => update('supervisorId', v)}
-                disabled={isLoadingCompanyData}
+                disabled={isLoadingCompanyData || isError}
               >
                 <SelectTrigger>
                   {isLoadingCompanyData ? (

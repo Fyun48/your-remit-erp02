@@ -4,7 +4,11 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentCompany } from '@/lib/use-current-company'
 import { EmployeeList } from './employee-list'
 
-export default async function HREmployeesPage() {
+interface PageProps {
+  searchParams: Promise<{ showResigned?: string }>
+}
+
+export default async function HREmployeesPage({ searchParams }: PageProps) {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
@@ -12,9 +16,20 @@ export default async function HREmployeesPage() {
   const currentCompany = await getCurrentCompany(session.user.id)
   if (!currentCompany) redirect('/dashboard/hr')
 
+  const params = await searchParams
+  const showResigned = params.showResigned === 'true'
+
+  // 根據是否顯示離職員工決定查詢條件
+  const statusFilter = showResigned
+    ? undefined // 顯示全部狀態
+    : { in: ['ACTIVE' as const, 'ON_LEAVE' as const] } // 只顯示在職和留停
+
   const [employees, departments, positions] = await Promise.all([
     prisma.employeeAssignment.findMany({
-      where: { companyId: currentCompany.id },
+      where: {
+        companyId: currentCompany.id,
+        ...(statusFilter && { status: statusFilter }),
+      },
       include: {
         employee: {
           include: {
@@ -56,6 +71,7 @@ export default async function HREmployeesPage() {
       employees={employees}
       departments={departments}
       positions={positions}
+      showResigned={showResigned}
     />
   )
 }

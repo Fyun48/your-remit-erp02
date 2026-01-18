@@ -12,6 +12,7 @@ import {
   Stamp,
   Network,
   Workflow,
+  MessageSquare,
   LucideIcon,
 } from 'lucide-react'
 
@@ -30,6 +31,7 @@ export const defaultMenuItems: MenuItem[] = [
   { id: 'organization', name: '組織圖', href: '/dashboard/organization', icon: Network, permission: 'org.view' },
   { id: 'workflow', name: '流程管理', href: '/dashboard/workflow', icon: Workflow, permission: 'workflow.view' },
   { id: 'attendance', name: '出勤管理', href: '/dashboard/attendance', icon: Clock },
+  { id: 'messages', name: '內部訊息', href: '/dashboard/messages', icon: MessageSquare },
   { id: 'leave', name: '請假管理', href: '/dashboard/leave', icon: Calendar },
   { id: 'expense', name: '費用報銷', href: '/dashboard/expense', icon: Receipt },
   { id: 'approval', name: '審核中心', href: '/dashboard/approval', icon: FileText },

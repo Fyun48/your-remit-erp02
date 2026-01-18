@@ -35,6 +35,9 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Settings,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import Link from 'next/link'
@@ -74,7 +77,8 @@ export function AuditLogList({ userId }: AuditLogListProps) {
   const [page, setPage] = useState(1)
   const [entityType, setEntityType] = useState<string>('all')
   const [action, setAction] = useState<string>('all')
-  const [searchTerm, setSearchTerm] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [showDetailDialog, setShowDetailDialog] = useState(false)
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null)
 
@@ -82,6 +86,8 @@ export function AuditLogList({ userId }: AuditLogListProps) {
     userId,
     entityType: entityType === 'all' ? undefined : entityType,
     action: action === 'all' ? undefined : action as 'CREATE' | 'UPDATE' | 'DELETE',
+    startDate: startDate ? new Date(startDate) : undefined,
+    endDate: endDate ? new Date(endDate + 'T23:59:59') : undefined,
     page,
     pageSize: 20,
   })
@@ -99,18 +105,87 @@ export function AuditLogList({ userId }: AuditLogListProps) {
     setShowDetailDialog(true)
   }
 
+  // 載入中狀態
+  if (logsQuery.isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/system">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold">稽核日誌</h1>
+              <p className="text-muted-foreground">查看系統操作紀錄</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    )
+  }
+
+  // 錯誤狀態
+  if (logsQuery.error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/system">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold">稽核日誌</h1>
+              <p className="text-muted-foreground">查看系統操作紀錄</p>
+            </div>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+              <p className="text-lg font-medium text-red-600">載入失敗</p>
+              <p className="text-sm text-muted-foreground mt-2">{logsQuery.error.message}</p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => logsQuery.refetch()}
+              >
+                重試
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/system">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/system">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold">稽核日誌</h1>
+            <p className="text-muted-foreground">查看系統操作紀錄</p>
+          </div>
+        </div>
+        <Link href="/dashboard/system/audit-settings">
+          <Button variant="outline" size="sm">
+            <Settings className="h-4 w-4 mr-2" />
+            稽核設定
           </Button>
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold">稽核日誌</h1>
-          <p className="text-muted-foreground">查看系統操作紀錄</p>
-        </div>
       </div>
 
       {/* 統計卡片 */}
@@ -143,40 +218,69 @@ export function AuditLogList({ userId }: AuditLogListProps) {
       )}
 
       {/* 篩選條件 */}
-      <div className="flex gap-4 flex-wrap">
-        <Select value={entityType} onValueChange={setEntityType}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="資料類型" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">所有類型</SelectItem>
-            {entityTypesQuery.data?.map((type) => (
-              <SelectItem key={type.type} value={type.type}>
-                {type.label} ({type.count})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex gap-4 flex-wrap items-center">
+            <Select value={entityType} onValueChange={(v) => { setEntityType(v); setPage(1) }}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="資料類型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">所有類型</SelectItem>
+                {entityTypesQuery.data?.map((type) => (
+                  <SelectItem key={type.type} value={type.type}>
+                    {type.label} ({type.count})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={action} onValueChange={setAction}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="操作類型" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">所有操作</SelectItem>
-            <SelectItem value="CREATE">新增</SelectItem>
-            <SelectItem value="UPDATE">修改</SelectItem>
-            <SelectItem value="DELETE">刪除</SelectItem>
-          </SelectContent>
-        </Select>
+            <Select value={action} onValueChange={(v) => { setAction(v); setPage(1) }}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="操作類型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">所有操作</SelectItem>
+                <SelectItem value="CREATE">新增</SelectItem>
+                <SelectItem value="UPDATE">修改</SelectItem>
+                <SelectItem value="DELETE">刪除</SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Input
-          placeholder="搜尋操作者..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-xs"
-        />
-      </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => { setStartDate(e.target.value); setPage(1) }}
+                className="w-[160px]"
+              />
+              <span className="text-muted-foreground">~</span>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => { setEndDate(e.target.value); setPage(1) }}
+                className="w-[160px]"
+              />
+            </div>
+
+            {(entityType !== 'all' || action !== 'all' || startDate || endDate) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEntityType('all')
+                  setAction('all')
+                  setStartDate('')
+                  setEndDate('')
+                  setPage(1)
+                }}
+              >
+                清除篩選
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* 日誌列表 */}
       <Card>

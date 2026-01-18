@@ -2,6 +2,21 @@ import { prisma } from './prisma'
 import type { GroupPermissionType } from '@prisma/client'
 
 /**
+ * 檢查員工是否擁有 SUPER_ADMIN 角色（集團最高管理員）
+ * 此角色擁有所有權限
+ */
+export async function hasSuperAdminRole(employeeId: string): Promise<boolean> {
+  const assignment = await prisma.employeeAssignment.findFirst({
+    where: {
+      employeeId,
+      status: 'ACTIVE',
+      role: { name: 'SUPER_ADMIN' },
+    },
+  })
+  return !!assignment
+}
+
+/**
  * 檢查員工是否擁有指定的集團級權限
  */
 export async function hasGroupPermission(
@@ -26,44 +41,59 @@ export async function hasGroupPermission(
 
 /**
  * 檢查員工是否為集團管理員
+ * SUPER_ADMIN 角色自動擁有此權限
  */
 export async function isGroupAdmin(employeeId: string): Promise<boolean> {
+  // SUPER_ADMIN 角色擁有所有權限
+  if (await hasSuperAdminRole(employeeId)) return true
   return hasGroupPermission(employeeId, 'GROUP_ADMIN')
 }
 
 /**
  * 檢查員工是否可以檢視跨公司資料
+ * SUPER_ADMIN 角色和集團管理員自動擁有此權限
  */
 export async function canViewCrossCompany(employeeId: string): Promise<boolean> {
+  // SUPER_ADMIN 角色擁有所有權限
+  if (await hasSuperAdminRole(employeeId)) return true
   // 集團管理員可以跨公司檢視
-  if (await isGroupAdmin(employeeId)) return true
+  if (await hasGroupPermission(employeeId, 'GROUP_ADMIN')) return true
   return hasGroupPermission(employeeId, 'CROSS_COMPANY_VIEW')
 }
 
 /**
  * 檢查員工是否可以編輯跨公司資料
+ * SUPER_ADMIN 角色和集團管理員自動擁有此權限
  */
 export async function canEditCrossCompany(employeeId: string): Promise<boolean> {
+  // SUPER_ADMIN 角色擁有所有權限
+  if (await hasSuperAdminRole(employeeId)) return true
   // 集團管理員可以跨公司編輯
-  if (await isGroupAdmin(employeeId)) return true
+  if (await hasGroupPermission(employeeId, 'GROUP_ADMIN')) return true
   return hasGroupPermission(employeeId, 'CROSS_COMPANY_EDIT')
 }
 
 /**
  * 檢查員工是否可以檢視稽核日誌
+ * SUPER_ADMIN 角色和集團管理員自動擁有此權限
  */
 export async function canViewAuditLog(employeeId: string): Promise<boolean> {
+  // SUPER_ADMIN 角色擁有所有權限
+  if (await hasSuperAdminRole(employeeId)) return true
   // 集團管理員可以檢視稽核日誌
-  if (await isGroupAdmin(employeeId)) return true
+  if (await hasGroupPermission(employeeId, 'GROUP_ADMIN')) return true
   return hasGroupPermission(employeeId, 'AUDIT_LOG_VIEW')
 }
 
 /**
  * 檢查員工是否可以管理公司
+ * SUPER_ADMIN 角色和集團管理員自動擁有此權限
  */
 export async function canManageCompany(employeeId: string): Promise<boolean> {
+  // SUPER_ADMIN 角色擁有所有權限
+  if (await hasSuperAdminRole(employeeId)) return true
   // 集團管理員可以管理公司
-  if (await isGroupAdmin(employeeId)) return true
+  if (await hasGroupPermission(employeeId, 'GROUP_ADMIN')) return true
   return hasGroupPermission(employeeId, 'COMPANY_MANAGEMENT')
 }
 

@@ -9,6 +9,8 @@ import {
   Users,
   Building2,
   Activity,
+  Settings,
+  Bot,
 } from 'lucide-react'
 
 interface SystemDashboardProps {
@@ -17,6 +19,7 @@ interface SystemDashboardProps {
     isGroupAdmin: boolean
     canManageCompany: boolean
     canViewAuditLog: boolean
+    isSuperAdmin: boolean
   }
   stats: {
     totalGroups: number
@@ -59,6 +62,22 @@ export function SystemDashboard({ permissions, stats }: SystemDashboardProps) {
       href: '/dashboard/system/audit-logs',
       color: 'text-orange-500',
       show: permissions.canViewAuditLog,
+    },
+    {
+      title: '稽核設定',
+      description: '設定稽核記錄開關',
+      icon: Settings,
+      href: '/dashboard/system/audit-settings',
+      color: 'text-gray-500',
+      show: permissions.isSuperAdmin,
+    },
+    {
+      title: 'AI 服務設定',
+      description: '設定 AI 助理 API 金鑰',
+      icon: Bot,
+      href: '/dashboard/system/ai-settings',
+      color: 'text-emerald-500',
+      show: permissions.isSuperAdmin,
     },
   ].filter((item) => item.show)
 
@@ -144,10 +163,17 @@ export function SystemDashboard({ permissions, stats }: SystemDashboardProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {permissions.isGroupAdmin && (
+            {permissions.isSuperAdmin && (
+              <div className="flex items-center gap-2 text-sm">
+                <Shield className="h-4 w-4 text-red-500" />
+                <span className="font-medium">超級管理員</span>
+                <span className="text-muted-foreground">- 擁有最高系統權限，包含稽核設定</span>
+              </div>
+            )}
+            {permissions.isGroupAdmin && !permissions.isSuperAdmin && (
               <div className="flex items-center gap-2 text-sm">
                 <Shield className="h-4 w-4 text-purple-500" />
-                <span className="font-medium">集團超級管理員</span>
+                <span className="font-medium">集團管理員</span>
                 <span className="text-muted-foreground">- 擁有所有系統管理權限</span>
               </div>
             )}

@@ -128,3 +128,25 @@ This is a Traditional Chinese (繁體中文) application. UI text, comments, and
 - Code identifiers: English
 - UI labels and user-facing text: Chinese
 - Comments: Mix of Chinese and English
+
+## Claude Code 協作規則
+
+以下為與 Claude Code 協作時的重要原則：
+
+### 回應語言
+- 請盡可能使用**繁體中文**回應所有訊息
+
+### 開發伺服器管理
+- 當 `npm run dev` 發現埠號 (port 3000) 被佔用時，**不要**自動切換到其他埠號
+- 應先終止佔用該埠號的舊程序，再重新啟動開發伺服器
+- 操作步驟：
+  1. 使用 `netstat -ano | findstr :3000` 找出佔用程序的 PID
+  2. 使用 `cmd //c "taskkill /PID {PID} /F"` 終止該程序
+  3. 重新執行 `npm run dev`
+
+### 檔案編輯
+- 編輯檔案前，若有正在執行的開發伺服器，請先停止後再編輯
+
+### Git 操作
+- 只有在使用者明確說「git push」時才執行推送
+- 本地測試階段不主動推送到遠端

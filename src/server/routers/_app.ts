@@ -35,6 +35,9 @@ import { userPreferenceRouter } from './userPreference'
 import { searchRouter } from './search'
 import { aiRouter } from './ai'
 import { notificationRouter } from './notification'
+import { changeLogRouter } from './changeLog'
+import { auditSettingRouter } from './auditSetting'
+import { messagingRouter } from './messaging'
 
 export const appRouter = router({
   health: healthRouter,
@@ -73,6 +76,9 @@ export const appRouter = router({
   search: searchRouter,
   ai: aiRouter,
   notification: notificationRouter,
+  changeLog: changeLogRouter,
+  auditSetting: auditSettingRouter,
+  messaging: messagingRouter,
 })
 
 export type AppRouter = typeof appRouter

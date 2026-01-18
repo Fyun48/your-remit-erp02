@@ -52,11 +52,15 @@ import {
   AlertTriangle,
   ArrowRightLeft,
   UserMinus,
+  UserPlus,
   History,
   Camera,
   Loader2,
   Plus,
   X,
+  ChevronLeft,
+  ChevronRight,
+  KeyRound,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { trpc } from '@/lib/trpc'
@@ -120,6 +124,12 @@ interface Role {
   isSystem: boolean
 }
 
+interface EmployeeNav {
+  id: string
+  name: string
+  employeeNo: string
+}
+
 interface EmployeeDetailProps {
   employee: Employee
   companyId: string
@@ -128,6 +138,11 @@ interface EmployeeDetailProps {
   positions: Position[]
   supervisors: Supervisor[]
   roles: Role[]
+  prevEmployee: EmployeeNav | null
+  nextEmployee: EmployeeNav | null
+  currentPosition: number
+  totalEmployees: number
+  showResigned: boolean
 }
 
 const genderLabels: Record<string, string> = {
@@ -150,14 +165,23 @@ export function EmployeeDetail({
   positions,
   supervisors,
   roles,
+  prevEmployee,
+  nextEmployee,
+  currentPosition,
+  totalEmployees,
+  showResigned,
 }: EmployeeDetailProps) {
+  // 導航連結的查詢參數
+  const navQueryString = showResigned ? '?showResigned=true' : ''
   const router = useRouter()
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isTransferOpen, setIsTransferOpen] = useState(false)
   const [isOffboardOpen, setIsOffboardOpen] = useState(false)
+  const [isReinstateOpen, setIsReinstateOpen] = useState(false)
   const [isAddAssignmentOpen, setIsAddAssignmentOpen] = useState(false)
   const [isEndAssignmentOpen, setIsEndAssignmentOpen] = useState(false)
   const [isRoleEditOpen, setIsRoleEditOpen] = useState(false)
+  const [isCredentialEditOpen, setIsCredentialEditOpen] = useState(false)
   const [selectedAssignmentToEnd, setSelectedAssignmentToEnd] = useState<Assignment | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
@@ -225,6 +249,46 @@ export function EmployeeDetail({
     reason: '',
   })
 
+  const [credentialData, setCredentialData] = useState({
+    email: employee.email,
+    password: '',
+    confirmPassword: '',
+  })
+
+  // 復職表單資料
+  const [reinstateData, setReinstateData] = useState({
+    reinstateDate: new Date().toISOString().split('T')[0],
+    companyId: companyId,
+    departmentId: '',
+    positionId: '',
+    supervisorId: '',
+    note: '',
+  })
+
+  // 取得離職員工的最後任職資料（用於復職預設值）
+  const { data: lastAssignment } = trpc.hr.getLastAssignment.useQuery(
+    { employeeId: employee.id },
+    { enabled: isResigned && isReinstateOpen }
+  )
+
+  // 當取得最後任職資料時，更新復職表單的預設值
+  const [reinstateInitialized, setReinstateInitialized] = useState(false)
+  if (lastAssignment && !reinstateInitialized && isReinstateOpen) {
+    setReinstateData((prev) => ({
+      ...prev,
+      companyId: lastAssignment.company.id,
+      departmentId: lastAssignment.department.id,
+      positionId: lastAssignment.position.id,
+    }))
+    setReinstateInitialized(true)
+  }
+
+  // 取得復職用的公司資料（部門、職位、主管）
+  const { data: reinstateCompanyData } = trpc.hr.getCompanyData.useQuery(
+    { companyId: reinstateData.companyId },
+    { enabled: isReinstateOpen && !!reinstateData.companyId }
+  )
+
   const updateEmployee = trpc.hr.updateEmployee.useMutation({
     onSuccess: () => {
       setIsEditOpen(false)
@@ -252,6 +316,19 @@ export function EmployeeDetail({
   const offboard = trpc.hr.offboard.useMutation({
     onSuccess: () => {
       setIsOffboardOpen(false)
+      setIsSubmitting(false)
+      router.refresh()
+    },
+    onError: (error) => {
+      alert(error.message)
+      setIsSubmitting(false)
+    },
+  })
+
+  const reinstate = trpc.hr.reinstate.useMutation({
+    onSuccess: () => {
+      setIsReinstateOpen(false)
+      setReinstateInitialized(false)
       setIsSubmitting(false)
       router.refresh()
     },
@@ -305,6 +382,45 @@ export function EmployeeDetail({
     },
   })
 
+  const updateCredentials = trpc.hr.updateEmployeeCredentials.useMutation({
+    onSuccess: () => {
+      setIsCredentialEditOpen(false)
+      setIsSubmitting(false)
+      setCredentialData({ ...credentialData, password: '', confirmPassword: '' })
+      router.refresh()
+    },
+    onError: (error) => {
+      alert(error.message)
+      setIsSubmitting(false)
+    },
+  })
+
+  const handleCredentialUpdate = (e: React.FormEvent) => {
+    e.preventDefault()
+    // 驗證密碼
+    if (credentialData.password && credentialData.password !== credentialData.confirmPassword) {
+      alert('兩次輸入的密碼不一致')
+      return
+    }
+    if (credentialData.password && credentialData.password.length < 6) {
+      alert('密碼至少需要 6 個字元')
+      return
+    }
+    // 檢查是否有變更
+    const hasEmailChange = credentialData.email !== employee.email
+    const hasPasswordChange = credentialData.password.length > 0
+    if (!hasEmailChange && !hasPasswordChange) {
+      alert('請修改 Email 或密碼')
+      return
+    }
+    setIsSubmitting(true)
+    updateCredentials.mutate({
+      employeeId: employee.id,
+      email: hasEmailChange ? credentialData.email : undefined,
+      password: hasPasswordChange ? credentialData.password : undefined,
+    })
+  }
+
   const handleEdit = (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -346,6 +462,27 @@ export function EmployeeDetail({
       employeeId: employee.id,
       resignDate: new Date(offboardData.resignDate),
       reason: offboardData.reason || undefined,
+    })
+  }
+
+  const handleReinstate = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!reinstateData.departmentId || !reinstateData.positionId) {
+      alert('請選擇部門和職位')
+      return
+    }
+    setIsSubmitting(true)
+    // 由於這是 client component，暫時使用 employee.id 作為 operatorId
+    // 實際應該從 session 取得，但這裡簡化處理
+    reinstate.mutate({
+      employeeId: employee.id,
+      reinstateDate: new Date(reinstateData.reinstateDate),
+      companyId: reinstateData.companyId,
+      departmentId: reinstateData.departmentId,
+      positionId: reinstateData.positionId,
+      supervisorId: reinstateData.supervisorId || undefined,
+      note: reinstateData.note || undefined,
+      operatorId: employee.id, // TODO: 應從 session 取得實際操作者 ID
     })
   }
 
@@ -500,10 +637,14 @@ export function EmployeeDetail({
           </div>
         </div>
         {!isResigned && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setIsEditOpen(true)}>
               <Pencil className="h-4 w-4 mr-2" />
               編輯資料
+            </Button>
+            <Button variant="outline" onClick={() => setIsCredentialEditOpen(true)}>
+              <KeyRound className="h-4 w-4 mr-2" />
+              登入資訊
             </Button>
             <Button variant="outline" onClick={() => setIsTransferOpen(true)}>
               <ArrowRightLeft className="h-4 w-4 mr-2" />
@@ -515,7 +656,76 @@ export function EmployeeDetail({
             </Button>
           </div>
         )}
+        {isResigned && (
+          <div className="flex gap-2">
+            <Button variant="default" onClick={() => {
+              setReinstateInitialized(false)
+              setIsReinstateOpen(true)
+            }}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              復職
+            </Button>
+            <Button variant="outline" onClick={() => setIsCredentialEditOpen(true)}>
+              <KeyRound className="h-4 w-4 mr-2" />
+              登入資訊
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* 員工導航列 */}
+      {totalEmployees > 1 && (
+        <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3 border">
+          <div className="flex items-center gap-3">
+            {prevEmployee ? (
+              <Link href={`/dashboard/hr/employees/${prevEmployee.id}${navQueryString}`}>
+                <Button variant="outline" size="sm" className="gap-2 hover:bg-background">
+                  <ChevronLeft className="h-4 w-4" />
+                  <div className="text-left hidden sm:block">
+                    <div className="text-xs text-muted-foreground">上一位</div>
+                    <div className="font-medium">{prevEmployee.name}</div>
+                  </div>
+                  <span className="sm:hidden">上一位</span>
+                </Button>
+              </Link>
+            ) : (
+              <Button variant="outline" size="sm" className="gap-2 opacity-50" disabled>
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:block text-xs text-muted-foreground">無</span>
+                <span className="sm:hidden">上一位</span>
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">員工</span>
+            <Badge variant="secondary" className="font-mono px-2.5">
+              {currentPosition} / {totalEmployees}
+            </Badge>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {nextEmployee ? (
+              <Link href={`/dashboard/hr/employees/${nextEmployee.id}${navQueryString}`}>
+                <Button variant="outline" size="sm" className="gap-2 hover:bg-background">
+                  <div className="text-right hidden sm:block">
+                    <div className="text-xs text-muted-foreground">下一位</div>
+                    <div className="font-medium">{nextEmployee.name}</div>
+                  </div>
+                  <span className="sm:hidden">下一位</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            ) : (
+              <Button variant="outline" size="sm" className="gap-2 opacity-50" disabled>
+                <span className="sm:hidden">下一位</span>
+                <span className="hidden sm:block text-xs text-muted-foreground">無</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       <Tabs defaultValue="job" className="space-y-4">
         <TabsList>
@@ -1070,6 +1280,127 @@ export function EmployeeDetail({
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* 復職 Dialog */}
+      <Dialog open={isReinstateOpen} onOpenChange={(open) => {
+        setIsReinstateOpen(open)
+        if (!open) setReinstateInitialized(false)
+      }}>
+        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>復職作業</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleReinstate} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reinstate-date">復職日期 *</Label>
+              <Input
+                id="reinstate-date"
+                type="date"
+                value={reinstateData.reinstateDate}
+                onChange={(e) => setReinstateData({ ...reinstateData, reinstateDate: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>公司 *</Label>
+              <Select
+                value={reinstateData.companyId}
+                onValueChange={(v) => setReinstateData({
+                  ...reinstateData,
+                  companyId: v,
+                  departmentId: '',
+                  positionId: '',
+                  supervisorId: '',
+                })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇公司" />
+                </SelectTrigger>
+                <SelectContent>
+                  {lastAssignment && (
+                    <SelectItem value={lastAssignment.company.id}>
+                      {lastAssignment.company.name}
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>部門 *</Label>
+              <Select
+                value={reinstateData.departmentId}
+                onValueChange={(v) => setReinstateData({ ...reinstateData, departmentId: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇部門" />
+                </SelectTrigger>
+                <SelectContent>
+                  {reinstateCompanyData?.departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>職位 *</Label>
+              <Select
+                value={reinstateData.positionId}
+                onValueChange={(v) => setReinstateData({ ...reinstateData, positionId: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇職位" />
+                </SelectTrigger>
+                <SelectContent>
+                  {reinstateCompanyData?.positions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>直屬主管</Label>
+              <Select
+                value={reinstateData.supervisorId}
+                onValueChange={(v) => setReinstateData({ ...reinstateData, supervisorId: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇主管（可選）" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">無</SelectItem>
+                  {reinstateCompanyData?.supervisors
+                    .filter((s) => s.employee.id !== employee.id)
+                    .map((s) => (
+                      <SelectItem key={s.employee.id} value={s.id}>
+                        {s.employee.name} ({s.position?.name})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reinstate-note">備註</Label>
+              <Input
+                id="reinstate-note"
+                value={reinstateData.note}
+                onChange={(e) => setReinstateData({ ...reinstateData, note: e.target.value })}
+                placeholder="復職原因或備註"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsReinstateOpen(false)}>
+                取消
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? '處理中...' : '確認復職'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* 新增兼任 Dialog */}
       <Dialog open={isAddAssignmentOpen} onOpenChange={setIsAddAssignmentOpen}>
         <DialogContent className="max-w-lg" aria-describedby={undefined}>
@@ -1237,6 +1568,55 @@ export function EmployeeDetail({
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 修改登入資訊 Dialog */}
+      <Dialog open={isCredentialEditOpen} onOpenChange={setIsCredentialEditOpen}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>修改登入資訊</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCredentialUpdate} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="credential-email">登入 Email</Label>
+              <Input
+                id="credential-email"
+                type="email"
+                value={credentialData.email}
+                onChange={(e) => setCredentialData({ ...credentialData, email: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">此為員工登入系統使用的帳號</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="credential-password">新密碼</Label>
+              <Input
+                id="credential-password"
+                type="password"
+                placeholder="若不修改密碼請留空"
+                value={credentialData.password}
+                onChange={(e) => setCredentialData({ ...credentialData, password: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="credential-confirm">確認密碼</Label>
+              <Input
+                id="credential-confirm"
+                type="password"
+                placeholder="再次輸入新密碼"
+                value={credentialData.confirmPassword}
+                onChange={(e) => setCredentialData({ ...credentialData, confirmPassword: e.target.value })}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsCredentialEditOpen(false)}>
+                取消
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? '儲存中...' : '儲存'}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

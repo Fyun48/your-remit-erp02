@@ -33,6 +33,19 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// Audit 設定（控制哪些操作需要被記錄）
+model AuditSetting {
+  id          String   @id @default(cuid())
+  entityType  String   // Employee, Department, Voucher...
+  action      String   // CREATE, UPDATE, DELETE
+  isEnabled   Boolean  @default(true) // 是否啟用記錄
+  updatedById String?  // 最後更新者
+  updatedAt   DateTime @updatedAt
+
+  @@unique([entityType, action])
+  @@map("audit_settings")
+}
+
 // ==================== 集團級權限 ====================
 
 model GroupPermission {
@@ -53,11 +66,13 @@ model GroupPermission {
 }
 
 enum GroupPermissionType {
-  GROUP_ADMIN // 集團超級管理員
+  SUPER_ADMIN // 超級管理員（最高權限）
+  GROUP_ADMIN // 集團管理員
   CROSS_COMPANY_VIEW // 跨公司檢視
   CROSS_COMPANY_EDIT // 跨公司編輯
   AUDIT_LOG_VIEW // 稽核日誌檢視
   COMPANY_MANAGEMENT // 公司管理 (創建/停用)
+  DELETE_CHANGE_LOG // 刪除異動紀錄
 }
 
 // ==================== 組織架構 ====================
@@ -240,6 +255,14 @@ model Employee {
   delegatesAsPrincipal       WorkflowApprovalDelegate[] @relation("DelegatePrincipal")
   delegatesAsDelegate        WorkflowApprovalDelegate[] @relation("DelegateDelegate")
 
+  // 員工異動紀錄
+  changeLogs        EmployeeChangeLog[] @relation("EmployeeChangeLogs")
+  changeLogsCreated EmployeeChangeLog[] @relation("ChangeLogCreator")
+
+  // 內部即時訊息
+  conversationParticipants ConversationParticipant[]
+  messagesSent             Message[]
+
   @@map("employees")
 }
 
@@ -282,6 +305,48 @@ enum AssignmentStatus {
   ACTIVE // 在職
   ON_LEAVE // 留停
   RESIGNED // 離職
+}
+
+// ==================== 員工異動紀錄 ====================
+
+// 異動類型
+enum ChangeType {
+  ONBOARD           // 入職
+  OFFBOARD          // 離職
+  REINSTATE         // 復職
+  TRANSFER          // 調動
+  ON_LEAVE          // 留停
+  RETURN_FROM_LEAVE // 留停復職
+}
+
+// 員工異動紀錄
+model EmployeeChangeLog {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation("EmployeeChangeLogs", fields: [employeeId], references: [id])
+
+  changeType   ChangeType  // 異動類型
+  changeDate   DateTime    // 異動生效日期
+
+  // 異動前後的資料（nullable，因為入職時沒有「前」）
+  fromCompanyId    String?
+  fromDepartmentId String?
+  fromPositionId   String?
+  toCompanyId      String?
+  toDepartmentId   String?
+  toPositionId     String?
+
+  reason       String?     // 異動原因
+  note         String?     // 備註
+
+  createdById  String      // 建立者（操作人）
+  createdBy    Employee    @relation("ChangeLogCreator", fields: [createdById], references: [id])
+  createdAt    DateTime    @default(now())
+
+  @@index([employeeId, changeDate])
+  @@index([changeType])
+  @@index([createdAt])
+  @@map("employee_change_logs")
 }
 
 // ==================== 權限 ====================
@@ -1935,4 +2000,65 @@ model Notification {
   @@index([userId, isRead])
   @@index([createdAt])
   @@map("notifications")
+}
+
+// ==================== 內部即時訊息 ====================
+
+model Conversation {
+  id        String   @id @default(cuid())
+  type      String   @default("DIRECT") // DIRECT (一對一), GROUP (群組)
+  name      String?  // 群組對話名稱（一對一為 null）
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  joinedAt       DateTime @default(now())
+  lastReadAt     DateTime? // 最後已讀時間，用於計算未讀訊息
+
+  @@unique([conversationId, employeeId])
+  @@index([employeeId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         Employee @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String   @db.Text
+  isDeleted      Boolean  @default(false) // 軟刪除，顯示「訊息已收回」
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  attachments    MessageAttachment[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fileName  String   // 原始檔名
+  fileType  String   // MIME type
+  fileSize  Int      // bytes
+  fileUrl   String   // 檔案 URL
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
+  @@map("message_attachments")
 }

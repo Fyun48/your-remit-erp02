@@ -2,9 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableBody,
@@ -69,6 +72,7 @@ interface EmployeeListProps {
   employees: EmployeeAssignment[]
   departments: Department[]
   positions: Position[]
+  showResigned: boolean
 }
 
 const statusLabels: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
@@ -81,10 +85,24 @@ export function EmployeeList({
   companyName,
   employees,
   departments,
+  showResigned,
 }: EmployeeListProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [search, setSearch] = useState('')
   const [filterDept, setFilterDept] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+
+  // 切換顯示離職員工
+  const handleShowResignedChange = (checked: boolean) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (checked) {
+      params.set('showResigned', 'true')
+    } else {
+      params.delete('showResigned')
+    }
+    router.push(`/dashboard/hr/employees?${params.toString()}`)
+  }
 
   const filteredEmployees = employees.filter((emp) => {
     // 搜尋
@@ -137,7 +155,7 @@ export function EmployeeList({
       {/* 篩選列 */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-[200px]">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -172,9 +190,24 @@ export function EmployeeList({
                 <SelectItem value="">全部狀態</SelectItem>
                 <SelectItem value="ACTIVE">在職</SelectItem>
                 <SelectItem value="ON_LEAVE">留停</SelectItem>
-                <SelectItem value="RESIGNED">離職</SelectItem>
+                {showResigned && <SelectItem value="RESIGNED">離職</SelectItem>}
               </SelectContent>
             </Select>
+
+            {/* 顯示離職員工勾選框 */}
+            <div className="flex items-center space-x-2 ml-auto">
+              <Checkbox
+                id="showResigned"
+                checked={showResigned}
+                onCheckedChange={handleShowResignedChange}
+              />
+              <Label
+                htmlFor="showResigned"
+                className="text-sm font-medium cursor-pointer select-none"
+              >
+                顯示已離職員工
+              </Label>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -257,7 +290,7 @@ export function EmployeeList({
                         <Badge variant={status.variant}>{status.label}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/dashboard/hr/employees/${emp.employee.id}`}>
+                        <Link href={`/dashboard/hr/employees/${emp.employee.id}${showResigned ? '?showResigned=true' : ''}`}>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <Eye className="h-4 w-4" />
                           </Button>

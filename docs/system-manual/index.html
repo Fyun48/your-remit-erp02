@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>集團企業 ERP 系統操作手冊</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #64748b;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 3rem 2rem;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .version-info {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        nav.toc {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+        }
+
+        nav.toc h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        nav.toc ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 0.5rem;
+        }
+
+        nav.toc a {
+            color: var(--text);
+            text-decoration: none;
+            display: block;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        nav.toc a:hover {
+            background: var(--bg);
+            color: var(--primary);
+        }
+
+        section {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+        }
+
+        section h2 {
+            font-size: 1.5rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        section h3 {
+            font-size: 1.2rem;
+            color: var(--text);
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        section h4 {
+            font-size: 1rem;
+            color: var(--secondary);
+            margin: 1rem 0 0.5rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid var(--border);
+        }
+
+        .feature-card h4 {
+            color: var(--primary);
+            margin: 0 0 0.5rem;
+        }
+
+        .feature-card p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        .screenshot-placeholder {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            color: var(--secondary);
+            margin: 1rem 0;
+            border: 2px dashed var(--border);
+        }
+
+        .screenshot-placeholder::before {
+            content: "📷";
+            display: block;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-list {
+            counter-reset: step;
+            list-style: none;
+            padding: 0;
+        }
+
+        .step-list li {
+            counter-increment: step;
+            padding: 1rem 1rem 1rem 3.5rem;
+            position: relative;
+            margin-bottom: 0.5rem;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .step-list li::before {
+            content: counter(step);
+            position: absolute;
+            left: 1rem;
+            top: 1rem;
+            width: 1.75rem;
+            height: 1.75rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg);
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        tr:hover td {
+            background: var(--bg);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #dbeafe; color: #1e40af; }
+
+        .tip {
+            background: #eff6ff;
+            border-left: 4px solid var(--primary);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .tip::before {
+            content: "💡 提示：";
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .warning {
+            background: #fef3c7;
+            border-left: 4px solid var(--warning);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .warning::before {
+            content: "⚠️ 注意：";
+            font-weight: bold;
+            color: #b45309;
+        }
+
+        .keyboard-shortcut {
+            display: inline-block;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.125rem 0.5rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            header {
+                padding: 2rem 1rem;
+            }
+
+            header h1 {
+                font-size: 1.75rem;
+            }
+
+            nav.toc ul {
+                grid-template-columns: 1fr;
+            }
+
+            section {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>集團企業 ERP 系統操作手冊</h1>
+            <p>完整的系統功能說明與操作指南</p>
+            <div class="version-info">
+                文件版本：1.0.0 | 最後更新：2026-01-18
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <nav class="toc">
+            <h2>目錄</h2>
+            <ul>
+                <li><a href="#overview">1. 系統概述</a></li>
+                <li><a href="#login">2. 登入與帳號</a></li>
+                <li><a href="#dashboard">3. 儀表板</a></li>
+                <li><a href="#attendance">4. 出勤管理</a></li>
+                <li><a href="#leave">5. 請假管理</a></li>
+                <li><a href="#expense">6. 費用報銷</a></li>
+                <li><a href="#approval">7. 審核中心</a></li>
+                <li><a href="#messages">8. 內部訊息</a></li>
+                <li><a href="#admin">9. 行政管理</a></li>
+                <li><a href="#hr">10. 人事管理</a></li>
+                <li><a href="#organization">11. 組織圖</a></li>
+                <li><a href="#workflow">12. 流程管理</a></li>
+                <li><a href="#finance">13. 財務會計</a></li>
+                <li><a href="#reports">14. 報表中心</a></li>
+                <li><a href="#notifications">15. 通知系統</a></li>
+                <li><a href="#settings">16. 系統設定</a></li>
+                <li><a href="#system-admin">17. 系統管理</a></li>
+                <li><a href="#permissions">18. 權限說明</a></li>
+            </ul>
+        </nav>
+
+        <!-- 1. 系統概述 -->
+        <section id="overview">
+            <h2>1. 系統概述</h2>
+            <p>本系統為多公司集團企業資源規劃（ERP）系統，支援集團級別的跨公司管理。系統採用現代化的網頁技術開發，可在任何支援現代瀏覽器的裝置上使用。</p>
+
+            <h3>1.1 系統架構</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>集團管理</h4>
+                    <p>支援多集團架構，每個集團可管理多家公司</p>
+                </div>
+                <div class="feature-card">
+                    <h4>公司管理</h4>
+                    <p>每家公司獨立的部門、職位、員工管理</p>
+                </div>
+                <div class="feature-card">
+                    <h4>跨公司調動</h4>
+                    <p>員工可在集團內不同公司間調動或兼任</p>
+                </div>
+                <div class="feature-card">
+                    <h4>彈性權限</h4>
+                    <p>基於角色、部門、職位的多層級權限控制</p>
+                </div>
+            </div>
+
+            <h3>1.2 瀏覽器支援</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>瀏覽器</th>
+                        <th>最低版本</th>
+                        <th>建議</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Google Chrome</td>
+                        <td>90+</td>
+                        <td><span class="badge badge-success">推薦</span></td>
+                    </tr>
+                    <tr>
+                        <td>Microsoft Edge</td>
+                        <td>90+</td>
+                        <td><span class="badge badge-success">推薦</span></td>
+                    </tr>
+                    <tr>
+                        <td>Mozilla Firefox</td>
+                        <td>88+</td>
+                        <td><span class="badge badge-info">支援</span></td>
+                    </tr>
+                    <tr>
+                        <td>Safari</td>
+                        <td>14+</td>
+                        <td><span class="badge badge-info">支援</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- 2. 登入與帳號 -->
+        <section id="login">
+            <h2>2. 登入與帳號</h2>
+
+            <h3>2.1 一般登入</h3>
+            <p>使用您的員工帳號（員工編號或電子郵件）和密碼登入系統。</p>
+            <ol class="step-list">
+                <li>開啟系統網址，進入登入頁面</li>
+                <li>輸入您的帳號（員工編號或電子郵件）</li>
+                <li>輸入密碼</li>
+                <li>點擊「登入」按鈕</li>
+            </ol>
+            <div class="screenshot-placeholder">登入頁面截圖</div>
+
+            <h3>2.2 QR Code 快速登入</h3>
+            <p>使用已登入的行動裝置掃描 QR Code 快速登入。</p>
+            <ol class="step-list">
+                <li>在登入頁面點擊「QR Code 登入」</li>
+                <li>使用手機上已登入的 APP 掃描 QR Code</li>
+                <li>在手機上確認登入</li>
+                <li>網頁自動跳轉至儀表板</li>
+            </ol>
+
+            <h3>2.3 忘記密碼</h3>
+            <ol class="step-list">
+                <li>點擊登入頁面的「忘記密碼」連結</li>
+                <li>輸入您的電子郵件地址</li>
+                <li>系統將寄送密碼重設連結至您的信箱</li>
+                <li>點擊郵件中的連結設定新密碼</li>
+            </ol>
+            <div class="tip">密碼重設連結有效期限為 24 小時，請盡快完成重設。</div>
+        </section>
+
+        <!-- 3. 儀表板 -->
+        <section id="dashboard">
+            <h2>3. 儀表板</h2>
+            <p>儀表板是登入後的首頁，顯示您的個人資訊摘要與快速操作入口。</p>
+
+            <h3>3.1 個人資訊區</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>歡迎訊息</h4>
+                    <p>顯示您的姓名和目前日期時間</p>
+                </div>
+                <div class="feature-card">
+                    <h4>今日出勤</h4>
+                    <p>顯示今日打卡狀態（已上班/已下班）</p>
+                </div>
+                <div class="feature-card">
+                    <h4>請假餘額</h4>
+                    <p>顯示各類假別的剩餘天數</p>
+                </div>
+                <div class="feature-card">
+                    <h4>待審核項目</h4>
+                    <p>顯示需要您審核的申請數量</p>
+                </div>
+            </div>
+            <div class="screenshot-placeholder">儀表板截圖</div>
+
+            <h3>3.2 快捷操作</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>操作</th>
+                        <th>說明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>打卡</td>
+                        <td>快速進行上班/下班打卡</td>
+                    </tr>
+                    <tr>
+                        <td>請假申請</td>
+                        <td>快速新增請假申請</td>
+                    </tr>
+                    <tr>
+                        <td>費用報銷</td>
+                        <td>快速新增費用報銷申請</td>
+                    </tr>
+                    <tr>
+                        <td>查看通知</td>
+                        <td>查看最新系統通知</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- 4. 出勤管理 -->
+        <section id="attendance">
+            <h2>4. 出勤管理</h2>
+            <p>管理您的每日出勤打卡紀錄。</p>
+
+            <h3>4.1 打卡功能</h3>
+            <h4>上班打卡</h4>
+            <ol class="step-list">
+                <li>進入「出勤管理」頁面</li>
+                <li>確認目前時間顯示正確</li>
+                <li>點擊「上班打卡」按鈕</li>
+                <li>系統記錄打卡時間並顯示確認訊息</li>
+            </ol>
+
+            <h4>下班打卡</h4>
+            <ol class="step-list">
+                <li>進入「出勤管理」頁面</li>
+                <li>點擊「下班打卡」按鈕</li>
+                <li>系統記錄下班時間並計算當日工時</li>
+            </ol>
+            <div class="screenshot-placeholder">出勤打卡介面截圖</div>
+
+            <h3>4.2 出勤紀錄查詢</h3>
+            <p>可查詢過去的出勤紀錄，包含：</p>
+            <ul>
+                <li>每日打卡時間（上班/下班）</li>
+                <li>工作時數統計</li>
+                <li>遲到/早退紀錄</li>
+                <li>加班時數</li>
+            </ul>
+
+            <h3>4.3 班別設定</h3>
+            <p>系統支援多種班別設定，由管理員設定後套用：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>班別</th>
+                        <th>上班時間</th>
+                        <th>下班時間</th>
+                        <th>彈性</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>正常班</td>
+                        <td>09:00</td>
+                        <td>18:00</td>
+                        <td>±30分鐘</td>
+                    </tr>
+                    <tr>
+                        <td>早班</td>
+                        <td>08:00</td>
+                        <td>17:00</td>
+                        <td>±30分鐘</td>
+                    </tr>
+                    <tr>
+                        <td>彈性班</td>
+                        <td>08:00-10:00</td>
+                        <td>17:00-19:00</td>
+                        <td>核心時間制</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="tip">彈性班需在核心時間（10:00-16:00）期間在崗。</div>
+        </section>
+
+        <!-- 5. 請假管理 -->
+        <section id="leave">
+            <h2>5. 請假管理</h2>
+            <p>申請、查詢和管理各類假別。</p>
+
+            <h3>5.1 新增請假申請</h3>
+            <ol class="step-list">
+                <li>進入「請假管理」頁面</li>
+                <li>點擊「新增請假」按鈕</li>
+                <li>選擇假別類型（特休、病假、事假等）</li>
+                <li>選擇請假日期與時間</li>
+                <li>填寫請假事由</li>
+                <li>如需要，上傳相關證明文件</li>
+                <li>點擊「送出申請」</li>
+            </ol>
+            <div class="screenshot-placeholder">請假申請表單截圖</div>
+
+            <h3>5.2 假別說明</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>假別</th>
+                        <th>年度額度</th>
+                        <th>說明</th>
+                        <th>需附證明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>特別休假</td>
+                        <td>依年資</td>
+                        <td>年度特休假</td>
+                        <td>否</td>
+                    </tr>
+                    <tr>
+                        <td>病假</td>
+                        <td>30天</td>
+                        <td>因病需休養</td>
+                        <td>3天以上需醫師證明</td>
+                    </tr>
+                    <tr>
+                        <td>事假</td>
+                        <td>14天</td>
+                        <td>私人事務</td>
+                        <td>否</td>
+                    </tr>
+                    <tr>
+                        <td>婚假</td>
+                        <td>8天</td>
+                        <td>本人結婚</td>
+                        <td>結婚證明</td>
+                    </tr>
+                    <tr>
+                        <td>喪假</td>
+                        <td>依親等</td>
+                        <td>親屬過世</td>
+                        <td>訃聞或死亡證明</td>
+                    </tr>
+                    <tr>
+                        <td>產假</td>
+                        <td>56天</td>
+                        <td>生產/流產</td>
+                        <td>醫師證明</td>
+                    </tr>
+                    <tr>
+                        <td>陪產假</td>
+                        <td>7天</td>
+                        <td>配偶生產</td>
+                        <td>出生證明</td>
+                    </tr>
+                    <tr>
+                        <td>公假</td>
+                        <td>無限制</td>
+                        <td>公務出差/訓練</td>
+                        <td>公文或通知</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>5.3 請假餘額查詢</h3>
+            <p>在請假管理頁面上方可查看各假別的：</p>
+            <ul>
+                <li>年度總額度</li>
+                <li>已使用天數</li>
+                <li>剩餘天數</li>
+                <li>預計請假（已申請尚未核准）</li>
+            </ul>
+
+            <h3>5.4 請假紀錄</h3>
+            <p>可依以下條件篩選查詢：</p>
+            <ul>
+                <li>日期範圍</li>
+                <li>假別類型</li>
+                <li>審核狀態（待審核/已核准/已駁回）</li>
+            </ul>
+            <div class="warning">已核准的請假如需取消，請聯繫人事部門處理。</div>
+        </section>
+
+        <!-- 6. 費用報銷 -->
+        <section id="expense">
+            <h2>6. 費用報銷</h2>
+            <p>申請各類業務費用的報銷。</p>
+
+            <h3>6.1 新增報銷申請</h3>
+            <ol class="step-list">
+                <li>進入「費用報銷」頁面</li>
+                <li>點擊「新增報銷」按鈕</li>
+                <li>選擇報銷類型（交通、餐費、住宿等）</li>
+                <li>填寫費用明細（日期、金額、說明）</li>
+                <li>上傳發票或收據照片</li>
+                <li>確認總金額無誤</li>
+                <li>點擊「送出申請」</li>
+            </ol>
+            <div class="screenshot-placeholder">費用報銷表單截圖</div>
+
+            <h3>6.2 報銷類別</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>交通費</h4>
+                    <p>計程車、高鐵、飛機、油資、停車費</p>
+                </div>
+                <div class="feature-card">
+                    <h4>餐費</h4>
+                    <p>業務用餐、加班餐費、客戶招待</p>
+                </div>
+                <div class="feature-card">
+                    <h4>住宿費</h4>
+                    <p>出差住宿、會議住宿</p>
+                </div>
+                <div class="feature-card">
+                    <h4>辦公用品</h4>
+                    <p>文具、耗材、小型設備</p>
+                </div>
+                <div class="feature-card">
+                    <h4>通訊費</h4>
+                    <p>業務電話費、網路費</p>
+                </div>
+                <div class="feature-card">
+                    <h4>其他</h4>
+                    <p>無法歸類的其他費用</p>
+                </div>
+            </div>
+
+            <h3>6.3 注意事項</h3>
+            <div class="warning">
+                請確保上傳的發票/收據清晰可辨，包含日期、金額、商家名稱。電子發票請截圖完整交易明細。
+            </div>
+            <ul>
+                <li>報銷金額需與發票金額一致</li>
+                <li>超過 NT$3,000 需主管核准</li>
+                <li>超過 NT$10,000 需部門主管核准</li>
+                <li>申請後 30 天內需完成審核</li>
+            </ul>
+        </section>
+
+        <!-- 7. 審核中心 -->
+        <section id="approval">
+            <h2>7. 審核中心</h2>
+            <p>查看和處理需要您審核的各類申請。</p>
+
+            <h3>7.1 待審核清單</h3>
+            <p>審核中心顯示所有需要您處理的申請，包括：</p>
+            <ul>
+                <li>請假申請</li>
+                <li>費用報銷</li>
+                <li>用印申請</li>
+                <li>名片申請</li>
+                <li>文具申請</li>
+            </ul>
+            <div class="screenshot-placeholder">審核中心清單截圖</div>
+
+            <h3>7.2 審核操作</h3>
+            <h4>核准申請</h4>
+            <ol class="step-list">
+                <li>點擊待審核項目查看詳情</li>
+                <li>確認申請內容無誤</li>
+                <li>可選擇填寫審核意見</li>
+                <li>點擊「核准」按鈕</li>
+            </ol>
+
+            <h4>駁回申請</h4>
+            <ol class="step-list">
+                <li>點擊待審核項目查看詳情</li>
+                <li>填寫駁回原因（必填）</li>
+                <li>點擊「駁回」按鈕</li>
+                <li>申請人將收到駁回通知</li>
+            </ol>
+
+            <h4>退回重填</h4>
+            <ol class="step-list">
+                <li>點擊待審核項目查看詳情</li>
+                <li>填寫需修改的說明</li>
+                <li>點擊「退回重填」按鈕</li>
+                <li>申請人可修改後重新送出</li>
+            </ol>
+
+            <h3>7.3 代理審核</h3>
+            <p>當您因故無法處理審核時，可設定代理人：</p>
+            <ol class="step-list">
+                <li>進入「流程管理」→「代理人設定」</li>
+                <li>選擇代理人</li>
+                <li>設定代理期間</li>
+                <li>選擇可代理的申請類型</li>
+                <li>儲存設定</li>
+            </ol>
+            <div class="tip">代理人需與您有相同或更高的審核權限。</div>
+        </section>
+
+        <!-- 8. 內部訊息 -->
+        <section id="messages">
+            <h2>8. 內部訊息</h2>
+            <p>與公司同事進行即時通訊。</p>
+
+            <h3>8.1 對話清單</h3>
+            <p>左側顯示所有對話，包含：</p>
+            <ul>
+                <li>對方頭像與姓名</li>
+                <li>最新訊息預覽</li>
+                <li>未讀訊息數量（紅點）</li>
+                <li>最後訊息時間</li>
+            </ul>
+            <div class="screenshot-placeholder">訊息清單截圖</div>
+
+            <h3>8.2 發送訊息</h3>
+            <ol class="step-list">
+                <li>點擊「新對話」按鈕</li>
+                <li>搜尋並選擇要傳訊的對象</li>
+                <li>在輸入框輸入訊息</li>
+                <li>按 Enter 或點擊送出按鈕發送</li>
+            </ol>
+
+            <h3>8.3 附加檔案</h3>
+            <ol class="step-list">
+                <li>點擊輸入框旁的迴紋針圖示</li>
+                <li>選擇要傳送的檔案</li>
+                <li>確認檔案預覽</li>
+                <li>點擊送出</li>
+            </ol>
+            <p>支援的檔案類型：</p>
+            <ul>
+                <li>圖片：JPG、PNG、GIF（最大 10MB）</li>
+                <li>文件：PDF、Word、Excel（最大 10MB）</li>
+                <li>文字：TXT（最大 1MB）</li>
+            </ul>
+
+            <h3>8.4 訊息狀態</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>圖示</th>
+                        <th>狀態</th>
+                        <th>說明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>（無）</td>
+                        <td>發送中</td>
+                        <td>訊息正在傳送</td>
+                    </tr>
+                    <tr>
+                        <td>✓</td>
+                        <td>已送達</td>
+                        <td>訊息已存入伺服器</td>
+                    </tr>
+                    <tr>
+                        <td>✓✓</td>
+                        <td>已讀取</td>
+                        <td>對方已閱讀訊息</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="tip">點擊 Header 的訊息圖示可快速查看未讀訊息。</div>
+        </section>
+
+        <!-- 9. 行政管理 -->
+        <section id="admin">
+            <h2>9. 行政管理</h2>
+            <p>處理各類行政申請，包含用印、名片、文具。</p>
+
+            <h3>9.1 用印申請</h3>
+            <p>申請公司印章用於正式文件。</p>
+            <ol class="step-list">
+                <li>進入「行政管理」→「用印申請」</li>
+                <li>點擊「新增申請」</li>
+                <li>選擇印章類型（可複選）</li>
+                <li>填寫用印事由與份數</li>
+                <li>上傳需用印的文件</li>
+                <li>送出申請</li>
+            </ol>
+
+            <h4>印章類型</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>印章</th>
+                        <th>用途</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>公司章</td>
+                        <td>一般公文、合約、證明文件</td>
+                    </tr>
+                    <tr>
+                        <td>合約章</td>
+                        <td>正式合約文件</td>
+                    </tr>
+                    <tr>
+                        <td>發票章</td>
+                        <td>發票、收據</td>
+                    </tr>
+                    <tr>
+                        <td>銀行章</td>
+                        <td>銀行相關文件</td>
+                    </tr>
+                    <tr>
+                        <td>董事會章</td>
+                        <td>董事會決議文件</td>
+                    </tr>
+                    <tr>
+                        <td>騎縫章</td>
+                        <td>多頁文件騎縫</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="screenshot-placeholder">用印申請表單截圖</div>
+
+            <h3>9.2 名片申請</h3>
+            <ol class="step-list">
+                <li>進入「行政管理」→「名片申請」</li>
+                <li>確認個人資訊（姓名、職稱、聯絡方式）</li>
+                <li>選擇名片樣式與數量</li>
+                <li>填寫特殊需求（如有）</li>
+                <li>送出申請</li>
+            </ol>
+
+            <h3>9.3 文具申請</h3>
+            <ol class="step-list">
+                <li>進入「行政管理」→「文具申請」</li>
+                <li>瀏覽可申請的文具項目</li>
+                <li>選擇需要的品項與數量</li>
+                <li>填寫領取地點</li>
+                <li>送出申請</li>
+            </ol>
+        </section>
+
+        <!-- 10. 人事管理 -->
+        <section id="hr">
+            <h2>10. 人事管理</h2>
+            <p>管理公司員工資料、組織架構、調動與離職。（需人事管理權限）</p>
+
+            <h3>10.1 員工管理</h3>
+            <h4>查看員工清單</h4>
+            <p>可依以下條件篩選：</p>
+            <ul>
+                <li>所屬公司</li>
+                <li>部門</li>
+                <li>職位</li>
+                <li>在職狀態</li>
+                <li>姓名或員工編號搜尋</li>
+            </ul>
+            <div class="screenshot-placeholder">員工清單截圖</div>
+
+            <h4>新增員工</h4>
+            <ol class="step-list">
+                <li>點擊「新增員工」按鈕</li>
+                <li>填寫基本資料（姓名、身分證、生日等）</li>
+                <li>填寫聯絡資訊（電話、地址、緊急聯絡人）</li>
+                <li>設定任職資訊（公司、部門、職位、到職日）</li>
+                <li>設定系統帳號（電子郵件、初始密碼）</li>
+                <li>儲存並通知員工</li>
+            </ol>
+
+            <h4>編輯員工資料</h4>
+            <ol class="step-list">
+                <li>從員工清單點擊要編輯的員工</li>
+                <li>點擊「編輯」按鈕</li>
+                <li>修改需要更新的欄位</li>
+                <li>儲存變更</li>
+            </ol>
+            <div class="warning">修改員工資料會自動記錄變更歷程，可在「變更紀錄」中查詢。</div>
+
+            <h3>10.2 部門管理</h3>
+            <p>管理公司的部門架構。</p>
+            <ul>
+                <li>新增/編輯/刪除部門</li>
+                <li>設定部門層級（上級部門）</li>
+                <li>指定部門主管</li>
+                <li>查看部門人員清單</li>
+            </ul>
+
+            <h3>10.3 職位管理</h3>
+            <p>管理公司的職位定義。</p>
+            <ul>
+                <li>新增/編輯/刪除職位</li>
+                <li>設定職位等級（Level 1-10）</li>
+                <li>設定職位類別（管理職/專業職/行政職）</li>
+            </ul>
+
+            <h3>10.4 員工調動</h3>
+            <p>處理員工的部門或公司調動。</p>
+            <ol class="step-list">
+                <li>進入「人事管理」→「員工調動」</li>
+                <li>選擇要調動的員工</li>
+                <li>選擇新的公司/部門/職位</li>
+                <li>設定生效日期</li>
+                <li>填寫調動原因</li>
+                <li>送出調動申請</li>
+            </ol>
+
+            <h3>10.5 離職管理</h3>
+            <p>處理員工離職流程。</p>
+            <ol class="step-list">
+                <li>進入「人事管理」→「離職管理」</li>
+                <li>選擇離職員工</li>
+                <li>填寫離職日期與原因</li>
+                <li>執行離職交接程序</li>
+                <li>完成離職作業</li>
+            </ol>
+
+            <h3>10.6 變更紀錄</h3>
+            <p>查詢所有員工資料的變更歷程。</p>
+            <div class="screenshot-placeholder">變更紀錄截圖</div>
+        </section>
+
+        <!-- 11. 組織圖 -->
+        <section id="organization">
+            <h2>11. 組織圖</h2>
+            <p>視覺化呈現公司或集團的組織架構。</p>
+
+            <h3>11.1 查看組織圖</h3>
+            <ol class="step-list">
+                <li>進入「組織圖」頁面</li>
+                <li>選擇要查看的公司或集團</li>
+                <li>系統顯示階層式組織圖</li>
+                <li>點擊節點可查看詳細資訊</li>
+            </ol>
+            <div class="screenshot-placeholder">組織圖截圖</div>
+
+            <h3>11.2 組織圖操作</h3>
+            <ul>
+                <li>滑鼠滾輪：放大/縮小</li>
+                <li>拖曳：平移視圖</li>
+                <li>點擊節點：查看部門/人員詳情</li>
+                <li>雙擊節點：展開/收合子部門</li>
+            </ul>
+
+            <h3>11.3 編輯組織圖（管理員）</h3>
+            <p>具有編輯權限的管理員可：</p>
+            <ul>
+                <li>調整部門位置與層級</li>
+                <li>新增/移除部門</li>
+                <li>變更部門主管</li>
+                <li>發布新版本組織圖</li>
+            </ul>
+        </section>
+
+        <!-- 12. 流程管理 -->
+        <section id="workflow">
+            <h2>12. 流程管理</h2>
+            <p>設定和管理各類申請的審核流程。（需流程管理權限）</p>
+
+            <h3>12.1 流程清單</h3>
+            <p>系統支援以下類型的審核流程：</p>
+            <ul>
+                <li>請假流程</li>
+                <li>費用報銷流程</li>
+                <li>用印申請流程</li>
+                <li>名片申請流程</li>
+                <li>文具申請流程</li>
+            </ul>
+            <div class="screenshot-placeholder">流程清單截圖</div>
+
+            <h3>12.2 流程編輯器</h3>
+            <p>使用視覺化編輯器設計審核流程：</p>
+            <ol class="step-list">
+                <li>選擇要編輯的流程類型</li>
+                <li>進入流程編輯器</li>
+                <li>拖放節點建立流程</li>
+                <li>設定各節點的審核人員</li>
+                <li>設定條件分支（如金額、假別）</li>
+                <li>儲存並啟用流程</li>
+            </ol>
+
+            <h4>節點類型</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>節點</th>
+                        <th>說明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>開始</td>
+                        <td>流程起點</td>
+                    </tr>
+                    <tr>
+                        <td>審核</td>
+                        <td>指定人員審核</td>
+                    </tr>
+                    <tr>
+                        <td>條件</td>
+                        <td>依條件分支</td>
+                    </tr>
+                    <tr>
+                        <td>會簽</td>
+                        <td>多人同時審核</td>
+                    </tr>
+                    <tr>
+                        <td>結束</td>
+                        <td>流程終點</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="screenshot-placeholder">流程編輯器截圖</div>
+
+            <h3>12.3 代理人設定</h3>
+            <p>設定當您不在時的審核代理人。</p>
+            <ol class="step-list">
+                <li>進入「流程管理」→「代理人設定」</li>
+                <li>點擊「新增代理」</li>
+                <li>選擇代理人</li>
+                <li>設定代理期間</li>
+                <li>選擇可代理的流程類型</li>
+                <li>儲存設定</li>
+            </ol>
+
+            <h3>12.4 員工審核路徑</h3>
+            <p>查看每位員工的申請會經過哪些審核人員。</p>
+        </section>
+
+        <!-- 13. 財務會計 -->
+        <section id="finance">
+            <h2>13. 財務會計</h2>
+            <p>管理公司的財務會計作業。（需財務管理權限）</p>
+
+            <h3>13.1 會計科目</h3>
+            <p>管理會計科目表，包含：</p>
+            <ul>
+                <li>資產類科目</li>
+                <li>負債類科目</li>
+                <li>權益類科目</li>
+                <li>收入類科目</li>
+                <li>支出類科目</li>
+            </ul>
+            <div class="screenshot-placeholder">會計科目截圖</div>
+
+            <h3>13.2 傳票管理</h3>
+            <h4>新增傳票</h4>
+            <ol class="step-list">
+                <li>進入「財務會計」→「傳票管理」</li>
+                <li>點擊「新增傳票」</li>
+                <li>選擇傳票類型（收入/支出/轉帳）</li>
+                <li>填寫傳票日期與摘要</li>
+                <li>輸入借方與貸方科目及金額</li>
+                <li>確認借貸平衡</li>
+                <li>儲存傳票</li>
+            </ol>
+            <div class="warning">傳票借方與貸方金額必須相等（借貸平衡）。</div>
+
+            <h3>13.3 會計期間</h3>
+            <p>管理會計期間的開啟與關閉：</p>
+            <ul>
+                <li>開啟新會計期間</li>
+                <li>關閉會計期間（需主管核准）</li>
+                <li>查看各期間傳票數量與金額</li>
+            </ul>
+
+            <h3>13.4 客戶/廠商管理</h3>
+            <p>管理應收帳款客戶與應付帳款廠商：</p>
+            <ul>
+                <li>新增/編輯客戶資料</li>
+                <li>新增/編輯廠商資料</li>
+                <li>查看往來明細</li>
+                <li>管理付款條件</li>
+            </ul>
+
+            <h3>13.5 財務報表</h3>
+            <p>產出各類財務報表：</p>
+            <ul>
+                <li>日記帳</li>
+                <li>總分類帳</li>
+                <li>試算表</li>
+                <li>資產負債表</li>
+                <li>損益表</li>
+            </ul>
+        </section>
+
+        <!-- 14. 報表中心 -->
+        <section id="reports">
+            <h2>14. 報表中心</h2>
+            <p>產出各類管理報表。（需報表權限）</p>
+
+            <h3>14.1 出勤報表</h3>
+            <ul>
+                <li>個人出勤明細</li>
+                <li>部門出勤統計</li>
+                <li>加班時數統計</li>
+                <li>遲到早退統計</li>
+            </ul>
+
+            <h3>14.2 請假報表</h3>
+            <ul>
+                <li>請假使用統計</li>
+                <li>假別使用分析</li>
+                <li>部門請假彙總</li>
+            </ul>
+
+            <h3>14.3 費用報表</h3>
+            <ul>
+                <li>費用支出明細</li>
+                <li>費用類別分析</li>
+                <li>部門費用統計</li>
+            </ul>
+
+            <h3>14.4 報表匯出</h3>
+            <p>所有報表支援匯出為：</p>
+            <ul>
+                <li>Excel (.xlsx)</li>
+                <li>PDF</li>
+                <li>CSV</li>
+            </ul>
+            <div class="screenshot-placeholder">報表中心截圖</div>
+        </section>
+
+        <!-- 15. 通知系統 -->
+        <section id="notifications">
+            <h2>15. 通知系統</h2>
+            <p>接收系統的各類通知訊息。</p>
+
+            <h3>15.1 通知類型</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>類型</th>
+                        <th>說明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="badge badge-success">核准</span></td>
+                        <td>您的申請已被核准</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-danger">駁回</span></td>
+                        <td>您的申請已被駁回</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-warning">待審核</span></td>
+                        <td>有新的申請等待您審核</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-info">系統</span></td>
+                        <td>系統公告或提醒</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>15.2 通知中心</h3>
+            <p>在通知中心可以：</p>
+            <ul>
+                <li>查看所有通知</li>
+                <li>標記為已讀</li>
+                <li>全部標記已讀</li>
+                <li>刪除通知</li>
+                <li>清除所有通知</li>
+            </ul>
+
+            <h3>15.3 即時通知</h3>
+            <p>右上角的通知鈴鐺會即時顯示：</p>
+            <ul>
+                <li>未讀通知數量（紅點）</li>
+                <li>點擊展開最近 10 筆通知</li>
+                <li>點擊通知項目跳轉至相關頁面</li>
+            </ul>
+        </section>
+
+        <!-- 16. 系統設定 -->
+        <section id="settings">
+            <h2>16. 系統設定</h2>
+            <p>設定系統的各項參數。（需系統設定權限）</p>
+
+            <h3>16.1 費用類別設定</h3>
+            <p>管理費用報銷的類別：</p>
+            <ul>
+                <li>新增/編輯/停用費用類別</li>
+                <li>設定類別代碼與名稱</li>
+                <li>設定報銷上限金額</li>
+            </ul>
+
+            <h3>16.2 班別設定</h3>
+            <p>管理員工的班別定義：</p>
+            <ul>
+                <li>新增/編輯/停用班別</li>
+                <li>設定上下班時間</li>
+                <li>設定彈性時間</li>
+                <li>設定休息時間</li>
+            </ul>
+
+            <h3>16.3 審核流程設定</h3>
+            <p>設定各類申請的審核流程，詳見「流程管理」章節。</p>
+
+            <h3>16.4 AI 服務設定</h3>
+            <p>設定 AI 助理功能：</p>
+            <ol class="step-list">
+                <li>選擇 AI 服務供應商（OpenAI / Google Gemini）</li>
+                <li>輸入 API 金鑰</li>
+                <li>選擇使用的模型</li>
+                <li>測試連線</li>
+                <li>儲存設定</li>
+            </ol>
+            <div class="tip">啟用 AI 服務後，使用者可透過右下角的 AI 助理詢問系統相關問題。</div>
+        </section>
+
+        <!-- 17. 系統管理 -->
+        <section id="system-admin">
+            <h2>17. 系統管理</h2>
+            <p>進階的系統管理功能。（需系統管理員權限）</p>
+
+            <h3>17.1 集團管理</h3>
+            <p>管理系統中的集團：</p>
+            <ul>
+                <li>新增/編輯集團</li>
+                <li>設定集團基本資料</li>
+                <li>管理集團權限</li>
+            </ul>
+
+            <h3>17.2 公司管理</h3>
+            <p>管理集團下的公司：</p>
+            <ul>
+                <li>新增/編輯公司</li>
+                <li>設定公司基本資料</li>
+                <li>設定公司統編與地址</li>
+            </ul>
+
+            <h3>17.3 權限管理</h3>
+            <p>管理員工的特殊權限：</p>
+            <ol class="step-list">
+                <li>選擇要設定權限的員工</li>
+                <li>選擇要授予的功能模組</li>
+                <li>設定權限範圍（全部/同公司/同部門）</li>
+                <li>設定權限到期日（選填）</li>
+                <li>填寫授權原因</li>
+                <li>儲存權限設定</li>
+            </ol>
+            <div class="screenshot-placeholder">權限管理截圖</div>
+
+            <h3>17.4 稽核日誌</h3>
+            <p>查詢系統的操作紀錄：</p>
+            <ul>
+                <li>依日期範圍查詢</li>
+                <li>依操作者查詢</li>
+                <li>依操作類型查詢</li>
+                <li>依資料表查詢</li>
+            </ul>
+
+            <h3>17.5 稽核設定</h3>
+            <p>設定要記錄稽核日誌的資料表與操作類型。</p>
+        </section>
+
+        <!-- 18. 權限說明 -->
+        <section id="permissions">
+            <h2>18. 權限說明</h2>
+            <p>系統採用三層式權限架構。</p>
+
+            <h3>18.1 基本權限</h3>
+            <p>所有員工登入後預設擁有的權限：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>功能模組</th>
+                        <th>權限</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>儀表板</td>
+                        <td><span class="badge badge-success">完整</span></td>
+                    </tr>
+                    <tr>
+                        <td>出勤管理</td>
+                        <td><span class="badge badge-success">打卡、查看自己</span></td>
+                    </tr>
+                    <tr>
+                        <td>內部訊息</td>
+                        <td><span class="badge badge-success">完整</span></td>
+                    </tr>
+                    <tr>
+                        <td>請假管理</td>
+                        <td><span class="badge badge-success">申請、查看自己</span></td>
+                    </tr>
+                    <tr>
+                        <td>費用報銷</td>
+                        <td><span class="badge badge-success">申請、查看自己</span></td>
+                    </tr>
+                    <tr>
+                        <td>審核中心</td>
+                        <td><span class="badge badge-success">查看自己進度</span></td>
+                    </tr>
+                    <tr>
+                        <td>行政申請</td>
+                        <td><span class="badge badge-success">用印/名片/文具</span></td>
+                    </tr>
+                    <tr>
+                        <td>組織圖</td>
+                        <td><span class="badge badge-info">唯讀</span></td>
+                    </tr>
+                    <tr>
+                        <td>人事管理</td>
+                        <td><span class="badge badge-danger">只能看自己</span></td>
+                    </tr>
+                    <tr>
+                        <td>流程管理</td>
+                        <td><span class="badge badge-danger">隱藏</span></td>
+                    </tr>
+                    <tr>
+                        <td>財務會計</td>
+                        <td><span class="badge badge-danger">隱藏</span></td>
+                    </tr>
+                    <tr>
+                        <td>報表中心</td>
+                        <td><span class="badge badge-danger">隱藏</span></td>
+                    </tr>
+                    <tr>
+                        <td>系統管理</td>
+                        <td><span class="badge badge-danger">隱藏</span></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>18.2 部門/職位加成權限</h3>
+            <p>依據員工的部門或職位自動給予額外權限：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>條件</th>
+                        <th>額外權限</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>部門 = 財務會計部（非總務職位）</td>
+                        <td>+財務會計</td>
+                    </tr>
+                    <tr>
+                        <td>職位 = 總務（一般）</td>
+                        <td>+人事管理（同公司）</td>
+                    </tr>
+                    <tr>
+                        <td>職位 = 總務（主管級，Level ≥ 5）</td>
+                        <td>+人事管理（跨公司）</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>18.3 特殊權限</h3>
+            <p>由管理員個別授予的特殊權限，具有最高優先級：</p>
+            <ul>
+                <li>可疊加在基本權限之上</li>
+                <li>可覆蓋部門/職位權限</li>
+                <li>可設定到期時間</li>
+                <li>需記錄授權原因</li>
+            </ul>
+            <div class="tip">特殊權限的優先級：特殊權限 > 部門/職位權限 > 基本權限</div>
+
+            <h3>18.4 集團管理員</h3>
+            <p>擁有 GROUP_ADMIN 權限的使用者可管理整個集團，包括：</p>
+            <ul>
+                <li>所有公司的人事管理</li>
+                <li>所有流程的管理</li>
+                <li>系統設定</li>
+                <li>權限管理</li>
+            </ul>
+        </section>
+
+        <footer>
+            <p>集團企業 ERP 系統 &copy; 2026</p>
+            <p>如有任何問題，請聯繫系統管理員</p>
+        </footer>
+    </div>
+</body>
+</html>
