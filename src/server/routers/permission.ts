@@ -12,6 +12,7 @@ import {
   isCompanyManager,
 } from '@/lib/permission'
 import { isGroupAdmin } from '@/lib/group-permission'
+import { createAuditLog } from '@/lib/audit'
 
 export const permissionRouter = router({
   // 取得所有功能模組
@@ -219,5 +220,280 @@ export const permissionRouter = router({
       }
 
       return { success: true, granted: toGrant.length, revoked: toRevoke.length }
+    }),
+
+  // ==================== 權限範本 ====================
+
+  // 取得所有權限範本
+  listTemplates: publicProcedure
+    .input(z.object({ userId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      // 只有管理員可以查看
+      const groupAdmin = await isGroupAdmin(input.userId)
+      if (!groupAdmin) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無權限' })
+      }
+
+      return ctx.prisma.permissionTemplate.findMany({
+        where: { isActive: true },
+        orderBy: { name: 'asc' },
+      })
+    }),
+
+  // 建立權限範本
+  createTemplate: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      name: z.string().min(1),
+      description: z.string().optional(),
+      permissions: z.array(z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const groupAdmin = await isGroupAdmin(input.userId)
+      if (!groupAdmin) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無權限' })
+      }
+
+      const template = await ctx.prisma.permissionTemplate.create({
+        data: {
+          name: input.name,
+          description: input.description,
+          permissions: input.permissions,
+          createdById: input.userId,
+        },
+      })
+
+      await createAuditLog({
+        entityType: 'PermissionTemplate',
+        entityId: template.id,
+        action: 'CREATE',
+        operatorId: input.userId,
+        newValue: { name: input.name, permissions: input.permissions },
+      })
+
+      return template
+    }),
+
+  // 更新權限範本
+  updateTemplate: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      templateId: z.string(),
+      name: z.string().min(1),
+      description: z.string().optional(),
+      permissions: z.array(z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const groupAdmin = await isGroupAdmin(input.userId)
+      if (!groupAdmin) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無權限' })
+      }
+
+      const oldTemplate = await ctx.prisma.permissionTemplate.findUnique({
+        where: { id: input.templateId },
+      })
+
+      const template = await ctx.prisma.permissionTemplate.update({
+        where: { id: input.templateId },
+        data: {
+          name: input.name,
+          description: input.description,
+          permissions: input.permissions,
+        },
+      })
+
+      await createAuditLog({
+        entityType: 'PermissionTemplate',
+        entityId: template.id,
+        action: 'UPDATE',
+        operatorId: input.userId,
+        oldValue: oldTemplate,
+        newValue: { name: input.name, permissions: input.permissions },
+      })
+
+      return template
+    }),
+
+  // 刪除權限範本（軟刪除）
+  deleteTemplate: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      templateId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const groupAdmin = await isGroupAdmin(input.userId)
+      if (!groupAdmin) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無權限' })
+      }
+
+      await ctx.prisma.permissionTemplate.update({
+        where: { id: input.templateId },
+        data: { isActive: false },
+      })
+
+      await createAuditLog({
+        entityType: 'PermissionTemplate',
+        entityId: input.templateId,
+        action: 'DELETE',
+        operatorId: input.userId,
+      })
+
+      return { success: true }
+    }),
+
+  // 套用權限範本到多名員工（批次授權）
+  applyTemplateToEmployees: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      templateId: z.string(),
+      employeeIds: z.array(z.string()),
+      companyId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // 檢查操作者權限
+      const canManage = await hasPermission(input.userId, input.companyId, 'system.permission')
+      if (!canManage) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無權限管理權限' })
+      }
+
+      // 取得範本
+      const template = await ctx.prisma.permissionTemplate.findUnique({
+        where: { id: input.templateId },
+      })
+
+      if (!template || !template.isActive) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '權限範本不存在' })
+      }
+
+      const permissions = template.permissions as string[]
+      let totalGranted = 0
+
+      // 為每位員工套用權限
+      for (const employeeId of input.employeeIds) {
+        for (const permCode of permissions) {
+          try {
+            await grantPermission(employeeId, input.companyId, permCode, input.userId)
+            totalGranted++
+          } catch {
+            // 如果權限已存在則跳過
+          }
+        }
+      }
+
+      await createAuditLog({
+        entityType: 'PermissionTemplate',
+        entityId: input.templateId,
+        action: 'APPLY',
+        operatorId: input.userId,
+        companyId: input.companyId,
+        newValue: {
+          templateName: template.name,
+          employeeCount: input.employeeIds.length,
+          permissions: permissions.length,
+        },
+      })
+
+      return {
+        success: true,
+        employeesProcessed: input.employeeIds.length,
+        totalPermissionsGranted: totalGranted,
+      }
+    }),
+
+  // 批次授予權限（不使用範本）
+  batchGrantToEmployees: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      employeeIds: z.array(z.string()),
+      companyId: z.string(),
+      permissions: z.array(z.string()),
+      expiresAt: z.date().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      // 檢查操作者權限
+      const canManage = await hasPermission(input.userId, input.companyId, 'system.permission')
+      if (!canManage) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無權限管理權限' })
+      }
+
+      let totalGranted = 0
+
+      // 為每位員工授予權限
+      for (const employeeId of input.employeeIds) {
+        for (const permCode of input.permissions) {
+          try {
+            await grantPermission(employeeId, input.companyId, permCode, input.userId, input.expiresAt)
+            totalGranted++
+          } catch {
+            // 如果權限已存在則跳過
+          }
+        }
+      }
+
+      await createAuditLog({
+        entityType: 'EmployeePermission',
+        entityId: `batch-${Date.now()}`,
+        action: 'BATCH_GRANT',
+        operatorId: input.userId,
+        companyId: input.companyId,
+        newValue: {
+          employeeCount: input.employeeIds.length,
+          permissions: input.permissions,
+        },
+      })
+
+      return {
+        success: true,
+        employeesProcessed: input.employeeIds.length,
+        totalPermissionsGranted: totalGranted,
+      }
+    }),
+
+  // 批次移除權限
+  batchRevokeFromEmployees: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      employeeIds: z.array(z.string()),
+      companyId: z.string(),
+      permissions: z.array(z.string()),
+    }))
+    .mutation(async ({ input }) => {
+      // 檢查操作者權限
+      const canManage = await hasPermission(input.userId, input.companyId, 'system.permission')
+      if (!canManage) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無權限管理權限' })
+      }
+
+      let totalRevoked = 0
+
+      // 為每位員工移除權限
+      for (const employeeId of input.employeeIds) {
+        for (const permCode of input.permissions) {
+          try {
+            await revokePermission(employeeId, input.companyId, permCode)
+            totalRevoked++
+          } catch {
+            // 如果權限不存在則跳過
+          }
+        }
+      }
+
+      await createAuditLog({
+        entityType: 'EmployeePermission',
+        entityId: `batch-${Date.now()}`,
+        action: 'BATCH_REVOKE',
+        operatorId: input.userId,
+        companyId: input.companyId,
+        newValue: {
+          employeeCount: input.employeeIds.length,
+          permissions: input.permissions,
+        },
+      })
+
+      return {
+        success: true,
+        employeesProcessed: input.employeeIds.length,
+        totalPermissionsRevoked: totalRevoked,
+      }
     }),
 })

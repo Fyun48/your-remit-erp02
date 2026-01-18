@@ -263,6 +263,11 @@ model Employee {
   conversationParticipants ConversationParticipant[]
   messagesSent             Message[]
 
+  // LINE 帳號連動
+  lineUserId         String?   // LINE 用戶 ID
+  lineAccessToken    String?   // LINE 存取令牌
+  lineTokenExpiresAt DateTime? // LINE 令牌到期時間
+
   @@map("employees")
 }
 
@@ -413,6 +418,20 @@ model EmployeePermission {
 enum GrantType {
   GRANT // 授予
   REVOKE // 移除
+}
+
+// 權限範本（用於快速套用一組權限）
+model PermissionTemplate {
+  id          String   @id @default(cuid())
+  name        String   // 範本名稱
+  description String?  // 範本說明
+  permissions Json     // 權限代碼陣列 ["hr.view", "leave.approve", ...]
+  isActive    Boolean  @default(true)
+  createdById String   // 建立者
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("permission_templates")
 }
 
 // ==================== NextAuth.js ====================

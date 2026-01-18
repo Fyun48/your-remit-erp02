@@ -38,6 +38,7 @@ import { notificationRouter } from './notification'
 import { changeLogRouter } from './changeLog'
 import { auditSettingRouter } from './auditSetting'
 import { messagingRouter } from './messaging'
+import { lineRouter } from './line'
 
 export const appRouter = router({
   health: healthRouter,
@@ -79,6 +80,7 @@ export const appRouter = router({
   changeLog: changeLogRouter,
   auditSetting: auditSettingRouter,
   messaging: messagingRouter,
+  line: lineRouter,
 })
 
 export type AppRouter = typeof appRouter

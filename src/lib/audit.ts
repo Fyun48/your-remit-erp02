@@ -1,6 +1,14 @@
 import { prisma } from './prisma'
 
-export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE'
+export type AuditAction =
+  | 'CREATE'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'APPLY'
+  | 'BATCH_GRANT'
+  | 'BATCH_REVOKE'
+  | 'LINE_LINK'
+  | 'LINE_UNLINK'
 
 interface AuditLogParams {
   entityType: string

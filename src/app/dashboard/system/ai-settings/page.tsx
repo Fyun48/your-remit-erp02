@@ -23,5 +23,5 @@ export default async function AISettingsPage() {
     redirect('/dashboard')
   }
 
-  return <AISettingsList userId={session.user.id} />
+  return <AISettingsList />
 }

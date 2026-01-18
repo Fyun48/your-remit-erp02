@@ -1,9 +1,21 @@
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Clock, GitBranch, Receipt, Shield, Users } from 'lucide-react'
+import { Clock, GitBranch, Receipt, Shield, Users, User, Sparkles } from 'lucide-react'
 
 export default function SettingsPage() {
   const settingsItems = [
+    {
+      title: '帳號設定',
+      description: '管理個人帳號、LINE 連動等設定',
+      href: '/dashboard/settings/account',
+      icon: User,
+    },
+    {
+      title: 'AI 助手設定',
+      description: '設定 AI 助手的行為與偏好',
+      href: '/dashboard/settings/ai',
+      icon: Sparkles,
+    },
     {
       title: '班別設定',
       description: '管理公司班別，設定上下班時間與遲到早退寬限',

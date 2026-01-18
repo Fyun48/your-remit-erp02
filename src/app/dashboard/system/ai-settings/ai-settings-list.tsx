@@ -27,10 +27,6 @@ import {
 import { trpc } from '@/lib/trpc'
 import Link from 'next/link'
 
-interface AISettingsListProps {
-  userId: string
-}
-
 const OPENAI_MODELS = [
   { value: 'gpt-4o', label: 'GPT-4o (推薦)' },
   { value: 'gpt-4o-mini', label: 'GPT-4o Mini (較快速)' },
@@ -44,7 +40,7 @@ const GEMINI_MODELS = [
   { value: 'gemini-pro', label: 'Gemini Pro' },
 ]
 
-export function AISettingsList({ userId }: AISettingsListProps) {
+export function AISettingsList() {
   const [provider, setProvider] = useState<string>('disabled')
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState('')

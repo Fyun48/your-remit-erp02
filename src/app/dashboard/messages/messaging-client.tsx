@@ -27,10 +27,21 @@ import {
   File,
   Check,
   CheckCheck,
+  ExternalLink,
+  Camera,
+  MoreVertical,
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { ScreenCaptureButton } from '@/components/chat/screen-capture'
+import { ConversationExportDialog } from '@/components/chat/conversation-export'
+import { LineShareButton } from '@/components/chat/line-share-button'
 import { trpc } from '@/lib/trpc'
 import { format, isToday, isYesterday, isThisYear } from 'date-fns'
-import { zhTW } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 
 interface MessagingClientProps {
@@ -50,8 +61,44 @@ export function MessagingClient({ userId }: MessagingClientProps) {
     fileSize: number
     fileUrl: string
   }>>([])
+  const [showExportDialog, setShowExportDialog] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Popout to new browser window
+  const handlePopout = () => {
+    if (!selectedConversationId) return
+    const width = 400
+    const height = 600
+    const left = window.screenX + (window.outerWidth - width) / 2
+    const top = window.screenY + (window.outerHeight - height) / 2
+
+    window.open(
+      `/dashboard/messages/popup/${selectedConversationId}`,
+      `chat-${selectedConversationId}`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`
+    )
+  }
+
+  // Handle screen capture upload
+  const handleScreenCapture = async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const response = await fetch('/api/messages/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPendingAttachments(prev => [...prev, data])
+      }
+    } catch {
+      // Handle error silently
+    }
+  }
 
   // API Queries
   const conversationsQuery = trpc.messaging.getConversations.useQuery(
@@ -306,15 +353,44 @@ export function MessagingClient({ userId }: MessagingClientProps) {
           <>
             {/* 對話標題 */}
             <CardHeader className="py-3 border-b">
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback>{selectedConversation.name.slice(0, 2)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <CardTitle className="text-base">{selectedConversation.name}</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedConversation.type === 'DIRECT' ? '私人對話' : '群組'}
-                  </p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar>
+                    <AvatarFallback>{selectedConversation.name.slice(0, 2)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <CardTitle className="text-base">{selectedConversation.name}</CardTitle>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedConversation.type === 'DIRECT' ? '私人對話' : '群組'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <LineShareButton
+                    text={`對話：${selectedConversation.name}`}
+                    variant="icon"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handlePopout}
+                    title="在新視窗開啟"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setShowExportDialog(true)}>
+                        <Camera className="h-4 w-4 mr-2" />
+                        匯出對話截圖
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>
@@ -460,6 +536,7 @@ export function MessagingClient({ userId }: MessagingClientProps) {
                     <Paperclip className="h-4 w-4" />
                   )}
                 </Button>
+                <ScreenCaptureButton onCapture={handleScreenCapture} />
                 <Input
                   placeholder="輸入訊息..."
                   value={messageInput}
@@ -492,6 +569,17 @@ export function MessagingClient({ userId }: MessagingClientProps) {
               <p className="text-sm mt-1">或點擊 + 開始新對話</p>
             </div>
           </div>
+        )}
+
+        {/* 對話截圖匯出 Dialog */}
+        {selectedConversation && messagesQuery.data?.messages && (
+          <ConversationExportDialog
+            open={showExportDialog}
+            onOpenChange={setShowExportDialog}
+            conversationName={selectedConversation.name}
+            messages={messagesQuery.data.messages}
+            currentUserId={userId}
+          />
         )}
       </Card>
     </div>
