@@ -148,6 +148,10 @@ model Company {
   projects         Project[]
   projectTemplates ProjectTemplate[]
 
+  // 專案 KPI
+  projectKpiSetting   ProjectKpiSetting?
+  projectKpiSummaries ProjectKpiSummary[]
+
   @@map("companies")
 }
 
@@ -172,6 +176,9 @@ model Department {
 
   // 專案管理
   projects Project[]
+
+  // 專案 KPI
+  projectKpiSummaries ProjectKpiSummary[]
 
   @@unique([companyId, code])
   @@map("departments")
@@ -2459,4 +2466,49 @@ model ProjectTemplateTag {
 
   @@unique([templateId, name])
   @@map("project_template_tags")
+}
+
+// ==================== 專案 KPI ====================
+
+model ProjectKpiSetting {
+  id               String  @id @default(cuid())
+  companyId        String  @unique
+  completionWeight Float   @default(0.4) // 完成率權重
+  onTimeWeight     Float   @default(0.35) // 準時率權重
+  qualityWeight    Float   @default(0.25) // 品質分權重
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("project_kpi_settings")
+}
+
+model ProjectKpiSummary {
+  id            String @id @default(cuid())
+  companyId     String
+  departmentId  String
+  year          Int
+  month         Int
+
+  projectCount   Int   @default(0) // 專案數
+  completedCount Int   @default(0) // 完成數
+  avgCompletion  Float @default(0) // 平均完成率
+  avgOnTime      Float @default(0) // 平均準時率
+  avgQuality     Float @default(0) // 平均品質分
+  overallScore   Float @default(0) // 綜合績效分數
+  targetScore    Float? // 目標分數
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, departmentId, year, month])
+  @@index([companyId])
+  @@index([departmentId])
+  @@index([year, month])
+  @@map("project_kpi_summaries")
 }

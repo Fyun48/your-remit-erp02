@@ -42,6 +42,7 @@ import { lineRouter } from './line'
 import { employeeRouter } from './employee'
 import { systemSettingRouter } from './systemSetting'
 import { projectRouter } from './project'
+import { projectKpiRouter } from './projectKpi'
 
 export const appRouter = router({
   health: healthRouter,
@@ -87,6 +88,7 @@ export const appRouter = router({
   employee: employeeRouter,
   systemSetting: systemSettingRouter,
   project: projectRouter,
+  projectKpi: projectKpiRouter,
 })
 
 export type AppRouter = typeof appRouter
