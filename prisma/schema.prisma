@@ -275,8 +275,13 @@ model Employee {
   lineTokenExpiresAt DateTime? // LINE 令牌到期時間
 
   // 專案管理
-  projectsManaged    Project[]     @relation("ProjectManager")
-  tasksAssigned      ProjectTask[] @relation("TaskAssignee")
+  projectsManaged     Project[]               @relation("ProjectManager")
+  tasksAssigned       ProjectTask[]           @relation("TaskAssignee")
+  projectMemberships  ProjectMember[]         @relation("ProjectMembership")
+  projectVisibilities ProjectVisibleMember[]  @relation("ProjectVisibility")
+  projectComments     ProjectComment[]        @relation("ProjectCommentAuthor")
+  projectMentions     ProjectCommentMention[] @relation("ProjectMention")
+  projectAttachments  ProjectAttachment[]     @relation("ProjectAttachmentUploader")
 
   @@map("employees")
 }
@@ -2143,41 +2148,41 @@ enum TaskPriority {
 // ==================== 專案管理 ====================
 
 model Project {
-  id              String            @id @default(cuid())
-  name            String
-  description     String?           @db.Text
-  type            ProjectType
-  status          ProjectStatus     @default(PLANNING)
-  visibility      ProjectVisibility @default(DEPARTMENT)
+  id          String            @id @default(cuid())
+  name        String
+  description String?           @db.Text
+  type        ProjectType
+  status      ProjectStatus     @default(PLANNING)
+  visibility  ProjectVisibility @default(DEPARTMENT)
 
-  plannedStartDate  DateTime?
-  plannedEndDate    DateTime?
-  actualStartDate   DateTime?
-  actualEndDate     DateTime?
+  plannedStartDate DateTime?
+  plannedEndDate   DateTime?
+  actualStartDate  DateTime?
+  actualEndDate    DateTime?
 
-  companyId       String
-  departmentId    String
-  managerId       String
-  customerId      String?
-  templateId      String?
+  companyId    String
+  departmentId String
+  managerId    String
+  customerId   String?
+  templateId   String?
 
-  qualityScore    Int?
+  qualityScore Int?
 
-  company         Company           @relation(fields: [companyId], references: [id])
-  department      Department        @relation(fields: [departmentId], references: [id])
-  manager         Employee          @relation("ProjectManager", fields: [managerId], references: [id])
-  customer        Customer?         @relation(fields: [customerId], references: [id])
+  company    Company    @relation(fields: [companyId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+  manager    Employee   @relation("ProjectManager", fields: [managerId], references: [id])
+  customer   Customer?  @relation(fields: [customerId], references: [id])
 
-  phases          ProjectPhase[]
-  members         ProjectMember[]
-  visibleMembers  ProjectVisibleMember[]
-  comments        ProjectComment[]
-  attachments     ProjectAttachment[]
-  activities      ProjectActivity[]
-  auditLogs       ProjectAuditLog[]
+  phases         ProjectPhase[]
+  members        ProjectMember[]
+  visibleMembers ProjectVisibleMember[]
+  comments       ProjectComment[]
+  attachments    ProjectAttachment[]
+  activities     ProjectActivity[]
+  auditLogs      ProjectAuditLog[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([companyId])
   @@index([departmentId])
@@ -2187,56 +2192,171 @@ model Project {
 }
 
 model ProjectPhase {
-  id              String      @id @default(cuid())
-  projectId       String
-  name            String
-  description     String?     @db.Text
-  sortOrder       Int
-  status          PhaseStatus @default(PENDING)
-  plannedEndDate  DateTime?
-  actualEndDate   DateTime?
+  id             String      @id @default(cuid())
+  projectId      String
+  name           String
+  description    String?     @db.Text
+  sortOrder      Int
+  status         PhaseStatus @default(PENDING)
+  plannedEndDate DateTime?
+  actualEndDate  DateTime?
 
-  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tasks           ProjectTask[]
-  comments        ProjectComment[]
-  attachments     ProjectAttachment[]
+  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       ProjectTask[]
+  comments    ProjectComment[]
+  attachments ProjectAttachment[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([projectId])
   @@map("project_phases")
 }
 
 model ProjectTask {
-  id              String       @id @default(cuid())
-  phaseId         String
-  parentId        String?
-  name            String
-  description     String?      @db.Text
-  priority        TaskPriority @default(MEDIUM)
-  status          TaskStatus   @default(TODO)
+  id          String       @id @default(cuid())
+  phaseId     String
+  parentId    String?
+  name        String
+  description String?      @db.Text
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(TODO)
 
-  assigneeId      String?
-  estimatedHours  Float?
-  actualHours     Float?
-  startDate       DateTime?
-  dueDate         DateTime?
-  completedAt     DateTime?
+  assigneeId     String?
+  estimatedHours Float?
+  actualHours    Float?
+  startDate      DateTime?
+  dueDate        DateTime?
+  completedAt    DateTime?
 
-  phase           ProjectPhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  parent          ProjectTask? @relation("SubTasks", fields: [parentId], references: [id])
-  children        ProjectTask[] @relation("SubTasks")
-  assignee        Employee?    @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  comments        ProjectComment[]
-  attachments     ProjectAttachment[]
+  phase       ProjectPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  parent      ProjectTask?        @relation("SubTasks", fields: [parentId], references: [id])
+  children    ProjectTask[]       @relation("SubTasks")
+  assignee    Employee?           @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  comments    ProjectComment[]
+  attachments ProjectAttachment[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([phaseId])
   @@index([parentId])
   @@index([assigneeId])
   @@index([status])
   @@map("project_tasks")
+}
+
+model ProjectMember {
+  id         String      @id @default(cuid())
+  projectId  String
+  employeeId String
+  role       ProjectRole @default(MEMBER)
+  joinedAt   DateTime    @default(now())
+  leftAt     DateTime?
+
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee Employee @relation("ProjectMembership", fields: [employeeId], references: [id])
+
+  @@unique([projectId, employeeId])
+  @@index([projectId])
+  @@index([employeeId])
+  @@map("project_members")
+}
+
+model ProjectVisibleMember {
+  id         String @id @default(cuid())
+  projectId  String
+  employeeId String
+
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee Employee @relation("ProjectVisibility", fields: [employeeId], references: [id])
+
+  @@unique([projectId, employeeId])
+  @@map("project_visible_members")
+}
+
+model ProjectComment {
+  id        String  @id @default(cuid())
+  projectId String?
+  phaseId   String?
+  taskId    String?
+  authorId  String
+  content   String  @db.Text
+
+  project     Project?                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase       ProjectPhase?           @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  task        ProjectTask?            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author      Employee                @relation("ProjectCommentAuthor", fields: [authorId], references: [id])
+  attachments ProjectAttachment[]
+  mentions    ProjectCommentMention[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([phaseId])
+  @@index([taskId])
+  @@index([authorId])
+  @@map("project_comments")
+}
+
+model ProjectCommentMention {
+  id         String @id @default(cuid())
+  commentId  String
+  employeeId String
+
+  comment  ProjectComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  employee Employee       @relation("ProjectMention", fields: [employeeId], references: [id])
+
+  @@unique([commentId, employeeId])
+  @@map("project_comment_mentions")
+}
+
+model ProjectAttachment {
+  id        String  @id @default(cuid())
+  projectId String?
+  phaseId   String?
+  taskId    String?
+  commentId String?
+
+  fileName   String
+  fileUrl    String
+  fileSize   Int
+  mimeType   String
+  uploaderId String
+
+  project  Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase    ProjectPhase?   @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  task     ProjectTask?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  comment  ProjectComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  uploader Employee        @relation("ProjectAttachmentUploader", fields: [uploaderId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([uploaderId])
+  @@map("project_attachments")
+}
+
+// Placeholder for future task - ProjectActivity model
+model ProjectActivity {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@map("project_activities")
+}
+
+// Placeholder for future task - ProjectAuditLog model
+model ProjectAuditLog {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@map("project_audit_logs")
 }
