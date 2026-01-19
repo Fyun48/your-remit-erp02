@@ -189,4 +189,119 @@ export const projectRouter = router({
       await ctx.prisma.project.delete({ where: { id: input.id } })
       return { success: true }
     }),
+
+  // ==================== 階段管理 ====================
+
+  createPhase: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      name: z.string().min(1, '請輸入階段名稱'),
+      description: z.string().optional(),
+      plannedEndDate: z.date().optional(),
+      actorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { actorId, ...data } = input
+      const maxOrder = await ctx.prisma.projectPhase.aggregate({
+        where: { projectId: input.projectId },
+        _max: { sortOrder: true },
+      })
+
+      const phase = await ctx.prisma.projectPhase.create({
+        data: {
+          ...data,
+          sortOrder: (maxOrder._max.sortOrder || 0) + 1,
+        },
+      })
+
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: input.projectId,
+          actorId,
+          action: 'CREATED',
+          targetType: 'PHASE',
+          targetId: phase.id,
+          summary: `新增了階段「${phase.name}」`,
+        },
+      })
+
+      return phase
+    }),
+
+  updatePhase: publicProcedure
+    .input(z.object({
+      id: z.string(),
+      name: z.string().min(1).optional(),
+      description: z.string().optional(),
+      status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED']).optional(),
+      plannedEndDate: z.date().nullable().optional(),
+      actualEndDate: z.date().nullable().optional(),
+      actorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, actorId, ...data } = input
+      const phase = await ctx.prisma.projectPhase.update({
+        where: { id },
+        data,
+      })
+
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: phase.projectId,
+          actorId,
+          action: 'UPDATED',
+          targetType: 'PHASE',
+          targetId: phase.id,
+          summary: `更新了階段「${phase.name}」`,
+        },
+      })
+
+      return phase
+    }),
+
+  deletePhase: publicProcedure
+    .input(z.object({
+      id: z.string(),
+      actorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const phase = await ctx.prisma.projectPhase.findUnique({
+        where: { id: input.id },
+      })
+
+      if (!phase) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '階段不存在' })
+      }
+
+      await ctx.prisma.projectPhase.delete({ where: { id: input.id } })
+
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: phase.projectId,
+          actorId: input.actorId,
+          action: 'DELETED',
+          targetType: 'PHASE',
+          targetId: input.id,
+          summary: `刪除了階段「${phase.name}」`,
+        },
+      })
+
+      return { success: true }
+    }),
+
+  reorderPhases: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      phaseIds: z.array(z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const updates = input.phaseIds.map((id, index) =>
+        ctx.prisma.projectPhase.update({
+          where: { id },
+          data: { sortOrder: index + 1 },
+        })
+      )
+      await ctx.prisma.$transaction(updates)
+      return { success: true }
+    }),
 })
