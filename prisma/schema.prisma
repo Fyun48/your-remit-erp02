@@ -144,6 +144,9 @@ model Company {
   workflowDefinitions WorkflowDefinition[] @relation("CompanyWorkflows")
   workflowInstances   WorkflowInstance[]
 
+  // 專案管理
+  projects Project[]
+
   @@map("companies")
 }
 
@@ -165,6 +168,9 @@ model Department {
 
   // 財務會計關聯
   voucherLines VoucherLine[]
+
+  // 專案管理
+  projects Project[]
 
   @@unique([companyId, code])
   @@map("departments")
@@ -267,6 +273,10 @@ model Employee {
   lineUserId         String? // LINE 用戶 ID
   lineAccessToken    String? // LINE 存取令牌
   lineTokenExpiresAt DateTime? // LINE 令牌到期時間
+
+  // 專案管理
+  projectsManaged    Project[]     @relation("ProjectManager")
+  tasksAssigned      ProjectTask[] @relation("TaskAssignee")
 
   @@map("employees")
 }
@@ -1603,6 +1613,9 @@ model Customer {
   receivables  AccountReceivable[]
   voucherLines VoucherLine[]
 
+  // 專案管理
+  projects Project[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2125,4 +2138,105 @@ enum TaskPriority {
   HIGH
   MEDIUM
   LOW
+}
+
+// ==================== 專案管理 ====================
+
+model Project {
+  id              String            @id @default(cuid())
+  name            String
+  description     String?           @db.Text
+  type            ProjectType
+  status          ProjectStatus     @default(PLANNING)
+  visibility      ProjectVisibility @default(DEPARTMENT)
+
+  plannedStartDate  DateTime?
+  plannedEndDate    DateTime?
+  actualStartDate   DateTime?
+  actualEndDate     DateTime?
+
+  companyId       String
+  departmentId    String
+  managerId       String
+  customerId      String?
+  templateId      String?
+
+  qualityScore    Int?
+
+  company         Company           @relation(fields: [companyId], references: [id])
+  department      Department        @relation(fields: [departmentId], references: [id])
+  manager         Employee          @relation("ProjectManager", fields: [managerId], references: [id])
+  customer        Customer?         @relation(fields: [customerId], references: [id])
+
+  phases          ProjectPhase[]
+  members         ProjectMember[]
+  visibleMembers  ProjectVisibleMember[]
+  comments        ProjectComment[]
+  attachments     ProjectAttachment[]
+  activities      ProjectActivity[]
+  auditLogs       ProjectAuditLog[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([status])
+  @@map("projects")
+}
+
+model ProjectPhase {
+  id              String      @id @default(cuid())
+  projectId       String
+  name            String
+  description     String?     @db.Text
+  sortOrder       Int
+  status          PhaseStatus @default(PENDING)
+  plannedEndDate  DateTime?
+  actualEndDate   DateTime?
+
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks           ProjectTask[]
+  comments        ProjectComment[]
+  attachments     ProjectAttachment[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([projectId])
+  @@map("project_phases")
+}
+
+model ProjectTask {
+  id              String       @id @default(cuid())
+  phaseId         String
+  parentId        String?
+  name            String
+  description     String?      @db.Text
+  priority        TaskPriority @default(MEDIUM)
+  status          TaskStatus   @default(TODO)
+
+  assigneeId      String?
+  estimatedHours  Float?
+  actualHours     Float?
+  startDate       DateTime?
+  dueDate         DateTime?
+  completedAt     DateTime?
+
+  phase           ProjectPhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  parent          ProjectTask? @relation("SubTasks", fields: [parentId], references: [id])
+  children        ProjectTask[] @relation("SubTasks")
+  assignee        Employee?    @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  comments        ProjectComment[]
+  attachments     ProjectAttachment[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([phaseId])
+  @@index([parentId])
+  @@index([assigneeId])
+  @@index([status])
+  @@map("project_tasks")
 }
