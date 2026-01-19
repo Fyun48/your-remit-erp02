@@ -36,10 +36,10 @@ model AuditLog {
 // Audit 設定（控制哪些操作需要被記錄）
 model AuditSetting {
   id          String   @id @default(cuid())
-  entityType  String   // Employee, Department, Voucher...
-  action      String   // CREATE, UPDATE, DELETE
+  entityType  String // Employee, Department, Voucher...
+  action      String // CREATE, UPDATE, DELETE
   isEnabled   Boolean  @default(true) // 是否啟用記錄
-  updatedById String?  // 最後更新者
+  updatedById String? // 最後更新者
   updatedAt   DateTime @updatedAt
 
   @@unique([entityType, action])
@@ -244,7 +244,7 @@ model Employee {
   qrLoginTokens QrLoginToken[]
 
   // 系統通知
-  notifications    Notification[] @relation("UserNotifications")
+  notifications Notification[] @relation("UserNotifications")
 
   // 工作流程
   workflowDefinitions        WorkflowDefinition[]       @relation("EmployeeWorkflows")
@@ -264,8 +264,8 @@ model Employee {
   messagesSent             Message[]
 
   // LINE 帳號連動
-  lineUserId         String?   // LINE 用戶 ID
-  lineAccessToken    String?   // LINE 存取令牌
+  lineUserId         String? // LINE 用戶 ID
+  lineAccessToken    String? // LINE 存取令牌
   lineTokenExpiresAt DateTime? // LINE 令牌到期時間
 
   @@map("employees")
@@ -316,22 +316,22 @@ enum AssignmentStatus {
 
 // 異動類型
 enum ChangeType {
-  ONBOARD           // 入職
-  OFFBOARD          // 離職
-  REINSTATE         // 復職
-  TRANSFER          // 調動
-  ON_LEAVE          // 留停
+  ONBOARD // 入職
+  OFFBOARD // 離職
+  REINSTATE // 復職
+  TRANSFER // 調動
+  ON_LEAVE // 留停
   RETURN_FROM_LEAVE // 留停復職
 }
 
 // 員工異動紀錄
 model EmployeeChangeLog {
-  id           String   @id @default(cuid())
-  employeeId   String
-  employee     Employee @relation("EmployeeChangeLogs", fields: [employeeId], references: [id])
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation("EmployeeChangeLogs", fields: [employeeId], references: [id])
 
-  changeType   ChangeType  // 異動類型
-  changeDate   DateTime    // 異動生效日期
+  changeType ChangeType // 異動類型
+  changeDate DateTime // 異動生效日期
 
   // 異動前後的資料（nullable，因為入職時沒有「前」）
   fromCompanyId    String?
@@ -341,12 +341,12 @@ model EmployeeChangeLog {
   toDepartmentId   String?
   toPositionId     String?
 
-  reason       String?     // 異動原因
-  note         String?     // 備註
+  reason String? // 異動原因
+  note   String? // 備註
 
-  createdById  String      // 建立者（操作人）
-  createdBy    Employee    @relation("ChangeLogCreator", fields: [createdById], references: [id])
-  createdAt    DateTime    @default(now())
+  createdById String // 建立者（操作人）
+  createdBy   Employee @relation("ChangeLogCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
 
   @@index([employeeId, changeDate])
   @@index([changeType])
@@ -423,11 +423,11 @@ enum GrantType {
 // 權限範本（用於快速套用一組權限）
 model PermissionTemplate {
   id          String   @id @default(cuid())
-  name        String   // 範本名稱
-  description String?  // 範本說明
-  permissions Json     // 權限代碼陣列 ["hr.view", "leave.approve", ...]
+  name        String // 範本名稱
+  description String? // 範本說明
+  permissions Json // 權限代碼陣列 ["hr.view", "leave.approve", ...]
   isActive    Boolean  @default(true)
-  createdById String   // 建立者
+  createdById String // 建立者
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -787,13 +787,13 @@ enum OrgChartType {
 // 組織節點類型
 enum OrgNodeType {
   DEPARTMENT // 部門
-  POSITION   // 職位
-  EMPLOYEE   // 員工
-  TEAM       // 團隊
-  DIVISION   // 事業部
-  COMMITTEE  // 委員會
-  COMPANY    // 公司
-  EXTERNAL   // 外部單位
+  POSITION // 職位
+  EMPLOYEE // 員工
+  TEAM // 團隊
+  DIVISION // 事業部
+  COMMITTEE // 委員會
+  COMPANY // 公司
+  EXTERNAL // 外部單位
 }
 
 // 組織關係類型
@@ -1807,10 +1807,10 @@ model SealRequest {
   applicantId String
   applicant   Employee @relation("SealApplicant", fields: [applicantId], references: [id])
 
-  sealTypes     Json @default("[]") // 印章類型陣列 e.g., ["COMPANY_SEAL", "PERFORATION_SEAL"]
+  sealTypes     Json    @default("[]") // 印章類型陣列 e.g., ["COMPANY_SEAL", "PERFORATION_SEAL"]
   purpose       String // 用途說明
   documentName  String? // 文件名稱
-  documentCount Int      @default(1) // 用印份數
+  documentCount Int     @default(1) // 用印份數
 
   isCarryOut     Boolean   @default(false) // 是否攜出
   expectedReturn DateTime? // 預計歸還時間
@@ -1999,20 +1999,20 @@ model SystemSetting {
 // ==================== 系統通知 ====================
 
 model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  user      Employee @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  id     String   @id @default(cuid())
+  userId String
+  user   Employee @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
 
-  type      String   // REQUEST_APPROVED, REQUEST_REJECTED, REVISION_REQUIRED, APPROVAL_NEEDED
-  title     String
-  message   String
-  link      String?  // URL to navigate to when clicked
+  type    String // REQUEST_APPROVED, REQUEST_REJECTED, REVISION_REQUIRED, APPROVAL_NEEDED
+  title   String
+  message String
+  link    String? // URL to navigate to when clicked
 
-  refType   String   // LeaveRequest, ExpenseRequest, SealRequest, etc.
-  refId     String
+  refType String // LeaveRequest, ExpenseRequest, SealRequest, etc.
+  refId   String
 
-  isRead    Boolean  @default(false)
-  readAt    DateTime?
+  isRead Boolean   @default(false)
+  readAt DateTime?
 
   createdAt DateTime @default(now())
 
@@ -2026,7 +2026,7 @@ model Notification {
 model Conversation {
   id        String   @id @default(cuid())
   type      String   @default("DIRECT") // DIRECT (一對一), GROUP (群組)
-  name      String?  // 群組對話名稱（一對一為 null）
+  name      String? // 群組對話名稱（一對一為 null）
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2037,12 +2037,12 @@ model Conversation {
 }
 
 model ConversationParticipant {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   employeeId     String
-  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  joinedAt       DateTime @default(now())
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  joinedAt       DateTime     @default(now())
   lastReadAt     DateTime? // 最後已讀時間，用於計算未讀訊息
 
   @@unique([conversationId, employeeId])
@@ -2051,17 +2051,17 @@ model ConversationParticipant {
 }
 
 model Message {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   senderId       String
-  sender         Employee @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  content        String   @db.Text
-  isDeleted      Boolean  @default(false) // 軟刪除，顯示「訊息已收回」
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  sender         Employee     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String       @db.Text
+  isDeleted      Boolean      @default(false) // 軟刪除，顯示「訊息已收回」
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  attachments    MessageAttachment[]
+  attachments MessageAttachment[]
 
   @@index([conversationId, createdAt])
   @@index([senderId])
@@ -2072,12 +2072,57 @@ model MessageAttachment {
   id        String   @id @default(cuid())
   messageId String
   message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  fileName  String   // 原始檔名
-  fileType  String   // MIME type
-  fileSize  Int      // bytes
-  fileUrl   String   // 檔案 URL
+  fileName  String // 原始檔名
+  fileType  String // MIME type
+  fileSize  Int // bytes
+  fileUrl   String // 檔案 URL
   createdAt DateTime @default(now())
 
   @@index([messageId])
   @@map("message_attachments")
+}
+
+// ==================== 專案管理列舉 ====================
+
+enum ProjectType {
+  INTERNAL
+  CLIENT
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectVisibility {
+  PRIVATE
+  DEPARTMENT
+  COMPANY
+  CUSTOM
+}
+
+enum ProjectRole {
+  MANAGER
+  MEMBER
+  OBSERVER
+}
+
+enum PhaseStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskPriority {
+  HIGH
+  MEDIUM
+  LOW
 }
