@@ -304,4 +304,145 @@ export const projectRouter = router({
       await ctx.prisma.$transaction(updates)
       return { success: true }
     }),
+
+  // ==================== 任務管理 ====================
+
+  createTask: publicProcedure
+    .input(z.object({
+      phaseId: z.string(),
+      parentId: z.string().optional(),
+      name: z.string().min(1, '請輸入任務名稱'),
+      description: z.string().optional(),
+      priority: z.enum(['HIGH', 'MEDIUM', 'LOW']).default('MEDIUM'),
+      assigneeId: z.string().optional(),
+      estimatedHours: z.number().optional(),
+      startDate: z.date().optional(),
+      dueDate: z.date().optional(),
+      actorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { actorId, ...data } = input
+
+      const phase = await ctx.prisma.projectPhase.findUnique({
+        where: { id: input.phaseId },
+        select: { projectId: true },
+      })
+
+      if (!phase) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '階段不存在' })
+      }
+
+      const task = await ctx.prisma.projectTask.create({
+        data,
+        include: {
+          assignee: { select: { id: true, name: true } },
+        },
+      })
+
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: phase.projectId,
+          actorId,
+          action: 'CREATED',
+          targetType: 'TASK',
+          targetId: task.id,
+          summary: `新增了任務「${task.name}」`,
+        },
+      })
+
+      return task
+    }),
+
+  updateTask: publicProcedure
+    .input(z.object({
+      id: z.string(),
+      name: z.string().min(1).optional(),
+      description: z.string().optional(),
+      priority: z.enum(['HIGH', 'MEDIUM', 'LOW']).optional(),
+      status: z.enum(['TODO', 'IN_PROGRESS', 'COMPLETED']).optional(),
+      assigneeId: z.string().nullable().optional(),
+      estimatedHours: z.number().nullable().optional(),
+      actualHours: z.number().nullable().optional(),
+      startDate: z.date().nullable().optional(),
+      dueDate: z.date().nullable().optional(),
+      actorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, actorId, ...data } = input
+
+      const existing = await ctx.prisma.projectTask.findUnique({
+        where: { id },
+        include: { phase: { select: { projectId: true } } },
+      })
+
+      if (!existing) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '任務不存在' })
+      }
+
+      const updateData: Record<string, unknown> = { ...data }
+      if (data.status === 'COMPLETED' && existing.status !== 'COMPLETED') {
+        updateData.completedAt = new Date()
+      } else if (data.status && data.status !== 'COMPLETED') {
+        updateData.completedAt = null
+      }
+
+      const task = await ctx.prisma.projectTask.update({
+        where: { id },
+        data: updateData,
+        include: {
+          assignee: { select: { id: true, name: true } },
+        },
+      })
+
+      let summary = `更新了任務「${task.name}」`
+      if (data.status === 'COMPLETED') {
+        summary = `完成了任務「${task.name}」`
+      } else if (data.status === 'IN_PROGRESS' && existing.status === 'TODO') {
+        summary = `開始執行任務「${task.name}」`
+      }
+
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: existing.phase.projectId,
+          actorId,
+          action: data.status ? 'STATUS_CHANGED' : 'UPDATED',
+          targetType: 'TASK',
+          targetId: task.id,
+          summary,
+        },
+      })
+
+      return task
+    }),
+
+  deleteTask: publicProcedure
+    .input(z.object({
+      id: z.string(),
+      actorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const task = await ctx.prisma.projectTask.findUnique({
+        where: { id: input.id },
+        include: { phase: { select: { projectId: true } } },
+      })
+
+      if (!task) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '任務不存在' })
+      }
+
+      await ctx.prisma.projectTask.delete({ where: { id: input.id } })
+
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: task.phase.projectId,
+          actorId: input.actorId,
+          action: 'DELETED',
+          targetType: 'TASK',
+          targetId: input.id,
+          summary: `刪除了任務「${task.name}」`,
+        },
+      })
+
+      return { success: true }
+    }),
 })
