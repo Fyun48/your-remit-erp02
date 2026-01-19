@@ -176,7 +176,7 @@ export function ProjectForm({ companyId, companyName, currentUserId }: ProjectFo
                     setFormData({ ...formData, type: value as ProjectType, customerId: '' })
                   }
                 >
-                  <SelectTrigger id="type">
+                  <SelectTrigger>
                     <SelectValue placeholder="選擇專案類型" />
                   </SelectTrigger>
                   <SelectContent>
@@ -197,7 +197,7 @@ export function ProjectForm({ companyId, companyName, currentUserId }: ProjectFo
                     setFormData({ ...formData, visibility: value as ProjectVisibility })
                   }
                 >
-                  <SelectTrigger id="visibility">
+                  <SelectTrigger>
                     <SelectValue placeholder="選擇可見性" />
                   </SelectTrigger>
                   <SelectContent>
@@ -246,7 +246,7 @@ export function ProjectForm({ companyId, companyName, currentUserId }: ProjectFo
                   }
                   disabled={isDepartmentsLoading}
                 >
-                  <SelectTrigger id="department">
+                  <SelectTrigger>
                     <SelectValue
                       placeholder={isDepartmentsLoading ? '載入中...' : '選擇部門'}
                     />
@@ -270,7 +270,7 @@ export function ProjectForm({ companyId, companyName, currentUserId }: ProjectFo
                   }
                   disabled={isEmployeesLoading}
                 >
-                  <SelectTrigger id="manager">
+                  <SelectTrigger>
                     <SelectValue
                       placeholder={isEmployeesLoading ? '載入中...' : '選擇負責人'}
                     />
@@ -297,7 +297,7 @@ export function ProjectForm({ companyId, companyName, currentUserId }: ProjectFo
                   }
                   disabled={isCustomersLoading}
                 >
-                  <SelectTrigger id="customer">
+                  <SelectTrigger>
                     <SelectValue
                       placeholder={isCustomersLoading ? '載入中...' : '選擇客戶'}
                     />
