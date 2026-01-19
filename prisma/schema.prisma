@@ -282,6 +282,7 @@ model Employee {
   projectComments     ProjectComment[]        @relation("ProjectCommentAuthor")
   projectMentions     ProjectCommentMention[] @relation("ProjectMention")
   projectAttachments  ProjectAttachment[]     @relation("ProjectAttachmentUploader")
+  projectActivities   ProjectActivity[]       @relation("ProjectActivityActor")
 
   @@map("employees")
 }
@@ -2179,7 +2180,6 @@ model Project {
   comments       ProjectComment[]
   attachments    ProjectAttachment[]
   activities     ProjectActivity[]
-  auditLogs      ProjectAuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2339,24 +2339,42 @@ model ProjectAttachment {
   @@map("project_attachments")
 }
 
-// Placeholder for future task - ProjectActivity model
 model ProjectActivity {
-  id        String   @id @default(cuid())
-  projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id         String @id @default(cuid())
+  projectId  String
+  actorId    String
+  action     String
+  targetType String
+  targetId   String
+  summary    String
+
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor   Employee @relation("ProjectActivityActor", fields: [actorId], references: [id])
+
   createdAt DateTime @default(now())
 
   @@index([projectId])
+  @@index([actorId])
+  @@index([createdAt])
   @@map("project_activities")
 }
 
-// Placeholder for future task - ProjectAuditLog model
 model ProjectAuditLog {
-  id        String   @id @default(cuid())
-  projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id         String  @id @default(cuid())
+  projectId  String
+  actorId    String
+  action     String
+  targetType String
+  targetId   String
+  beforeData Json?
+  afterData  Json?
+  ipAddress  String?
+  userAgent  String?
+
   createdAt DateTime @default(now())
 
   @@index([projectId])
+  @@index([actorId])
+  @@index([createdAt])
   @@map("project_audit_logs")
 }
