@@ -445,4 +445,134 @@ export const projectRouter = router({
 
       return { success: true }
     }),
+
+  // ==================== 成員管理 ====================
+
+  addMember: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      employeeId: z.string(),
+      role: z.enum(['MANAGER', 'MEMBER', 'OBSERVER']).default('MEMBER'),
+      actorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { actorId, ...data } = input
+
+      const existing = await ctx.prisma.projectMember.findUnique({
+        where: {
+          projectId_employeeId: {
+            projectId: input.projectId,
+            employeeId: input.employeeId,
+          },
+        },
+      })
+
+      if (existing) {
+        throw new TRPCError({ code: 'CONFLICT', message: '該員工已是專案成員' })
+      }
+
+      const member = await ctx.prisma.projectMember.create({
+        data,
+        include: {
+          employee: { select: { id: true, name: true, employeeNo: true } },
+        },
+      })
+
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: input.projectId,
+          actorId,
+          action: 'MEMBER_ADDED',
+          targetType: 'MEMBER',
+          targetId: member.id,
+          summary: `將「${member.employee.name}」加入專案`,
+        },
+      })
+
+      return member
+    }),
+
+  updateMemberRole: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      employeeId: z.string(),
+      role: z.enum(['MANAGER', 'MEMBER', 'OBSERVER']),
+      actorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const member = await ctx.prisma.projectMember.update({
+        where: {
+          projectId_employeeId: {
+            projectId: input.projectId,
+            employeeId: input.employeeId,
+          },
+        },
+        data: { role: input.role },
+        include: {
+          employee: { select: { id: true, name: true } },
+        },
+      })
+
+      const roleLabels = { MANAGER: '經理', MEMBER: '成員', OBSERVER: '觀察者' }
+
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: input.projectId,
+          actorId: input.actorId,
+          action: 'MEMBER_ROLE_CHANGED',
+          targetType: 'MEMBER',
+          targetId: member.id,
+          summary: `將「${member.employee.name}」的角色變更為${roleLabels[input.role]}`,
+        },
+      })
+
+      return member
+    }),
+
+  removeMember: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      employeeId: z.string(),
+      actorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const member = await ctx.prisma.projectMember.findUnique({
+        where: {
+          projectId_employeeId: {
+            projectId: input.projectId,
+            employeeId: input.employeeId,
+          },
+        },
+        include: {
+          employee: { select: { name: true } },
+        },
+      })
+
+      if (!member) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '成員不存在' })
+      }
+
+      await ctx.prisma.projectMember.update({
+        where: {
+          projectId_employeeId: {
+            projectId: input.projectId,
+            employeeId: input.employeeId,
+          },
+        },
+        data: { leftAt: new Date() },
+      })
+
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: input.projectId,
+          actorId: input.actorId,
+          action: 'MEMBER_REMOVED',
+          targetType: 'MEMBER',
+          targetId: member.id,
+          summary: `將「${member.employee.name}」移出專案`,
+        },
+      })
+
+      return { success: true }
+    }),
 })
