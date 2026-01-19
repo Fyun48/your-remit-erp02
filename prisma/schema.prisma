@@ -288,6 +288,7 @@ model Employee {
 
   // 請假
   leaveRequests       LeaveRequest[]          @relation("EmployeeLeaveRequests")
+  projectAuditLogs    ProjectAuditLog[]       @relation("EmployeeProjectAuditLogs")
 
   @@map("employees")
 }
@@ -2186,6 +2187,7 @@ model Project {
   comments       ProjectComment[]
   attachments    ProjectAttachment[]
   activities     ProjectActivity[]
+  auditLogs      ProjectAuditLog[]      @relation("ProjectAuditLogs")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2378,6 +2380,9 @@ model ProjectAuditLog {
   userAgent  String?
 
   createdAt DateTime @default(now())
+
+  project Project  @relation("ProjectAuditLogs", fields: [projectId], references: [id], onDelete: Cascade)
+  actor   Employee @relation("EmployeeProjectAuditLogs", fields: [actorId], references: [id])
 
   @@index([projectId])
   @@index([actorId])

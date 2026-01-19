@@ -138,6 +138,25 @@ export const projectRouter = router({
         },
       })
 
+      // 記錄稽核紀錄
+      await ctx.prisma.projectAuditLog.create({
+        data: {
+          projectId: project.id,
+          actorId: input.managerId,
+          action: 'CREATE',
+          targetType: 'PROJECT',
+          targetId: project.id,
+          afterData: {
+            name: project.name,
+            type: input.type,
+            visibility: input.visibility,
+            companyId: input.companyId,
+            departmentId: input.departmentId,
+            managerId: input.managerId,
+          },
+        },
+      })
+
       return project
     }),
 
@@ -180,13 +199,80 @@ export const projectRouter = router({
         },
       })
 
+      // 記錄稽核紀錄（包含變更前後資料）
+      const changedFields: Record<string, unknown> = {}
+      const beforeFields: Record<string, unknown> = {}
+
+      if (data.name !== undefined && data.name !== existing.name) {
+        beforeFields.name = existing.name
+        changedFields.name = data.name
+      }
+      if (data.status !== undefined && data.status !== existing.status) {
+        beforeFields.status = existing.status
+        changedFields.status = data.status
+      }
+      if (data.visibility !== undefined && data.visibility !== existing.visibility) {
+        beforeFields.visibility = existing.visibility
+        changedFields.visibility = data.visibility
+      }
+      if (data.qualityScore !== undefined && data.qualityScore !== existing.qualityScore) {
+        beforeFields.qualityScore = existing.qualityScore
+        changedFields.qualityScore = data.qualityScore
+      }
+
+      if (Object.keys(changedFields).length > 0) {
+        await ctx.prisma.projectAuditLog.create({
+          data: {
+            projectId: id,
+            actorId: updatedById,
+            action: data.status !== existing.status ? 'STATUS_CHANGE' : 'UPDATE',
+            targetType: 'PROJECT',
+            targetId: id,
+            beforeData: beforeFields as object,
+            afterData: changedFields as object,
+          },
+        })
+      }
+
       return project
     }),
 
   // 刪除專案
   delete: publicProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({
+      id: z.string(),
+      deletedById: z.string(),
+    }))
     .mutation(async ({ ctx, input }) => {
+      // 取得專案資料作為稽核紀錄
+      const project = await ctx.prisma.project.findUnique({
+        where: { id: input.id },
+        select: {
+          name: true,
+          type: true,
+          status: true,
+          companyId: true,
+          departmentId: true,
+          managerId: true,
+        },
+      })
+
+      if (!project) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '專案不存在' })
+      }
+
+      // 記錄稽核紀錄（刪除前）
+      await ctx.prisma.projectAuditLog.create({
+        data: {
+          projectId: input.id,
+          actorId: input.deletedById,
+          action: 'DELETE',
+          targetType: 'PROJECT',
+          targetId: input.id,
+          beforeData: project,
+        },
+      })
+
       await ctx.prisma.project.delete({ where: { id: input.id } })
       return { success: true }
     }),
@@ -1327,7 +1413,7 @@ export const projectRouter = router({
     .query(async ({ ctx, input }) => {
       const where: Record<string, unknown> = {
         companyId: input.companyId,
-        isActive: true,
+        status: 'ACTIVE',
       }
 
       if (input.category) where.category = input.category
@@ -1665,5 +1751,407 @@ export const projectRouter = router({
       })
 
       return templates.map(t => t.category).filter(Boolean) as string[]
+    }),
+
+  // ==================== 稽核紀錄 ====================
+
+  // 取得專案稽核紀錄
+  getAuditLogs: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      action: z.string().optional(),
+      targetType: z.string().optional(),
+      actorId: z.string().optional(),
+      startDate: z.date().optional(),
+      endDate: z.date().optional(),
+      limit: z.number().min(1).max(100).default(50),
+      offset: z.number().min(0).default(0),
+    }))
+    .query(async ({ ctx, input }) => {
+      const where: Record<string, unknown> = {
+        projectId: input.projectId,
+      }
+
+      if (input.action) where.action = input.action
+      if (input.targetType) where.targetType = input.targetType
+      if (input.actorId) where.actorId = input.actorId
+
+      if (input.startDate || input.endDate) {
+        where.createdAt = {}
+        if (input.startDate) (where.createdAt as Record<string, unknown>).gte = input.startDate
+        if (input.endDate) (where.createdAt as Record<string, unknown>).lte = input.endDate
+      }
+
+      const [logs, total] = await Promise.all([
+        ctx.prisma.projectAuditLog.findMany({
+          where,
+          include: {
+            actor: { select: { id: true, name: true, employeeNo: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: input.limit,
+          skip: input.offset,
+        }),
+        ctx.prisma.projectAuditLog.count({ where }),
+      ])
+
+      return { logs, total }
+    }),
+
+  // 建立稽核紀錄 (內部使用)
+  createAuditLog: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      actorId: z.string(),
+      action: z.enum(['CREATE', 'UPDATE', 'DELETE', 'STATUS_CHANGE', 'MEMBER_ADD', 'MEMBER_REMOVE', 'PHASE_CREATE', 'PHASE_UPDATE', 'TASK_CREATE', 'TASK_UPDATE', 'TASK_STATUS_CHANGE']),
+      targetType: z.enum(['PROJECT', 'PHASE', 'TASK', 'MEMBER', 'COMMENT', 'ATTACHMENT']),
+      targetId: z.string(),
+      beforeData: z.record(z.string(), z.unknown()).nullable().optional(),
+      afterData: z.record(z.string(), z.unknown()).nullable().optional(),
+      ipAddress: z.string().optional(),
+      userAgent: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.projectAuditLog.create({
+        data: {
+          projectId: input.projectId,
+          actorId: input.actorId,
+          action: input.action,
+          targetType: input.targetType,
+          targetId: input.targetId,
+          beforeData: input.beforeData as object | undefined,
+          afterData: input.afterData as object | undefined,
+          ipAddress: input.ipAddress,
+          userAgent: input.userAgent,
+        },
+      })
+    }),
+
+  // 取得稽核紀錄統計
+  getAuditStats: publicProcedure
+    .input(z.object({ projectId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const stats = await ctx.prisma.projectAuditLog.groupBy({
+        by: ['action'],
+        where: { projectId: input.projectId },
+        _count: { action: true },
+      })
+
+      const actorStats = await ctx.prisma.projectAuditLog.groupBy({
+        by: ['actorId'],
+        where: { projectId: input.projectId },
+        _count: { actorId: true },
+        orderBy: { _count: { actorId: 'desc' } },
+        take: 10,
+      })
+
+      const actorIds = actorStats.map(s => s.actorId)
+      const actors = await ctx.prisma.employee.findMany({
+        where: { id: { in: actorIds } },
+        select: { id: true, name: true },
+      })
+
+      const actorMap = new Map(actors.map(a => [a.id, a.name]))
+
+      return {
+        byAction: stats.map(s => ({ action: s.action, count: s._count.action })),
+        byActor: actorStats.map(s => ({
+          actorId: s.actorId,
+          actorName: actorMap.get(s.actorId) || '未知',
+          count: s._count.actorId,
+        })),
+        totalLogs: stats.reduce((sum, s) => sum + s._count.action, 0),
+      }
+    }),
+
+  // ==================== 彈性權限設定 ====================
+
+  // 取得專案可見成員列表
+  getVisibleMembers: publicProcedure
+    .input(z.object({ projectId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.projectVisibleMember.findMany({
+        where: { projectId: input.projectId },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              name: true,
+              employeeNo: true,
+              assignments: {
+                where: { status: 'ACTIVE' },
+                include: {
+                  department: { select: { id: true, name: true } },
+                  position: { select: { id: true, name: true } },
+                },
+                take: 1,
+              },
+            },
+          },
+        },
+      })
+    }),
+
+  // 新增可見成員
+  addVisibleMember: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      employeeId: z.string(),
+      addedById: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // 檢查是否已存在
+      const existing = await ctx.prisma.projectVisibleMember.findUnique({
+        where: {
+          projectId_employeeId: {
+            projectId: input.projectId,
+            employeeId: input.employeeId,
+          },
+        },
+      })
+
+      if (existing) {
+        throw new TRPCError({ code: 'CONFLICT', message: '此成員已在可見清單中' })
+      }
+
+      const member = await ctx.prisma.projectVisibleMember.create({
+        data: {
+          projectId: input.projectId,
+          employeeId: input.employeeId,
+        },
+        include: {
+          employee: { select: { id: true, name: true } },
+        },
+      })
+
+      // 記錄稽核紀錄
+      await ctx.prisma.projectAuditLog.create({
+        data: {
+          projectId: input.projectId,
+          actorId: input.addedById,
+          action: 'MEMBER_ADD',
+          targetType: 'MEMBER',
+          targetId: member.id,
+          afterData: { employeeId: input.employeeId, type: 'VISIBLE_MEMBER' },
+        },
+      })
+
+      // 記錄活動
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: input.projectId,
+          actorId: input.addedById,
+          action: 'VISIBLE_MEMBER_ADDED',
+          targetType: 'VISIBLE_MEMBER',
+          targetId: member.id,
+          summary: `新增了「${member.employee.name}」為可見成員`,
+        },
+      })
+
+      return member
+    }),
+
+  // 移除可見成員
+  removeVisibleMember: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      employeeId: z.string(),
+      removedById: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const member = await ctx.prisma.projectVisibleMember.findUnique({
+        where: {
+          projectId_employeeId: {
+            projectId: input.projectId,
+            employeeId: input.employeeId,
+          },
+        },
+        include: {
+          employee: { select: { id: true, name: true } },
+        },
+      })
+
+      if (!member) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '可見成員不存在' })
+      }
+
+      await ctx.prisma.projectVisibleMember.delete({
+        where: { id: member.id },
+      })
+
+      // 記錄稽核紀錄
+      await ctx.prisma.projectAuditLog.create({
+        data: {
+          projectId: input.projectId,
+          actorId: input.removedById,
+          action: 'MEMBER_REMOVE',
+          targetType: 'MEMBER',
+          targetId: member.id,
+          beforeData: { employeeId: input.employeeId, type: 'VISIBLE_MEMBER' },
+        },
+      })
+
+      // 記錄活動
+      await ctx.prisma.projectActivity.create({
+        data: {
+          projectId: input.projectId,
+          actorId: input.removedById,
+          action: 'VISIBLE_MEMBER_REMOVED',
+          targetType: 'VISIBLE_MEMBER',
+          targetId: member.id,
+          summary: `移除了「${member.employee.name}」的可見權限`,
+        },
+      })
+
+      return { success: true }
+    }),
+
+  // 批次更新可見成員
+  updateVisibleMembers: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      employeeIds: z.array(z.string()),
+      updatedById: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // 取得現有成員
+      const existing = await ctx.prisma.projectVisibleMember.findMany({
+        where: { projectId: input.projectId },
+        select: { employeeId: true },
+      })
+
+      const existingIds = new Set(existing.map(m => m.employeeId))
+      const newIds = new Set(input.employeeIds)
+
+      // 計算新增和移除
+      const toAdd = input.employeeIds.filter(id => !existingIds.has(id))
+      const toRemove = existing.filter(m => !newIds.has(m.employeeId)).map(m => m.employeeId)
+
+      // 執行更新
+      await ctx.prisma.$transaction([
+        // 刪除移除的
+        ctx.prisma.projectVisibleMember.deleteMany({
+          where: {
+            projectId: input.projectId,
+            employeeId: { in: toRemove },
+          },
+        }),
+        // 新增的
+        ctx.prisma.projectVisibleMember.createMany({
+          data: toAdd.map(employeeId => ({
+            projectId: input.projectId,
+            employeeId,
+          })),
+        }),
+      ])
+
+      // 記錄稽核紀錄
+      if (toAdd.length > 0 || toRemove.length > 0) {
+        await ctx.prisma.projectAuditLog.create({
+          data: {
+            projectId: input.projectId,
+            actorId: input.updatedById,
+            action: 'UPDATE',
+            targetType: 'PROJECT',
+            targetId: input.projectId,
+            beforeData: { visibleMembers: Array.from(existingIds) },
+            afterData: { visibleMembers: input.employeeIds },
+          },
+        })
+
+        await ctx.prisma.projectActivity.create({
+          data: {
+            projectId: input.projectId,
+            actorId: input.updatedById,
+            action: 'VISIBLE_MEMBERS_UPDATED',
+            targetType: 'PROJECT',
+            targetId: input.projectId,
+            summary: `更新了專案可見成員（新增 ${toAdd.length} 人，移除 ${toRemove.length} 人）`,
+          },
+        })
+      }
+
+      return { added: toAdd.length, removed: toRemove.length }
+    }),
+
+  // 檢查使用者是否有專案存取權限
+  checkAccess: publicProcedure
+    .input(z.object({
+      projectId: z.string(),
+      employeeId: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const project = await ctx.prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: {
+          visibility: true,
+          companyId: true,
+          departmentId: true,
+          members: {
+            where: { employeeId: input.employeeId, leftAt: null },
+            select: { role: true },
+          },
+          visibleMembers: {
+            where: { employeeId: input.employeeId },
+            select: { id: true },
+          },
+        },
+      })
+
+      if (!project) {
+        return { hasAccess: false, role: null, reason: 'PROJECT_NOT_FOUND' }
+      }
+
+      // 檢查是否為專案成員
+      if (project.members.length > 0) {
+        return { hasAccess: true, role: project.members[0].role, reason: 'MEMBER' }
+      }
+
+      // 根據可見性檢查
+      switch (project.visibility) {
+        case 'PRIVATE':
+          return { hasAccess: false, role: null, reason: 'PRIVATE_PROJECT' }
+
+        case 'DEPARTMENT': {
+          // 檢查是否同部門
+          const assignment = await ctx.prisma.employeeAssignment.findFirst({
+            where: {
+              employeeId: input.employeeId,
+              companyId: project.companyId,
+              departmentId: project.departmentId,
+              status: 'ACTIVE',
+            },
+          })
+          if (assignment) {
+            return { hasAccess: true, role: 'OBSERVER', reason: 'SAME_DEPARTMENT' }
+          }
+          return { hasAccess: false, role: null, reason: 'DIFFERENT_DEPARTMENT' }
+        }
+
+        case 'COMPANY': {
+          // 檢查是否同公司
+          const assignment = await ctx.prisma.employeeAssignment.findFirst({
+            where: {
+              employeeId: input.employeeId,
+              companyId: project.companyId,
+              status: 'ACTIVE',
+            },
+          })
+          if (assignment) {
+            return { hasAccess: true, role: 'OBSERVER', reason: 'SAME_COMPANY' }
+          }
+          return { hasAccess: false, role: null, reason: 'DIFFERENT_COMPANY' }
+        }
+
+        case 'CUSTOM':
+          // 檢查是否在可見清單中
+          if (project.visibleMembers.length > 0) {
+            return { hasAccess: true, role: 'OBSERVER', reason: 'VISIBLE_MEMBER' }
+          }
+          return { hasAccess: false, role: null, reason: 'NOT_IN_VISIBLE_LIST' }
+
+        default:
+          return { hasAccess: false, role: null, reason: 'UNKNOWN_VISIBILITY' }
+      }
     }),
 })

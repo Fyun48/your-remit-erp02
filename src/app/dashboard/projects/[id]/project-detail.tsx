@@ -67,6 +67,8 @@ import {
   Paperclip,
   Bell,
   Copy,
+  Shield,
+  Settings,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import { format } from 'date-fns'
@@ -79,6 +81,8 @@ import { ProjectTeamAvailability } from './project-team-availability'
 import { ProjectComments } from './project-comments'
 import { ProjectAttachments } from './project-attachments'
 import { ProjectReminders } from './project-reminders'
+import { ProjectAuditLogs } from './project-audit-logs'
+import { ProjectPermissions } from './project-permissions'
 
 interface ProjectDetailProps {
   projectId: string
@@ -237,7 +241,12 @@ export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDe
   })
 
   // Fetch project data
-  const { data: project, isLoading, error } = trpc.project.getById.useQuery({ id: projectId })
+  const { data: project, isLoading, error, refetch } = trpc.project.getById.useQuery({ id: projectId })
+
+  // Check if current user is project manager
+  const isManager = project?.members?.some(
+    (m) => m.employee.id === currentUserId && m.role === 'MANAGER' && !m.leftAt
+  ) || false
 
   // Fetch employees for member selection
   const { data: employees } = trpc.hr.listEmployees.useQuery(
@@ -718,6 +727,14 @@ export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDe
             <Bell className="h-4 w-4" />
             提醒
           </TabsTrigger>
+          <TabsTrigger value="permissions" className="gap-2">
+            <Settings className="h-4 w-4" />
+            權限設定
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="gap-2">
+            <Shield className="h-4 w-4" />
+            稽核紀錄
+          </TabsTrigger>
         </TabsList>
 
         {/* Phases & Tasks Tab */}
@@ -1155,6 +1172,26 @@ export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDe
             employeeId={currentUserId}
             companyId={companyId}
           />
+        </TabsContent>
+
+        {/* Permissions Tab */}
+        <TabsContent value="permissions" className="space-y-4">
+          <ProjectPermissions
+            projectId={projectId}
+            companyId={companyId}
+            currentUserId={currentUserId}
+            currentVisibility={project.visibility}
+            isManager={isManager}
+            onVisibilityChange={() => {
+              // Refresh project data on visibility change
+              refetch()
+            }}
+          />
+        </TabsContent>
+
+        {/* Audit Log Tab */}
+        <TabsContent value="audit" className="space-y-4">
+          <ProjectAuditLogs projectId={projectId} />
         </TabsContent>
       </Tabs>
 
