@@ -39,6 +39,7 @@ const visibilityLabels: Record<ProjectVisibility, string> = {
   CUSTOM: '自訂',
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function ProjectForm({ companyId, companyName, currentUserId }: ProjectFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)

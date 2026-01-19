@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Bell, CheckCircle, XCircle, AlertCircle, Clock, Loader2 } from 'lucide-react'
+import { Bell, CheckCircle, XCircle, AlertCircle, Clock, Loader2, UserPlus, MessageSquare, ListTodo, AlertTriangle } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import {
   Popover,
@@ -41,6 +41,19 @@ function getNotificationIcon(type: string) {
       return <AlertCircle className="h-4 w-4 text-yellow-500" />
     case 'APPROVAL_NEEDED':
       return <Clock className="h-4 w-4 text-blue-500" />
+    // Project notification types
+    case 'TASK_ASSIGNED':
+      return <ListTodo className="h-4 w-4 text-purple-500" />
+    case 'TASK_DUE_SOON':
+      return <Clock className="h-4 w-4 text-orange-500" />
+    case 'TASK_OVERDUE':
+      return <AlertTriangle className="h-4 w-4 text-red-500" />
+    case 'PROJECT_MEMBER_ADDED':
+      return <UserPlus className="h-4 w-4 text-blue-500" />
+    case 'COMMENT_MENTIONED':
+      return <MessageSquare className="h-4 w-4 text-indigo-500" />
+    case 'PROJECT_STATUS_CHANGED':
+      return <AlertCircle className="h-4 w-4 text-cyan-500" />
     default:
       return <Bell className="h-4 w-4 text-muted-foreground" />
   }

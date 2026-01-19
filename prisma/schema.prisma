@@ -145,7 +145,8 @@ model Company {
   workflowInstances   WorkflowInstance[]
 
   // 專案管理
-  projects Project[]
+  projects         Project[]
+  projectTemplates ProjectTemplate[]
 
   @@map("companies")
 }
@@ -283,6 +284,10 @@ model Employee {
   projectMentions     ProjectCommentMention[] @relation("ProjectMention")
   projectAttachments  ProjectAttachment[]     @relation("ProjectAttachmentUploader")
   projectActivities   ProjectActivity[]       @relation("ProjectActivityActor")
+  projectTemplates    ProjectTemplate[]
+
+  // 請假
+  leaveRequests       LeaveRequest[]          @relation("EmployeeLeaveRequests")
 
   @@map("employees")
 }
@@ -745,6 +750,7 @@ model LeaveRequest {
   updatedAt DateTime @updatedAt
 
   leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+  employee  Employee  @relation("EmployeeLeaveRequests", fields: [employeeId], references: [id])
 
   @@index([employeeId, companyId])
   @@index([status])
@@ -2377,4 +2383,75 @@ model ProjectAuditLog {
   @@index([actorId])
   @@index([createdAt])
   @@map("project_audit_logs")
+}
+
+// ==================== 專案範本 ====================
+
+model ProjectTemplate {
+  id          String      @id @default(cuid())
+  name        String
+  description String?     @db.Text
+  category    String? // Template category (e.g., "軟體開發", "行銷活動", "工程建設")
+  type        ProjectType @default(INTERNAL)
+  companyId   String
+  createdById String
+  isActive    Boolean     @default(true)
+
+  phases ProjectTemplatePhase[]
+  tags   ProjectTemplateTag[]
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy Employee @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([category])
+  @@map("project_templates")
+}
+
+model ProjectTemplatePhase {
+  id           String  @id @default(cuid())
+  templateId   String
+  name         String
+  description  String? @db.Text
+  sortOrder    Int
+  durationDays Int? // Suggested duration in days
+
+  tasks    ProjectTemplateTask[]
+  template ProjectTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@map("project_template_phases")
+}
+
+model ProjectTemplateTask {
+  id             String       @id @default(cuid())
+  phaseId        String
+  parentId       String?
+  name           String
+  description    String?      @db.Text
+  priority       TaskPriority @default(MEDIUM)
+  estimatedHours Float?
+  durationDays   Int? // Suggested duration in days
+  sortOrder      Int          @default(0)
+
+  phase    ProjectTemplatePhase  @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  parent   ProjectTemplateTask?  @relation("TemplateTaskChildren", fields: [parentId], references: [id])
+  children ProjectTemplateTask[] @relation("TemplateTaskChildren")
+
+  @@index([phaseId])
+  @@map("project_template_tasks")
+}
+
+model ProjectTemplateTag {
+  id         String @id @default(cuid())
+  templateId String
+  name       String
+
+  template ProjectTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, name])
+  @@map("project_template_tags")
 }

@@ -27,7 +27,7 @@ export interface MenuItem {
 
 // 預設選單順序
 export const defaultMenuItems: MenuItem[] = [
-  { id: 'dashboard', name: '儀表板', href: '/dashboard', icon: LayoutDashboard },
+  { id: 'dashboard', name: '個人專區', href: '/dashboard', icon: LayoutDashboard },
   { id: 'hr', name: '人事管理', href: '/dashboard/hr', icon: Users, permission: 'hr.view' },
   { id: 'organization', name: '組織圖', href: '/dashboard/organization', icon: Network, permission: 'org.view' },
   { id: 'workflow', name: '流程管理', href: '/dashboard/workflow', icon: Workflow, permission: 'workflow.view' },

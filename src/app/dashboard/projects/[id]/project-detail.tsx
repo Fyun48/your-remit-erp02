@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -54,15 +53,32 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
-  Clock,
   AlertCircle,
   Activity,
   Briefcase,
   UserPlus,
   UserMinus,
+  Kanban,
+  GanttChart,
+  PieChart,
+  FileText,
+  UserCheck,
+  MessageSquare,
+  Paperclip,
+  Bell,
+  Copy,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import { format } from 'date-fns'
+import { ProjectKanban } from './project-kanban'
+import { ProjectGantt } from './project-gantt'
+import { ProjectStats } from './project-stats'
+import { ProjectReport } from './project-report'
+import { ProjectActivities } from './project-activities'
+import { ProjectTeamAvailability } from './project-team-availability'
+import { ProjectComments } from './project-comments'
+import { ProjectAttachments } from './project-attachments'
+import { ProjectReminders } from './project-reminders'
 
 interface ProjectDetailProps {
   projectId: string
@@ -144,7 +160,6 @@ const memberRoleLabels: Record<MemberRole, string> = {
 }
 
 export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDetailProps) {
-  const router = useRouter()
   const utils = trpc.useUtils()
 
   // State for dialogs
@@ -158,6 +173,10 @@ export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDe
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isEditMemberOpen, setIsEditMemberOpen] = useState(false)
   const [isRemoveMemberOpen, setIsRemoveMemberOpen] = useState(false)
+  const [isSaveAsTemplateOpen, setIsSaveAsTemplateOpen] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [templateCategory, setTemplateCategory] = useState('')
+  const [templateTags, setTemplateTags] = useState('')
 
   // State for selected items
   const [selectedPhase, setSelectedPhase] = useState<{
@@ -303,6 +322,15 @@ export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDe
       utils.project.getById.invalidate({ id: projectId })
       setIsRemoveMemberOpen(false)
       setSelectedMember(null)
+    },
+  })
+
+  const createTemplateFromProject = trpc.project.createTemplateFromProject.useMutation({
+    onSuccess: () => {
+      setIsSaveAsTemplateOpen(false)
+      setTemplateName('')
+      setTemplateCategory('')
+      setTemplateTags('')
     },
   })
 
@@ -518,10 +546,16 @@ export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDe
             <p className="text-muted-foreground">{project.company.name}</p>
           </div>
         </div>
-        <Button variant="outline" onClick={openEditProject}>
-          <Pencil className="h-4 w-4 mr-2" />
-          編輯專案
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsSaveAsTemplateOpen(true)}>
+            <Copy className="h-4 w-4 mr-2" />
+            存為範本
+          </Button>
+          <Button variant="outline" onClick={openEditProject}>
+            <Pencil className="h-4 w-4 mr-2" />
+            編輯專案
+          </Button>
+        </div>
       </div>
 
       {/* Info Cards */}
@@ -644,13 +678,45 @@ export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDe
             <Layers className="h-4 w-4" />
             階段與任務
           </TabsTrigger>
+          <TabsTrigger value="kanban" className="gap-2">
+            <Kanban className="h-4 w-4" />
+            看板
+          </TabsTrigger>
+          <TabsTrigger value="gantt" className="gap-2">
+            <GanttChart className="h-4 w-4" />
+            甘特圖
+          </TabsTrigger>
+          <TabsTrigger value="stats" className="gap-2">
+            <PieChart className="h-4 w-4" />
+            統計
+          </TabsTrigger>
+          <TabsTrigger value="report" className="gap-2">
+            <FileText className="h-4 w-4" />
+            報表
+          </TabsTrigger>
           <TabsTrigger value="members" className="gap-2">
             <Users className="h-4 w-4" />
             成員 ({project.members.filter((m) => !m.leftAt).length})
           </TabsTrigger>
+          <TabsTrigger value="comments" className="gap-2">
+            <MessageSquare className="h-4 w-4" />
+            討論
+          </TabsTrigger>
+          <TabsTrigger value="attachments" className="gap-2">
+            <Paperclip className="h-4 w-4" />
+            附件
+          </TabsTrigger>
+          <TabsTrigger value="team-status" className="gap-2">
+            <UserCheck className="h-4 w-4" />
+            團隊狀態
+          </TabsTrigger>
           <TabsTrigger value="activity" className="gap-2">
             <Activity className="h-4 w-4" />
             活動紀錄
+          </TabsTrigger>
+          <TabsTrigger value="reminders" className="gap-2">
+            <Bell className="h-4 w-4" />
+            提醒
           </TabsTrigger>
         </TabsList>
 
@@ -854,6 +920,130 @@ export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDe
           )}
         </TabsContent>
 
+        {/* Kanban Tab */}
+        <TabsContent value="kanban" className="space-y-4">
+          <ProjectKanban
+            tasks={project.phases.flatMap((phase) =>
+              phase.tasks.map((task) => ({
+                id: task.id,
+                name: task.name,
+                description: task.description,
+                status: task.status,
+                priority: task.priority,
+                dueDate: task.dueDate,
+                estimatedHours: task.estimatedHours,
+                assignee: task.assignee,
+                phase: {
+                  id: phase.id,
+                  name: phase.name,
+                },
+              }))
+            )}
+            onTaskStatusChange={(taskId, newStatus) => {
+              updateTask.mutate({
+                id: taskId,
+                status: newStatus,
+                actorId: currentUserId,
+              })
+            }}
+            onAddTask={(phaseId) => openAddTask(phaseId)}
+            isUpdating={updateTask.isPending}
+            phases={project.phases.map((p) => ({ id: p.id, name: p.name }))}
+          />
+        </TabsContent>
+
+        {/* Gantt Tab */}
+        <TabsContent value="gantt" className="space-y-4">
+          <ProjectGantt
+            projectName={project.name}
+            plannedStartDate={project.plannedStartDate}
+            plannedEndDate={project.plannedEndDate}
+            phases={project.phases.map((phase) => ({
+              id: phase.id,
+              name: phase.name,
+              status: phase.status,
+              plannedEndDate: phase.plannedEndDate,
+              tasks: phase.tasks.map((task) => ({
+                id: task.id,
+                name: task.name,
+                status: task.status,
+                priority: task.priority,
+                dueDate: task.dueDate,
+                estimatedHours: task.estimatedHours,
+                assignee: task.assignee,
+              })),
+            }))}
+          />
+        </TabsContent>
+
+        {/* Stats Tab */}
+        <TabsContent value="stats" className="space-y-4">
+          <ProjectStats
+            projectName={project.name}
+            projectStatus={project.status}
+            plannedStartDate={project.plannedStartDate}
+            plannedEndDate={project.plannedEndDate}
+            actualStartDate={project.actualStartDate}
+            phases={project.phases.map((phase) => ({
+              id: phase.id,
+              name: phase.name,
+              status: phase.status,
+              plannedEndDate: phase.plannedEndDate,
+              tasks: phase.tasks.map((task) => ({
+                id: task.id,
+                name: task.name,
+                status: task.status,
+                priority: task.priority,
+                dueDate: task.dueDate,
+                estimatedHours: task.estimatedHours,
+                assignee: task.assignee,
+              })),
+            }))}
+            members={project.members}
+          />
+        </TabsContent>
+
+        {/* Report Tab */}
+        <TabsContent value="report" className="space-y-4">
+          <ProjectReport
+            projectName={project.name}
+            projectStatus={project.status}
+            projectType={project.type}
+            companyName={project.company.name}
+            departmentName={project.department?.name}
+            managerName={project.manager?.name}
+            plannedStartDate={project.plannedStartDate}
+            plannedEndDate={project.plannedEndDate}
+            actualStartDate={project.actualStartDate}
+            createdAt={project.createdAt}
+            phases={project.phases.map((phase) => ({
+              id: phase.id,
+              name: phase.name,
+              status: phase.status,
+              plannedEndDate: phase.plannedEndDate,
+              tasks: phase.tasks.map((task) => ({
+                id: task.id,
+                name: task.name,
+                status: task.status,
+                priority: task.priority,
+                dueDate: task.dueDate,
+                estimatedHours: task.estimatedHours,
+                assignee: task.assignee,
+              })),
+            }))}
+            members={project.members.map((m) => ({
+              employeeId: m.employee.id,
+              employee: {
+                id: m.employee.id,
+                name: m.employee.name,
+                employeeNo: m.employee.employeeNo,
+              },
+              role: m.role,
+              leftAt: m.leftAt,
+            }))}
+          />
+        </TabsContent>
+
         {/* Members Tab */}
         <TabsContent value="members" className="space-y-4">
           <div className="flex justify-between items-center">
@@ -931,39 +1121,40 @@ export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDe
           )}
         </TabsContent>
 
+        {/* Comments Tab */}
+        <TabsContent value="comments" className="space-y-4">
+          <ProjectComments
+            projectId={projectId}
+            currentUserId={currentUserId}
+            members={project.members.filter((m) => !m.leftAt)}
+          />
+        </TabsContent>
+
+        {/* Attachments Tab */}
+        <TabsContent value="attachments" className="space-y-4">
+          <ProjectAttachments
+            projectId={projectId}
+            currentUserId={currentUserId}
+          />
+        </TabsContent>
+
+        {/* Team Status Tab */}
+        <TabsContent value="team-status" className="space-y-4">
+          <ProjectTeamAvailability projectId={projectId} />
+        </TabsContent>
+
         {/* Activity Tab */}
         <TabsContent value="activity" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                近期活動
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Display project creation info as fallback */}
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 mt-2 rounded-full bg-blue-500" />
-                  <div>
-                    <p className="font-medium">專案建立</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDate(project.createdAt)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 mt-2 rounded-full bg-gray-500" />
-                  <div>
-                    <p className="font-medium">最後更新</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDate(project.updatedAt)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ProjectActivities projectId={projectId} />
+        </TabsContent>
+
+        {/* Reminders Tab */}
+        <TabsContent value="reminders" className="space-y-4">
+          <ProjectReminders
+            projectId={projectId}
+            employeeId={currentUserId}
+            companyId={companyId}
+          />
         </TabsContent>
       </Tabs>
 
@@ -1595,6 +1786,64 @@ export function ProjectDetail({ projectId, companyId, currentUserId }: ProjectDe
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Save as Template Dialog */}
+      <Dialog open={isSaveAsTemplateOpen} onOpenChange={setIsSaveAsTemplateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>存為專案範本</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>範本名稱</Label>
+              <Input
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="輸入範本名稱"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>分類</Label>
+              <Input
+                value={templateCategory}
+                onChange={(e) => setTemplateCategory(e.target.value)}
+                placeholder="例：軟體開發、行銷活動"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>標籤（以逗號分隔）</Label>
+              <Input
+                value={templateTags}
+                onChange={(e) => setTemplateTags(e.target.value)}
+                placeholder="例：敏捷, MVP, 快速"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              將保存專案的所有階段與任務結構作為範本，不包含實際資料和成員。
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSaveAsTemplateOpen(false)}>
+              取消
+            </Button>
+            <Button
+              onClick={() => {
+                createTemplateFromProject.mutate({
+                  projectId,
+                  name: templateName,
+                  category: templateCategory || undefined,
+                  createdById: currentUserId,
+                  tags: templateTags ? templateTags.split(',').map(t => t.trim()).filter(Boolean) : undefined,
+                })
+              }}
+              disabled={!templateName || createTemplateFromProject.isPending}
+            >
+              {createTemplateFromProject.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              儲存範本
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -5,6 +5,13 @@ export type NotificationType =
   | 'REQUEST_REJECTED'
   | 'REVISION_REQUIRED'
   | 'APPROVAL_NEEDED'
+  // Project-related types
+  | 'TASK_ASSIGNED'
+  | 'TASK_DUE_SOON'
+  | 'TASK_OVERDUE'
+  | 'PROJECT_MEMBER_ADDED'
+  | 'COMMENT_MENTIONED'
+  | 'PROJECT_STATUS_CHANGED'
 
 export interface CreateNotificationParams {
   userId: string
