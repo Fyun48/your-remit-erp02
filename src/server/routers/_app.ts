@@ -5,6 +5,7 @@ import { attendanceRouter } from './attendance'
 import { leaveTypeRouter } from './leaveType'
 import { leaveRequestRouter } from './leaveRequest'
 import { leaveBalanceRouter } from './leaveBalance'
+import { leaveTypeTemplateRouter } from './leaveTypeTemplate'
 import { approvalFlowRouter } from './approvalFlow'
 import { approvalInstanceRouter } from './approvalInstance'
 import { expenseCategoryRouter } from './expenseCategory'
@@ -55,6 +56,7 @@ export const appRouter = router({
   leaveType: leaveTypeRouter,
   leaveRequest: leaveRequestRouter,
   leaveBalance: leaveBalanceRouter,
+  leaveTypeTemplate: leaveTypeTemplateRouter,
   approvalFlow: approvalFlowRouter,
   approvalInstance: approvalInstanceRouter,
   expenseCategory: expenseCategoryRouter,

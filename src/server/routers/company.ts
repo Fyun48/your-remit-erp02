@@ -428,4 +428,52 @@ export const companyRouter = router({
 
       return result
     }),
+
+  // 更新公司特休制度設定
+  updateAnnualLeaveSettings: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      companyId: z.string(),
+      annualLeaveMethod: z.enum(['ANNIVERSARY', 'CALENDAR']),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const hasPermission = await canManageCompany(input.userId)
+      if (!hasPermission) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無公司管理權限' })
+      }
+
+      const oldData = await ctx.prisma.company.findUnique({
+        where: { id: input.companyId },
+      })
+      if (!oldData) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '公司不存在' })
+      }
+
+      const result = await ctx.prisma.company.update({
+        where: { id: input.companyId },
+        data: { annualLeaveMethod: input.annualLeaveMethod },
+      })
+
+      await auditUpdate('Company', input.companyId, oldData, result, input.userId)
+
+      return result
+    }),
+
+  // 取得公司特休制度設定
+  getAnnualLeaveSettings: publicProcedure
+    .input(z.object({ companyId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const company = await ctx.prisma.company.findUnique({
+        where: { id: input.companyId },
+        select: {
+          id: true,
+          name: true,
+          annualLeaveMethod: true,
+        },
+      })
+      if (!company) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '公司不存在' })
+      }
+      return company
+    }),
 })

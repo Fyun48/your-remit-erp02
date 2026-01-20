@@ -104,6 +104,9 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 特休計算制度設定
+  annualLeaveMethod AnnualLeaveMethod @default(ANNIVERSARY)
+
   group             Group                @relation(fields: [groupId], references: [id])
   departments       Department[]
   positions         Position[]
@@ -309,8 +312,11 @@ model Employee {
   projectTemplates    ProjectTemplate[]
 
   // 請假
-  leaveRequests       LeaveRequest[]          @relation("EmployeeLeaveRequests")
-  projectAuditLogs    ProjectAuditLog[]       @relation("EmployeeProjectAuditLogs")
+  leaveRequests               LeaveRequest[]              @relation("EmployeeLeaveRequests")
+  leaveBalanceAdjustments     LeaveBalanceAdjustment[]    @relation("BalanceAdjustmentEmployee")
+  leaveBalanceAdjustedBy      LeaveBalanceAdjustment[]    @relation("BalanceAdjustmentAdjuster")
+  leaveTypeTemplates          LeaveTypeTemplate[]
+  projectAuditLogs            ProjectAuditLog[]           @relation("EmployeeProjectAuditLogs")
 
   // 薪資
   salaries     EmployeeSalary[]
@@ -732,9 +738,10 @@ model LeaveType {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company  Company?       @relation(fields: [companyId], references: [id])
-  requests LeaveRequest[]
-  balances LeaveBalance[]
+  company     Company?                  @relation(fields: [companyId], references: [id])
+  requests    LeaveRequest[]
+  balances    LeaveBalance[]
+  adjustments LeaveBalanceAdjustment[]
 
   @@unique([companyId, code])
   @@map("leave_types")
@@ -755,6 +762,12 @@ enum QuotaType {
   FIXED
   SENIORITY
   UNLIMITED
+}
+
+// 特休計算制度
+enum AnnualLeaveMethod {
+  ANNIVERSARY // 週年制（以到職日為起算點）
+  CALENDAR    // 曆年制（以每年 1/1 為起算點）
 }
 
 model LeaveRequest {
@@ -836,6 +849,76 @@ model LeaveBalance {
 
   @@unique([employeeId, companyId, leaveTypeId, year])
   @@map("leave_balances")
+}
+
+// 假別餘額調整記錄（稽核用）
+model LeaveBalanceAdjustment {
+  id          String @id @default(cuid())
+  employeeId  String
+  companyId   String
+  leaveTypeId String
+  year        Int
+
+  previousHours Float  // 調整前時數
+  newHours      Float  // 調整後時數
+  changeHours   Float  // 變動時數
+  reason        String // 調整原因
+
+  adjustedById String   // 調整者
+  adjustedAt   DateTime @default(now())
+
+  employee   Employee  @relation("BalanceAdjustmentEmployee", fields: [employeeId], references: [id])
+  adjustedBy Employee  @relation("BalanceAdjustmentAdjuster", fields: [adjustedById], references: [id])
+  leaveType  LeaveType @relation(fields: [leaveTypeId], references: [id])
+
+  @@index([employeeId, companyId, year])
+  @@map("leave_balance_adjustments")
+}
+
+// 假別範本
+model LeaveTypeTemplate {
+  id              String  @id @default(cuid())
+  name            String  // 範本名稱
+  description     String?
+  year            Int?    // 適用年度（null = 通用範本）
+  sourceCompanyId String? // 來源公司
+
+  items LeaveTypeTemplateItem[]
+
+  createdById String
+  createdBy   Employee @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("leave_type_templates")
+}
+
+// 假別範本項目
+model LeaveTypeTemplateItem {
+  id         String            @id @default(cuid())
+  templateId String
+  template   LeaveTypeTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  code                String
+  name                String
+  category            LeaveCategory
+  requiresReason      Boolean   @default(true)
+  requiresAttachment  Boolean   @default(false)
+  attachmentAfterDays Int       @default(0)
+  minUnit             LeaveUnit @default(HOUR)
+  quotaType           QuotaType @default(FIXED)
+  annualQuotaDays     Float     @default(0)
+  canCarryOver        Boolean   @default(false)
+  carryOverLimitDays  Float     @default(0)
+  canCashOut          Boolean   @default(false)
+  cashOutRate         Float     @default(1.0)
+  advanceDaysRequired Int       @default(0)
+  maxConsecutiveDays  Int       @default(0)
+  genderRestriction   Gender?
+  applicableAfterDays Int       @default(0)
+  sortOrder           Int       @default(0)
+
+  @@map("leave_type_template_items")
 }
 
 // ==================== 組織圖 ====================

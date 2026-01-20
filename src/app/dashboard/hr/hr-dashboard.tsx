@@ -14,6 +14,8 @@ import {
   Wallet,
   Clock,
   UserCheck,
+  Calendar,
+  Settings,
 } from 'lucide-react'
 
 interface HRDashboardProps {
@@ -105,6 +107,20 @@ export function HRDashboard({ companyName, stats }: HRDashboardProps) {
       icon: UserCheck,
       href: '/dashboard/hr/delegation',
       color: 'text-pink-500',
+    },
+    {
+      title: '假別設定',
+      description: '特休制度、假別列表與範本管理',
+      icon: Settings,
+      href: '/dashboard/hr/leave-settings',
+      color: 'text-slate-500',
+    },
+    {
+      title: '假別餘額管理',
+      description: '查詢與調整員工假別餘額',
+      icon: Calendar,
+      href: '/dashboard/hr/leave-balance',
+      color: 'text-amber-500',
     },
   ]
 

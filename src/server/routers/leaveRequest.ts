@@ -48,6 +48,39 @@ function calculateLeaveHours(
   return totalHours
 }
 
+// 根據天數計算結束日期
+function calculateEndDateFromDays(
+  startDate: Date,
+  leaveDays: number
+): Date {
+  const end = new Date(startDate)
+  // leaveDays 包含起始日，所以要減 1
+  end.setDate(end.getDate() + Math.floor(leaveDays) - 1)
+  return end
+}
+
+// 驗證最小請假單位
+function validateMinUnit(
+  startPeriod: string,
+  endPeriod: string,
+  minUnit: string
+): { valid: boolean; message?: string } {
+  if (minUnit === 'DAY') {
+    // 假別最小單位為「天」，只能選全天
+    if (startPeriod !== 'FULL_DAY' || endPeriod !== 'FULL_DAY') {
+      return {
+        valid: false,
+        message: '此假別最小請假單位為「天」，只能選擇全天',
+      }
+    }
+  } else if (minUnit === 'HALF_DAY') {
+    // 假別最小單位為「半天」，可選全天或半天
+    // 這個已經在 LeavePeriod enum 中處理了
+  }
+  // HOUR 最小單位暫不驗證（未來可擴展）
+  return { valid: true }
+}
+
 export const leaveRequestRouter = router({
   // 建立請假申請
   create: publicProcedure
@@ -57,8 +90,9 @@ export const leaveRequestRouter = router({
       leaveTypeId: z.string(),
       startDate: z.date(),
       startPeriod: z.enum(['FULL_DAY', 'AM', 'PM']).default('FULL_DAY'),
-      endDate: z.date(),
+      endDate: z.date().optional(), // 改為可選
       endPeriod: z.enum(['FULL_DAY', 'AM', 'PM']).default('FULL_DAY'),
+      leaveDays: z.number().positive().optional(), // 新增：請假天數
       reason: z.string().optional(),
       proxyEmployeeId: z.string().optional(),
     }))
@@ -77,12 +111,54 @@ export const leaveRequestRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: '此假別需要填寫請假事由' })
       }
 
+      // 計算結束日期（如果使用天數輸入模式）
+      let endDate = input.endDate
+      let endPeriod = input.endPeriod
+
+      if (input.leaveDays && !input.endDate) {
+        // 使用天數計算結束日期
+        if (input.leaveDays === 0.5) {
+          // 半天請假
+          endDate = input.startDate
+          endPeriod = input.startPeriod // 同一天的同一個時段
+        } else {
+          endDate = calculateEndDateFromDays(input.startDate, input.leaveDays)
+          // 如果天數包含半天（如 1.5 天），調整結束時段
+          if (input.leaveDays % 1 === 0.5) {
+            endPeriod = 'AM' // 最後一天只請上午
+          } else {
+            endPeriod = 'FULL_DAY'
+          }
+        }
+      }
+
+      // 驗證必須有結束日期
+      if (!endDate) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: '請選擇結束日期或輸入請假天數',
+        })
+      }
+
+      // 驗證最小請假單位
+      const minUnitValidation = validateMinUnit(
+        input.startPeriod,
+        endPeriod,
+        leaveType.minUnit
+      )
+      if (!minUnitValidation.valid) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: minUnitValidation.message || '不符合最小請假單位限制',
+        })
+      }
+
       // 計算請假時數
       const totalHours = calculateLeaveHours(
         input.startDate,
         input.startPeriod,
-        input.endDate,
-        input.endPeriod
+        endDate,
+        endPeriod
       )
 
       // 取得直屬主管作為審核者
@@ -102,8 +178,8 @@ export const leaveRequestRouter = router({
           leaveTypeId: input.leaveTypeId,
           startDate: input.startDate,
           startPeriod: input.startPeriod,
-          endDate: input.endDate,
-          endPeriod: input.endPeriod,
+          endDate: endDate,
+          endPeriod: endPeriod,
           totalHours,
           reason: input.reason,
           proxyEmployeeId: input.proxyEmployeeId,

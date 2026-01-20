@@ -42,6 +42,8 @@ export const SYSTEM_MODULES = {
   LEAVE_MANAGE: { code: 'leave.manage', name: '請假管理', module: 'leave', isBasic: false },
   LEAVE_TYPE: { code: 'leave.type', name: '假別管理', module: 'leave', isBasic: false },
   LEAVE_APPROVE: { code: 'leave.approve', name: '請假審核', module: 'leave', isBasic: false },
+  LEAVE_BALANCE_ADJUST: { code: 'leave.balance_adjust', name: '假別餘額調整', module: 'leave', isBasic: false },
+  LEAVE_TEMPLATE: { code: 'leave.template', name: '假別範本管理', module: 'leave', isBasic: false },
 
   // 費用管理（進階）
   EXPENSE_MANAGE: { code: 'expense.manage', name: '費用管理', module: 'expense', isBasic: false },
