@@ -6,6 +6,55 @@ import type { FlowModuleType, FlowExecutionStatus, FlowApprovalDecision } from '
  * 處理申請的審核流程建立、審核人決定、審核決策等
  */
 
+// 系統設定 key 常數
+const CC_EMPLOYEE_ID_KEY = 'FLOW_CC_EMPLOYEE_ID'
+
+/**
+ * 取得審核完成抄送員工 ID
+ */
+async function getCCEmployeeId(): Promise<string | null> {
+  const setting = await prisma.systemSetting.findUnique({
+    where: { key: CC_EMPLOYEE_ID_KEY },
+  })
+  return setting?.value || null
+}
+
+/**
+ * 發送抄送通知給指定員工（審核完成時）
+ */
+async function sendCCNotification(
+  executionId: string,
+  applicantName: string,
+  moduleType: FlowModuleType,
+  decision: 'APPROVED' | 'REJECTED',
+  referenceId: string
+): Promise<void> {
+  const ccEmployeeId = await getCCEmployeeId()
+  if (!ccEmployeeId) return
+
+  // 確認員工存在
+  const employee = await prisma.employee.findUnique({
+    where: { id: ccEmployeeId },
+    select: { id: true },
+  })
+  if (!employee) return
+
+  const moduleTypeName = getModuleTypeName(moduleType)
+  const decisionText = decision === 'APPROVED' ? '已核准' : '已駁回'
+
+  await prisma.notification.create({
+    data: {
+      userId: ccEmployeeId,
+      type: 'APPROVAL_CC',
+      title: `審核完成通知（抄送）`,
+      message: `${applicantName} 的${moduleTypeName}申請${decisionText}`,
+      refType: 'FlowExecution',
+      refId: executionId,
+      link: `/dashboard/approval`,
+    },
+  })
+}
+
 interface StartFlowParams {
   companyId: string
   moduleType: FlowModuleType
@@ -285,6 +334,15 @@ export async function processDecision(params: ProcessDecisionParams): Promise<Pr
         link: `/dashboard/approval`,
       },
     })
+
+    // 抄送通知給指定員工
+    await sendCCNotification(
+      executionId,
+      execution.applicant.name,
+      execution.moduleType,
+      'REJECTED',
+      execution.referenceId
+    )
   } else {
     // 核准 -> 檢查是否還有下一關
     const nextStep = execution.currentStep + 1
@@ -333,6 +391,15 @@ export async function processDecision(params: ProcessDecisionParams): Promise<Pr
           link: `/dashboard/approval`,
         },
       })
+
+      // 抄送通知給指定員工
+      await sendCCNotification(
+        executionId,
+        execution.applicant.name,
+        execution.moduleType,
+        'APPROVED',
+        execution.referenceId
+      )
     }
   }
 

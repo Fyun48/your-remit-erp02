@@ -11,6 +11,7 @@ import {
   Activity,
   Settings,
   Bot,
+  Bell,
 } from 'lucide-react'
 
 interface SystemDashboardProps {
@@ -77,6 +78,14 @@ export function SystemDashboard({ permissions, stats }: SystemDashboardProps) {
       icon: Bot,
       href: '/dashboard/system/ai-settings',
       color: 'text-emerald-500',
+      show: permissions.isSuperAdmin,
+    },
+    {
+      title: '通知設定',
+      description: '設定審核通知抄送對象',
+      icon: Bell,
+      href: '/dashboard/system/notification-settings',
+      color: 'text-amber-500',
       show: permissions.isSuperAdmin,
     },
   ].filter((item) => item.show)

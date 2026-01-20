@@ -3,8 +3,11 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { getCurrentCompany } from '@/lib/use-current-company'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Clock, Calendar, FileText, Receipt } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Users, Clock, Calendar, FileText, Receipt, GitBranch, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
+import { formatDistanceToNow } from 'date-fns'
+import { zhTW } from 'date-fns/locale'
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -145,7 +148,7 @@ export default async function DashboardPage() {
     remainingAnnualDays = Math.floor((totalHours - usedHours) / 8)
   }
 
-  // === Batch 4: 待我審核（主管）===
+  // === Batch 4: 待我審核（主管）+ 流程待審核項目 ===
   let pendingForMe = 0
   if (subordinates.length > 0) {
     const [pendingLeaveForMe, pendingExpenseForMe] = await Promise.all([
@@ -163,6 +166,50 @@ export default async function DashboardPage() {
       }),
     ])
     pendingForMe = pendingLeaveForMe + pendingExpenseForMe
+  }
+
+  // 取得待我審核的流程項目
+  const pendingApprovalRecords = await prisma.flowApprovalRecord.findMany({
+    where: {
+      assigneeId: userId,
+      decision: null,
+      execution: {
+        status: 'PENDING',
+      },
+    },
+    include: {
+      execution: {
+        include: {
+          applicant: {
+            select: { id: true, name: true, employeeNo: true },
+          },
+          template: {
+            select: { name: true },
+          },
+          approvals: {
+            select: { id: true },
+          },
+        },
+      },
+    },
+    orderBy: { execution: { createdAt: 'desc' } },
+    take: 5,
+  })
+
+  // 過濾出目前輪到我審核的項目
+  const myPendingApprovals = pendingApprovalRecords.filter(
+    (record) => record.execution.currentStep === record.stepOrder
+  )
+
+  // 模組類型中文名稱
+  const moduleTypeLabels: Record<string, string> = {
+    LEAVE: '請假申請',
+    EXPENSE: '費用核銷',
+    SEAL: '用印申請',
+    CARD: '名片申請',
+    STATIONERY: '文具領用',
+    OVERTIME: '加班申請',
+    BUSINESS_TRIP: '出差申請',
   }
 
   const stats = [
@@ -295,6 +342,65 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 待我審核的項目 */}
+      {myPendingApprovals.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <GitBranch className="h-5 w-5 text-orange-500" />
+              待我審核
+              <Badge variant="secondary" className="ml-2">
+                {myPendingApprovals.length}
+              </Badge>
+            </CardTitle>
+            <Link
+              href="/dashboard/approval"
+              className="text-sm text-primary hover:underline"
+            >
+              查看全部
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {myPendingApprovals.map((record) => (
+                <Link
+                  key={record.id}
+                  href="/dashboard/approval"
+                  className="block p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-orange-100">
+                        <AlertCircle className="h-4 w-4 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium">
+                          {moduleTypeLabels[record.execution.moduleType] || record.execution.moduleType}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          申請人：{record.execution.applicant.name} ({record.execution.applicant.employeeNo})
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="outline" className="text-xs">
+                        第 {record.stepOrder}/{record.execution.approvals.length} 關
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDistanceToNow(new Date(record.execution.createdAt), {
+                          addSuffix: true,
+                          locale: zhTW,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
