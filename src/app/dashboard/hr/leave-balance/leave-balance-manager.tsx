@@ -36,7 +36,8 @@ interface AdjustDialogData {
   employeeName: string
   leaveTypeId: string
   leaveTypeName: string
-  currentHours: number
+  currentAdjustedHours: number  // 目前已調整的時數
+  entitledHours: number         // 系統計算的應有時數
 }
 
 export function LeaveBalanceManager({
@@ -49,7 +50,8 @@ export function LeaveBalanceManager({
   const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState<string | undefined>()
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false)
   const [adjustData, setAdjustData] = useState<AdjustDialogData | null>(null)
-  const [adjustHours, setAdjustHours] = useState('')
+  const [adjustDays, setAdjustDays] = useState('0')      // 調整天數（可為負數）
+  const [adjustExtraHours, setAdjustExtraHours] = useState('0')  // 調整時數（可為負數）
   const [adjustReason, setAdjustReason] = useState('')
 
   const { data: leaveTypes } = trpc.leaveType.list.useQuery({ companyId })
@@ -76,7 +78,8 @@ export function LeaveBalanceManager({
     onSuccess: () => {
       setAdjustDialogOpen(false)
       setAdjustData(null)
-      setAdjustHours('')
+      setAdjustDays('0')
+      setAdjustExtraHours('0')
       setAdjustReason('')
       refetch()
       refetchAdjustments()
@@ -88,29 +91,59 @@ export function LeaveBalanceManager({
     employeeName: string,
     leaveTypeId: string,
     leaveTypeName: string,
-    currentHours: number
+    currentAdjustedHours: number,
+    entitledHours: number
   ) => {
     setAdjustData({
       employeeId,
       employeeName,
       leaveTypeId,
       leaveTypeName,
-      currentHours,
+      currentAdjustedHours,
+      entitledHours,
     })
-    setAdjustHours(currentHours.toString())
+    // 將目前的調整時數轉換為天數和時數顯示
+    const days = Math.floor(Math.abs(currentAdjustedHours) / 8) * (currentAdjustedHours >= 0 ? 1 : -1)
+    const hours = currentAdjustedHours % 8
+    setAdjustDays(days.toString())
+    setAdjustExtraHours(hours.toString())
     setAdjustDialogOpen(true)
+  }
+
+  // 計算調整後的總時數
+  const calculateTotalAdjustedHours = () => {
+    const days = parseFloat(adjustDays) || 0
+    const hours = parseFloat(adjustExtraHours) || 0
+    return days * 8 + hours
   }
 
   const handleAdjust = async () => {
     if (!adjustData || !adjustReason.trim()) return
+
+    const totalAdjustedHours = calculateTotalAdjustedHours()
 
     await adjustMutation.mutateAsync({
       employeeId: adjustData.employeeId,
       companyId,
       leaveTypeId: adjustData.leaveTypeId,
       year,
-      adjustedHours: parseFloat(adjustHours),
+      adjustedHours: totalAdjustedHours,
       reason: adjustReason,
+      adjustedById: userId,
+    })
+  }
+
+  // 還原預設值（將調整時數歸零）
+  const handleResetToDefault = async () => {
+    if (!adjustData) return
+
+    await adjustMutation.mutateAsync({
+      employeeId: adjustData.employeeId,
+      companyId,
+      leaveTypeId: adjustData.leaveTypeId,
+      year,
+      adjustedHours: 0,
+      reason: '還原預設值',
       adjustedById: userId,
     })
   }
@@ -272,7 +305,8 @@ export function LeaveBalanceManager({
                                             item.employee.name,
                                             balance.leaveType.id,
                                             balance.leaveType.name,
-                                            balance.adjustedHours
+                                            balance.adjustedHours,
+                                            balance.entitledHours
                                           )
                                         }
                                       >
@@ -397,7 +431,7 @@ export function LeaveBalanceManager({
 
       {/* 調整對話框 */}
       <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>調整假別餘額</DialogTitle>
             <DialogDescription>
@@ -405,31 +439,82 @@ export function LeaveBalanceManager({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="adjustHours">調整後時數</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="adjustHours"
-                  type="number"
-                  step="0.5"
-                  value={adjustHours}
-                  onChange={(e) => setAdjustHours(e.target.value)}
-                  className="w-32"
-                />
-                <span className="text-sm text-muted-foreground">小時</span>
-                <span className="text-sm">
-                  = {parseFloat(adjustHours || '0') / 8} 天
+            {/* 目前狀態 */}
+            <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">系統應有額度：</span>
+                <span>{adjustData?.entitledHours === -1 ? '無限' : `${(adjustData?.entitledHours || 0) / 8} 天 (${adjustData?.entitledHours || 0} 時)`}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">目前調整值：</span>
+                <span className={adjustData?.currentAdjustedHours !== 0 ? (adjustData?.currentAdjustedHours || 0) > 0 ? 'text-green-600' : 'text-red-600' : ''}>
+                  {adjustData?.currentAdjustedHours !== 0 ? (
+                    <>
+                      {(adjustData?.currentAdjustedHours || 0) > 0 ? '+' : ''}
+                      {(adjustData?.currentAdjustedHours || 0) / 8} 天 ({adjustData?.currentAdjustedHours} 時)
+                    </>
+                  ) : '無調整'}
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                變動: {parseFloat(adjustHours || '0') - (adjustData?.currentHours || 0)} 小時
+            </div>
+
+            {/* 調整輸入 */}
+            <div className="space-y-3">
+              <Label>設定調整值（正數增加、負數減少）</Label>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="adjustDays"
+                    type="number"
+                    step="1"
+                    value={adjustDays}
+                    onChange={(e) => setAdjustDays(e.target.value)}
+                    className="w-20"
+                  />
+                  <span className="text-sm">天</span>
+                </div>
+                <span className="text-muted-foreground">+</span>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="adjustExtraHours"
+                    type="number"
+                    step="0.5"
+                    value={adjustExtraHours}
+                    onChange={(e) => setAdjustExtraHours(e.target.value)}
+                    className="w-20"
+                  />
+                  <span className="text-sm">時</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                例如：輸入 2 天 + 4 時 = 額外增加 20 小時；輸入 -1 天 = 減少 8 小時
               </p>
             </div>
+
+            {/* 調整預覽 */}
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1 text-sm">
+              <div className="flex justify-between font-medium">
+                <span>新調整值：</span>
+                <span className={calculateTotalAdjustedHours() !== 0 ? calculateTotalAdjustedHours() > 0 ? 'text-green-600' : 'text-red-600' : ''}>
+                  {calculateTotalAdjustedHours() > 0 ? '+' : ''}{calculateTotalAdjustedHours() / 8} 天 ({calculateTotalAdjustedHours()} 時)
+                </span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>調整後總額度：</span>
+                <span>
+                  {adjustData?.entitledHours === -1
+                    ? '無限'
+                    : `${((adjustData?.entitledHours || 0) + calculateTotalAdjustedHours()) / 8} 天`}
+                </span>
+              </div>
+            </div>
+
+            {/* 調整原因 */}
             <div className="space-y-2">
               <Label htmlFor="adjustReason">調整原因 *</Label>
               <textarea
                 id="adjustReason"
-                className="w-full border rounded-md p-2 min-h-[80px]"
+                className="w-full border rounded-md p-2 min-h-[60px] text-sm"
                 value={adjustReason}
                 onChange={(e) => setAdjustReason(e.target.value)}
                 placeholder="請填寫調整原因（例如：補發特休、系統轉換調整等）"
@@ -437,7 +522,16 @@ export function LeaveBalanceManager({
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleResetToDefault}
+              disabled={adjustData?.currentAdjustedHours === 0 || adjustMutation.isPending}
+              className="sm:mr-auto"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              還原預設值
+            </Button>
             <Button variant="outline" onClick={() => setAdjustDialogOpen(false)}>
               取消
             </Button>
