@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { WorkflowStatus } from '@/components/workflow/workflow-status'
+import { FlowProgress } from '@/components/approval/flow-progress'
 import { ArrowLeft, Receipt, Calendar, Building, User, Printer } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -355,6 +356,13 @@ export function ExpenseDetail({ expense }: ExpenseDetailProps) {
 
         {/* 右側：簽核狀態 */}
         <div className="space-y-6">
+          {/* 新流程審核進度 */}
+          <FlowProgress
+            moduleType="EXPENSE"
+            referenceId={expense.id}
+          />
+
+          {/* 舊簽核狀態（相容性） */}
           <WorkflowStatus
             requestType="EXPENSE"
             requestId={expense.id}

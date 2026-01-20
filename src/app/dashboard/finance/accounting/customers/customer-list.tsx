@@ -1,10 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -30,26 +38,73 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Users, Phone, Mail, MapPin, LayoutGrid, List, Pencil, Trash2, Plus, Loader2 } from 'lucide-react'
+import {
+  Users,
+  Phone,
+  Mail,
+  MapPin,
+  LayoutGrid,
+  List,
+  Pencil,
+  Trash2,
+  Plus,
+  Loader2,
+  ArrowLeft,
+  Building2,
+} from 'lucide-react'
 import { trpc } from '@/lib/trpc'
+import { toast } from 'sonner'
+
+interface Company {
+  companyId: string
+  company: {
+    id: string
+    name: string
+  }
+}
 
 interface CustomerDashboardProps {
-  companyId: string
-  companyName: string
+  assignments: Company[]
+  initialCompanyId: string
+  hasPermission: boolean
 }
 
 type ViewMode = 'card' | 'list'
 
-export function CustomerDashboard({ companyId, companyName }: CustomerDashboardProps) {
+export function CustomerDashboard({ assignments, initialCompanyId, hasPermission }: CustomerDashboardProps) {
+  const router = useRouter()
   const utils = trpc.useUtils()
+  const [selectedCompanyId, setSelectedCompanyId] = useState(initialCompanyId)
   const [viewMode, setViewMode] = useState<ViewMode>('card')
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<typeof customers[0] | null>(null)
   const [deletingCustomer, setDeletingCustomer] = useState<typeof customers[0] | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const selectedCompany = assignments.find(a => a.companyId === selectedCompanyId)
+
+  const handleCompanyChange = async (companyId: string) => {
+    // 更新全域公司選擇 cookie
+    try {
+      const response = await fetch('/api/company/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId }),
+        credentials: 'include',
+      })
+      if (response.ok) {
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error('切換公司失敗', error)
+    }
+  }
+
   // tRPC Query for customers
-  const { data: customersData = [], isLoading } = trpc.customer.list.useQuery({ companyId })
+  const { data: customersData = [], isLoading } = trpc.customer.list.useQuery(
+    { companyId: selectedCompanyId },
+    { enabled: !!selectedCompanyId }
+  )
   const customers = customersData.map((c) => ({
     ...c,
     creditLimit: c.creditLimit ? Number(c.creditLimit) : null,
@@ -57,7 +112,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
 
   // Get suggested code for new customer
   const { data: suggestedCode } = trpc.customer.getNextCode.useQuery(
-    { companyId },
+    { companyId: selectedCompanyId },
     { enabled: addDialogOpen }
   )
 
@@ -124,10 +179,11 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
         creditLimit: '',
       })
       setIsSubmitting(false)
+      toast.success('客戶已新增')
       invalidateData()
     },
     onError: (error) => {
-      alert(error.message)
+      toast.error(error.message)
       setIsSubmitting(false)
     },
   })
@@ -136,10 +192,11 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
     onSuccess: () => {
       setEditingCustomer(null)
       setIsSubmitting(false)
+      toast.success('客戶已更新')
       invalidateData()
     },
     onError: (error) => {
-      alert(error.message)
+      toast.error(error.message)
       setIsSubmitting(false)
     },
   })
@@ -147,10 +204,11 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
   const deleteCustomer = trpc.customer.delete.useMutation({
     onSuccess: () => {
       setDeletingCustomer(null)
+      toast.success('客戶已刪除')
       invalidateData()
     },
     onError: (error) => {
-      alert(error.message)
+      toast.error(error.message)
     },
   })
 
@@ -162,12 +220,12 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!addFormData.name) {
-      alert('Please fill in customer name')
+      toast.error('請填寫客戶名稱')
       return
     }
     setIsSubmitting(true)
     createCustomer.mutate({
-      companyId,
+      companyId: selectedCompanyId,
       code: addFormData.code || undefined,
       name: addFormData.name,
       taxId: addFormData.taxId || undefined,
@@ -183,7 +241,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingCustomer || !editFormData.name) {
-      alert('Please fill in customer name')
+      toast.error('請填寫客戶名稱')
       return
     }
     setIsSubmitting(true)
@@ -216,126 +274,161 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Customer Management</h1>
-          <p className="text-muted-foreground">{companyName}</p>
+      {/* 頂部導航欄 */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/dashboard/finance/accounting')}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            返回
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">客戶管理</h1>
+            <p className="text-muted-foreground">{selectedCompany?.company.name}</p>
+          </div>
         </div>
-        <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Customer
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Add Customer</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAddSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="add-code">Customer Code</Label>
-                  <Input
-                    id="add-code"
-                    value={addFormData.code}
-                    onChange={(e) => setAddFormData({ ...addFormData, code: e.target.value })}
-                    placeholder={suggestedCode || 'C001'}
-                  />
-                  <p className="text-xs text-muted-foreground">Auto-generated if empty</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="add-name">Customer Name *</Label>
-                  <Input
-                    id="add-name"
-                    value={addFormData.name}
-                    onChange={(e) => setAddFormData({ ...addFormData, name: e.target.value })}
-                    placeholder="Company Name"
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="add-taxId">Tax ID</Label>
-                <Input
-                  id="add-taxId"
-                  value={addFormData.taxId}
-                  onChange={(e) => setAddFormData({ ...addFormData, taxId: e.target.value })}
-                  placeholder="12345678"
-                />
-              </div>
+        <div className="flex items-center gap-4">
+          {/* 公司選擇器 */}
+          {assignments.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="選擇公司" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignments.map((a) => (
+                    <SelectItem key={a.companyId} value={a.companyId}>
+                      {a.company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="add-contactName">Contact Name</Label>
-                  <Input
-                    id="add-contactName"
-                    value={addFormData.contactName}
-                    onChange={(e) => setAddFormData({ ...addFormData, contactName: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="add-contactPhone">Phone</Label>
-                  <Input
-                    id="add-contactPhone"
-                    value={addFormData.contactPhone}
-                    onChange={(e) => setAddFormData({ ...addFormData, contactPhone: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="add-contactEmail">Email</Label>
-                <Input
-                  id="add-contactEmail"
-                  type="email"
-                  value={addFormData.contactEmail}
-                  onChange={(e) => setAddFormData({ ...addFormData, contactEmail: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="add-address">Address</Label>
-                <Input
-                  id="add-address"
-                  value={addFormData.address}
-                  onChange={(e) => setAddFormData({ ...addFormData, address: e.target.value })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="add-paymentTerms">Payment Terms (Days)</Label>
-                  <Input
-                    id="add-paymentTerms"
-                    type="number"
-                    value={addFormData.paymentTerms}
-                    onChange={(e) => setAddFormData({ ...addFormData, paymentTerms: parseInt(e.target.value) || 30 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="add-creditLimit">Credit Limit</Label>
-                  <Input
-                    id="add-creditLimit"
-                    type="number"
-                    value={addFormData.creditLimit}
-                    onChange={(e) => setAddFormData({ ...addFormData, creditLimit: e.target.value })}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)}>
-                  Cancel
+          {hasPermission && (
+            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  新增客戶
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>新增客戶</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleAddSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="add-code">客戶代碼</Label>
+                      <Input
+                        id="add-code"
+                        value={addFormData.code}
+                        onChange={(e) => setAddFormData({ ...addFormData, code: e.target.value })}
+                        placeholder={suggestedCode || 'C001'}
+                      />
+                      <p className="text-xs text-muted-foreground">留空自動產生</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-name">客戶名稱 *</Label>
+                      <Input
+                        id="add-name"
+                        value={addFormData.name}
+                        onChange={(e) => setAddFormData({ ...addFormData, name: e.target.value })}
+                        placeholder="公司名稱"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="add-taxId">統一編號</Label>
+                    <Input
+                      id="add-taxId"
+                      value={addFormData.taxId}
+                      onChange={(e) => setAddFormData({ ...addFormData, taxId: e.target.value })}
+                      placeholder="12345678"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="add-contactName">聯絡人</Label>
+                      <Input
+                        id="add-contactName"
+                        value={addFormData.contactName}
+                        onChange={(e) => setAddFormData({ ...addFormData, contactName: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-contactPhone">電話</Label>
+                      <Input
+                        id="add-contactPhone"
+                        value={addFormData.contactPhone}
+                        onChange={(e) => setAddFormData({ ...addFormData, contactPhone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="add-contactEmail">電子郵件</Label>
+                    <Input
+                      id="add-contactEmail"
+                      type="email"
+                      value={addFormData.contactEmail}
+                      onChange={(e) => setAddFormData({ ...addFormData, contactEmail: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="add-address">地址</Label>
+                    <Input
+                      id="add-address"
+                      value={addFormData.address}
+                      onChange={(e) => setAddFormData({ ...addFormData, address: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="add-paymentTerms">付款天數</Label>
+                      <Input
+                        id="add-paymentTerms"
+                        type="number"
+                        value={addFormData.paymentTerms}
+                        onChange={(e) => setAddFormData({ ...addFormData, paymentTerms: parseInt(e.target.value) || 30 })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-creditLimit">信用額度</Label>
+                      <Input
+                        id="add-creditLimit"
+                        type="number"
+                        value={addFormData.creditLimit}
+                        onChange={(e) => setAddFormData({ ...addFormData, creditLimit: e.target.value })}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)}>
+                      取消
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? '儲存中...' : '儲存'}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
 
       {customers.length === 0 ? (
@@ -343,10 +436,12 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
           <CardContent className="pt-6">
             <div className="text-center">
               <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No customer data yet</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Customer data is used for accounts receivable management
-              </p>
+              <p className="text-muted-foreground">尚無客戶資料</p>
+              {hasPermission && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  客戶資料用於應收帳款管理
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -359,7 +454,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
               onClick={() => handleViewModeChange('card')}
             >
               <LayoutGrid className="h-4 w-4 mr-1" />
-              Card
+              卡片
             </Button>
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
@@ -367,7 +462,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
               onClick={() => handleViewModeChange('list')}
             >
               <List className="h-4 w-4 mr-1" />
-              List
+              列表
             </Button>
           </div>
 
@@ -381,29 +476,31 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
                         <span className="text-sm font-mono text-muted-foreground">{customer.code}</span>
                         {customer.name}
                       </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => setEditingCustomer(customer)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => setDeletingCustomer(customer)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {hasPermission && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setEditingCustomer(customer)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => setDeletingCustomer(customer)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm">
                     {customer.taxId && (
-                      <p className="text-muted-foreground">Tax ID: {customer.taxId}</p>
+                      <p className="text-muted-foreground">統編: {customer.taxId}</p>
                     )}
                     {customer.contactName && (
                       <div className="flex items-center gap-2">
@@ -430,9 +527,9 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
                       </div>
                     )}
                     <div className="pt-2 border-t flex justify-between text-muted-foreground">
-                      <span>Payment: {customer.paymentTerms} days</span>
+                      <span>付款: {customer.paymentTerms} 天</span>
                       {customer.creditLimit && (
-                        <span>Limit: ${customer.creditLimit.toLocaleString()}</span>
+                        <span>額度: ${customer.creditLimit.toLocaleString()}</span>
                       )}
                     </div>
                   </CardContent>
@@ -444,15 +541,15 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-24">Code</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Tax ID</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead className="text-right">Payment</TableHead>
-                    <TableHead className="text-right">Credit Limit</TableHead>
-                    <TableHead className="w-24">Actions</TableHead>
+                    <TableHead className="w-24">代碼</TableHead>
+                    <TableHead>名稱</TableHead>
+                    <TableHead>統編</TableHead>
+                    <TableHead>聯絡人</TableHead>
+                    <TableHead>電話</TableHead>
+                    <TableHead>電子郵件</TableHead>
+                    <TableHead className="text-right">付款天數</TableHead>
+                    <TableHead className="text-right">信用額度</TableHead>
+                    {hasPermission && <TableHead className="w-24">操作</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -464,30 +561,32 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
                       <TableCell>{customer.contactName || '-'}</TableCell>
                       <TableCell>{customer.contactPhone || '-'}</TableCell>
                       <TableCell>{customer.contactEmail || '-'}</TableCell>
-                      <TableCell className="text-right">{customer.paymentTerms} days</TableCell>
+                      <TableCell className="text-right">{customer.paymentTerms} 天</TableCell>
                       <TableCell className="text-right">
                         {customer.creditLimit ? `$${customer.creditLimit.toLocaleString()}` : '-'}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setEditingCustomer(customer)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setDeletingCustomer(customer)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {hasPermission && (
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setEditingCustomer(customer)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => setDeletingCustomer(customer)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -497,15 +596,15 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
         </div>
       )}
 
-      {/* Edit Dialog */}
+      {/* 編輯對話框 */}
       <Dialog open={!!editingCustomer} onOpenChange={(open) => !open && setEditingCustomer(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Customer - {editingCustomer?.code}</DialogTitle>
+            <DialogTitle>編輯客戶 - {editingCustomer?.code}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Customer Name *</Label>
+              <Label htmlFor="edit-name">客戶名稱 *</Label>
               <Input
                 id="edit-name"
                 value={editFormData.name}
@@ -514,7 +613,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-taxId">Tax ID</Label>
+              <Label htmlFor="edit-taxId">統一編號</Label>
               <Input
                 id="edit-taxId"
                 value={editFormData.taxId}
@@ -524,7 +623,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-contactName">Contact Name</Label>
+                <Label htmlFor="edit-contactName">聯絡人</Label>
                 <Input
                   id="edit-contactName"
                   value={editFormData.contactName}
@@ -532,7 +631,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-contactPhone">Phone</Label>
+                <Label htmlFor="edit-contactPhone">電話</Label>
                 <Input
                   id="edit-contactPhone"
                   value={editFormData.contactPhone}
@@ -542,7 +641,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-contactEmail">Email</Label>
+              <Label htmlFor="edit-contactEmail">電子郵件</Label>
               <Input
                 id="edit-contactEmail"
                 type="email"
@@ -552,7 +651,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-address">Address</Label>
+              <Label htmlFor="edit-address">地址</Label>
               <Input
                 id="edit-address"
                 value={editFormData.address}
@@ -562,7 +661,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-paymentTerms">Payment Terms (Days)</Label>
+                <Label htmlFor="edit-paymentTerms">付款天數</Label>
                 <Input
                   id="edit-paymentTerms"
                   type="number"
@@ -571,7 +670,7 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-creditLimit">Credit Limit</Label>
+                <Label htmlFor="edit-creditLimit">信用額度</Label>
                 <Input
                   id="edit-creditLimit"
                   type="number"
@@ -583,29 +682,29 @@ export function CustomerDashboard({ companyId, companyName }: CustomerDashboardP
 
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => setEditingCustomer(null)}>
-                Cancel
+                取消
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving...' : 'Save'}
+                {isSubmitting ? '儲存中...' : '儲存'}
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* 刪除確認對話框 */}
       <AlertDialog open={!!deletingCustomer} onOpenChange={(open) => !open && setDeletingCustomer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+            <AlertDialogTitle>確定要刪除此客戶？</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete customer &quot;{deletingCustomer?.name}&quot;? This action cannot be undone.
+              確定要刪除客戶「{deletingCustomer?.name}」嗎？此操作無法復原。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+              刪除
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

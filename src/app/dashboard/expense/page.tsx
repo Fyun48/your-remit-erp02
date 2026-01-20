@@ -22,7 +22,7 @@ export default async function ExpensePage() {
   if (!currentCompany) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">費用報銷</h1>
+        <h1 className="text-2xl font-bold">費用核銷</h1>
         <Card>
           <CardContent className="pt-6">
             <p className="text-muted-foreground">尚未指派任職公司</p>
@@ -34,7 +34,7 @@ export default async function ExpensePage() {
 
   const companyId = currentCompany.id
 
-  // 取得今年費用報銷紀錄
+  // 取得今年費用核銷紀錄
   const year = new Date().getFullYear()
   const requests = await prisma.expenseRequest.findMany({
     where: {
@@ -71,7 +71,7 @@ export default async function ExpensePage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">費用報銷</h1>
+        <h1 className="text-2xl font-bold">費用核銷</h1>
         <div className="flex items-center gap-4">
           <p className="text-sm text-muted-foreground">{currentCompany.name}</p>
           <Link href="/dashboard/expense/new">

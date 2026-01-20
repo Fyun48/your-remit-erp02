@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Workflow, Plus, Pencil, Eye, GitBranch, Users, Copy, Trash2, UserCog, UserCheck } from 'lucide-react'
+import { Workflow, Plus, Pencil, Eye, GitBranch, Users, Copy, Trash2, UserCog, Settings2 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 
 interface WorkflowDef {
@@ -135,10 +135,10 @@ export function WorkflowList({ companyId, companyName, userId, workflows }: Work
           <p className="text-muted-foreground">{companyName}</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/dashboard/workflow/delegates">
+          <Link href="/dashboard/workflow/templates">
             <Button variant="outline">
-              <UserCheck className="h-4 w-4 mr-2" />
-              職務代理
+              <Settings2 className="h-4 w-4 mr-2" />
+              審核流程設定
             </Button>
           </Link>
           <Link href="/dashboard/workflow/employee-paths">
@@ -288,7 +288,7 @@ export function WorkflowList({ companyId, companyName, userId, workflows }: Work
                     <SelectValue placeholder="選擇申請類型" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="EXPENSE">費用報銷</SelectItem>
+                    <SelectItem value="EXPENSE">費用核銷</SelectItem>
                     <SelectItem value="LEAVE">請假申請</SelectItem>
                     <SelectItem value="SEAL">用印申請</SelectItem>
                     <SelectItem value="BUSINESS_CARD">名片申請</SelectItem>
@@ -304,7 +304,7 @@ export function WorkflowList({ companyId, companyName, userId, workflows }: Work
                 id="workflow-name"
                 value={createData.name}
                 onChange={(e) => setCreateData({ ...createData, name: e.target.value })}
-                placeholder="例：費用報銷審批流程"
+                placeholder="例：費用核銷審批流程"
               />
             </div>
             <div className="space-y-2">

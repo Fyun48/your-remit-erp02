@@ -234,6 +234,8 @@ export const hrRouter = router({
       gender: z.enum(['MALE', 'FEMALE', 'OTHER']).nullable().optional(),
       birthDate: z.date().nullable().optional(),
       phone: z.string().optional(),
+      officePhone: z.string().optional(),
+      extension: z.string().optional(),
       personalEmail: z.string().email().optional(),
       residentialAddress: z.string().optional(),
       householdAddress: z.string().optional(),

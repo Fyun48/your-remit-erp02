@@ -43,6 +43,10 @@ import { employeeRouter } from './employee'
 import { systemSettingRouter } from './systemSetting'
 import { projectRouter } from './project'
 import { projectKpiRouter } from './projectKpi'
+import { payrollRouter } from './payroll'
+import { flowTemplateRouter } from './flowTemplate'
+import { delegationRouter } from './delegation'
+import { flowExecutionRouter } from './flowExecution'
 
 export const appRouter = router({
   health: healthRouter,
@@ -89,6 +93,10 @@ export const appRouter = router({
   systemSetting: systemSettingRouter,
   project: projectRouter,
   projectKpi: projectKpiRouter,
+  payroll: payrollRouter,
+  flowTemplate: flowTemplateRouter,
+  delegation: delegationRouter,
+  flowExecution: flowExecutionRouter,
 })
 
 export type AppRouter = typeof appRouter

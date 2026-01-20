@@ -489,4 +489,519 @@ export const financialReportRouter = router({
         },
       }
     }),
+
+  // 進銷項發票明細
+  invoiceDetail: publicProcedure
+    .input(z.object({
+      companyId: z.string(),
+      year: z.number(),
+      period: z.number(), // 1-6 代表雙月期
+      type: z.enum(['SALES', 'PURCHASE', 'ALL']),
+    }))
+    .query(async ({ ctx, input }) => {
+      // 計算期間的起訖日期
+      const startMonth = (input.period - 1) * 2 + 1
+      const endMonth = startMonth + 1
+      const startDate = new Date(input.year, startMonth - 1, 1)
+      const endDate = new Date(input.year, endMonth, 0)
+
+      // 取得銷項發票資料 (從應收帳款)
+      const salesInvoices: {
+        date: Date
+        voucherNo: string
+        invoiceNo: string | null
+        counterparty: string
+        description: string
+        amount: number
+        tax: number
+        total: number
+      }[] = []
+
+      const purchaseInvoices: {
+        date: Date
+        voucherNo: string
+        invoiceNo: string | null
+        counterparty: string
+        description: string
+        amount: number
+        tax: number
+        total: number
+      }[] = []
+
+      if (input.type === 'SALES' || input.type === 'ALL') {
+        const receivables = await ctx.prisma.accountReceivable.findMany({
+          where: {
+            companyId: input.companyId,
+            arDate: { gte: startDate, lte: endDate },
+          },
+          include: {
+            customer: true,
+          },
+          orderBy: { arDate: 'asc' },
+        })
+
+        receivables.forEach(ar => {
+          const amount = Number(ar.amount)
+          const tax = Math.round(amount * 0.05) // 5% 營業稅
+          salesInvoices.push({
+            date: ar.arDate,
+            voucherNo: ar.arNo,
+            invoiceNo: ar.invoiceNo,
+            counterparty: ar.customer.name,
+            description: ar.description || '',
+            amount: amount,
+            tax: tax,
+            total: amount + tax,
+          })
+        })
+      }
+
+      // 取得進項發票資料 (從應付帳款)
+      if (input.type === 'PURCHASE' || input.type === 'ALL') {
+        const payables = await ctx.prisma.accountPayable.findMany({
+          where: {
+            companyId: input.companyId,
+            apDate: { gte: startDate, lte: endDate },
+          },
+          include: {
+            vendor: true,
+          },
+          orderBy: { apDate: 'asc' },
+        })
+
+        payables.forEach(ap => {
+          const amount = Number(ap.amount)
+          const tax = Math.round(amount * 0.05) // 5% 營業稅
+          purchaseInvoices.push({
+            date: ap.apDate,
+            voucherNo: ap.apNo,
+            invoiceNo: ap.invoiceNo,
+            counterparty: ap.vendor.name,
+            description: ap.description || '',
+            amount: amount,
+            tax: tax,
+            total: amount + tax,
+          })
+        })
+      }
+
+      // 彙總
+      const salesSummary = {
+        count: salesInvoices.length,
+        totalAmount: salesInvoices.reduce((sum, inv) => sum + inv.amount, 0),
+        totalTax: salesInvoices.reduce((sum, inv) => sum + inv.tax, 0),
+        grandTotal: salesInvoices.reduce((sum, inv) => sum + inv.total, 0),
+      }
+
+      const purchaseSummary = {
+        count: purchaseInvoices.length,
+        totalAmount: purchaseInvoices.reduce((sum, inv) => sum + inv.amount, 0),
+        totalTax: purchaseInvoices.reduce((sum, inv) => sum + inv.tax, 0),
+        grandTotal: purchaseInvoices.reduce((sum, inv) => sum + inv.total, 0),
+      }
+
+      return {
+        period: {
+          year: input.year,
+          periodNo: input.period,
+          startDate,
+          endDate,
+          rocYear: input.year - 1911,
+          periodLabel: `${startMonth}-${endMonth}月`,
+        },
+        salesInvoices,
+        purchaseInvoices,
+        salesSummary,
+        purchaseSummary,
+      }
+    }),
+
+  // 扣繳憑單彙總
+  withholdingSummary: publicProcedure
+    .input(z.object({
+      companyId: z.string(),
+      year: z.number(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const startDate = new Date(input.year, 0, 1)
+      const endDate = new Date(input.year, 11, 31)
+
+      // 取得公司資料
+      const company = await ctx.prisma.company.findUnique({
+        where: { id: input.companyId },
+      })
+
+      // 扣繳資料彙總 (按所得人)
+      const withholdingMap = new Map<string, {
+        payeeId: string
+        payeeName: string
+        payeeType: 'EMPLOYEE' | 'VENDOR'
+        taxId: string
+        incomeType: string
+        incomeTypeName: string
+        grossAmount: number
+        taxWithheld: number
+        netAmount: number
+        paymentCount: number
+      }>()
+
+      // 1. 從薪資單取得員工薪資所得
+      const payrollSlips = await ctx.prisma.payrollSlip.findMany({
+        where: {
+          companyId: input.companyId,
+          period: {
+            year: input.year,
+            status: 'PAID',
+          },
+        },
+        include: {
+          employee: true,
+        },
+      })
+
+      payrollSlips.forEach(slip => {
+        const key = `EMPLOYEE-${slip.employeeId}`
+        const existing = withholdingMap.get(key) || {
+          payeeId: slip.employeeId,
+          payeeName: slip.employee.name,
+          payeeType: 'EMPLOYEE' as const,
+          taxId: slip.employee.idNumber || '',
+          incomeType: '50',
+          incomeTypeName: '薪資所得',
+          grossAmount: 0,
+          taxWithheld: 0,
+          netAmount: 0,
+          paymentCount: 0,
+        }
+        existing.grossAmount += Number(slip.grossPay)
+        existing.taxWithheld += Number(slip.incomeTax)
+        existing.paymentCount++
+        withholdingMap.set(key, existing)
+      })
+
+      // 2. 從應付帳款取得廠商付款（勞務費、租金等）
+      const payables = await ctx.prisma.accountPayable.findMany({
+        where: {
+          companyId: input.companyId,
+          apDate: { gte: startDate, lte: endDate },
+          status: { in: ['PAID', 'PARTIAL'] },
+        },
+        include: {
+          vendor: true,
+        },
+      })
+
+      payables.forEach(ap => {
+        const vendor = ap.vendor
+        const description = ap.description?.toLowerCase() || ''
+
+        // 判斷所得類型
+        let incomeType = '9A'
+        let incomeTypeName = '執行業務所得'
+
+        if (description.includes('租金') || description.includes('房租')) {
+          incomeType = '92'
+          incomeTypeName = '租賃所得'
+        } else if (description.includes('稿費') || description.includes('版稅')) {
+          incomeType = '9B'
+          incomeTypeName = '稿費所得'
+        }
+
+        const key = `VENDOR-${incomeType}-${vendor.id}`
+        const existing = withholdingMap.get(key) || {
+          payeeId: vendor.id,
+          payeeName: vendor.name,
+          payeeType: 'VENDOR' as const,
+          taxId: vendor.taxId || '',
+          incomeType,
+          incomeTypeName,
+          grossAmount: 0,
+          taxWithheld: 0,
+          netAmount: 0,
+          paymentCount: 0,
+        }
+        existing.grossAmount += Number(ap.paidAmount)
+        existing.paymentCount++
+        withholdingMap.set(key, existing)
+      })
+
+      // 計算扣繳稅額 (依所得類型)
+      const withholdingRates: Record<string, number> = {
+        '50': 0.05,  // 薪資 5%（超過起扣點）
+        '9A': 0.10,  // 執行業務 10%
+        '9B': 0.10,  // 稿費 10%
+        '92': 0.10,  // 租金 10%
+      }
+
+      const withholdingThreshold = 88501 // 2026年起扣點
+
+      withholdingMap.forEach((record) => {
+        const rate = withholdingRates[record.incomeType] || 0.10
+
+        if (record.incomeType === '50') {
+          // 薪資：月給付超過起扣點才扣繳
+          // 這裡簡化處理，實際應按月計算
+          if (record.grossAmount / 12 > withholdingThreshold) {
+            record.taxWithheld = Math.round(record.grossAmount * rate)
+          }
+        } else {
+          // 其他所得：單筆超過 $20,000 或累計超過起扣點
+          record.taxWithheld = Math.round(record.grossAmount * rate)
+        }
+
+        record.netAmount = record.grossAmount - record.taxWithheld
+      })
+
+      const records = Array.from(withholdingMap.values())
+        .sort((a, b) => a.incomeType.localeCompare(b.incomeType) || b.grossAmount - a.grossAmount)
+
+      // 彙總統計
+      const summary = {
+        totalPayees: records.length,
+        totalGross: records.reduce((sum, r) => sum + r.grossAmount, 0),
+        totalTax: records.reduce((sum, r) => sum + r.taxWithheld, 0),
+        totalNet: records.reduce((sum, r) => sum + r.netAmount, 0),
+        byIncomeType: Object.entries(
+          records.reduce((acc, r) => {
+            if (!acc[r.incomeType]) {
+              acc[r.incomeType] = {
+                incomeType: r.incomeType,
+                incomeTypeName: r.incomeTypeName,
+                count: 0,
+                grossAmount: 0,
+                taxWithheld: 0,
+              }
+            }
+            acc[r.incomeType].count++
+            acc[r.incomeType].grossAmount += r.grossAmount
+            acc[r.incomeType].taxWithheld += r.taxWithheld
+            return acc
+          }, {} as Record<string, { incomeType: string; incomeTypeName: string; count: number; grossAmount: number; taxWithheld: number }>)
+        ).map(([, v]) => v),
+      }
+
+      return {
+        company: {
+          id: company?.id || '',
+          name: company?.name || '',
+          taxId: company?.taxId || '',
+        },
+        year: input.year,
+        rocYear: input.year - 1911,
+        records,
+        summary,
+      }
+    }),
+
+  // 損益表歷年比較
+  incomeStatementComparison: publicProcedure
+    .input(z.object({
+      companyId: z.string(),
+      years: z.array(z.number()).min(2).max(3), // 2-3 年比較
+    }))
+    .query(async ({ ctx, input }) => {
+      const results = await Promise.all(
+        input.years.map(async (year) => {
+          const startDate = new Date(year, 0, 1)
+          const endDate = new Date(year, 11, 31)
+
+          // 營業收入科目 (4xxx)
+          const revenueLines = await ctx.prisma.voucherLine.findMany({
+            where: {
+              voucher: {
+                companyId: input.companyId,
+                voucherDate: { gte: startDate, lte: endDate },
+                status: 'POSTED',
+              },
+              account: { code: { startsWith: '4' } },
+            },
+            include: { account: true },
+          })
+
+          // 營業費用科目 (5xxx, 6xxx)
+          const expenseLines = await ctx.prisma.voucherLine.findMany({
+            where: {
+              voucher: {
+                companyId: input.companyId,
+                voucherDate: { gte: startDate, lte: endDate },
+                status: 'POSTED',
+              },
+              account: {
+                OR: [
+                  { code: { startsWith: '5' } },
+                  { code: { startsWith: '6' } },
+                ],
+              },
+            },
+            include: { account: true },
+          })
+
+          // 計算收入 (貸方 - 借方)
+          const revenue = revenueLines.reduce((sum, line) => {
+            return sum + (Number(line.creditAmount) - Number(line.debitAmount))
+          }, 0)
+
+          // 計算費用 (借方 - 貸方)
+          const expenses = expenseLines.reduce((sum, line) => {
+            return sum + (Number(line.debitAmount) - Number(line.creditAmount))
+          }, 0)
+
+          return {
+            year,
+            revenue: Math.round(revenue),
+            expenses: Math.round(expenses),
+            netIncome: Math.round(revenue - expenses),
+          }
+        })
+      )
+
+      // 計算年增減
+      const comparisons = results.map((current, index) => {
+        if (index === 0) {
+          return {
+            ...current,
+            revenueChange: null,
+            revenueChangePercent: null,
+            expensesChange: null,
+            expensesChangePercent: null,
+            netIncomeChange: null,
+            netIncomeChangePercent: null,
+          }
+        }
+
+        const previous = results[index - 1]
+        return {
+          ...current,
+          revenueChange: current.revenue - previous.revenue,
+          revenueChangePercent: previous.revenue !== 0
+            ? Math.round(((current.revenue - previous.revenue) / Math.abs(previous.revenue)) * 1000) / 10
+            : null,
+          expensesChange: current.expenses - previous.expenses,
+          expensesChangePercent: previous.expenses !== 0
+            ? Math.round(((current.expenses - previous.expenses) / Math.abs(previous.expenses)) * 1000) / 10
+            : null,
+          netIncomeChange: current.netIncome - previous.netIncome,
+          netIncomeChangePercent: previous.netIncome !== 0
+            ? Math.round(((current.netIncome - previous.netIncome) / Math.abs(previous.netIncome)) * 1000) / 10
+            : null,
+        }
+      })
+
+      return {
+        years: input.years,
+        data: comparisons,
+      }
+    }),
+
+  // 資產負債表歷年比較
+  balanceSheetComparison: publicProcedure
+    .input(z.object({
+      companyId: z.string(),
+      years: z.array(z.number()).min(2).max(3),
+    }))
+    .query(async ({ ctx, input }) => {
+      const results = await Promise.all(
+        input.years.map(async (year) => {
+          const asOfDate = new Date(year, 11, 31)
+
+          // 資產科目 (1xxx)
+          const assetLines = await ctx.prisma.voucherLine.findMany({
+            where: {
+              voucher: {
+                companyId: input.companyId,
+                voucherDate: { lte: asOfDate },
+                status: 'POSTED',
+              },
+              account: { code: { startsWith: '1' } },
+            },
+            include: { account: true },
+          })
+
+          // 負債科目 (2xxx)
+          const liabilityLines = await ctx.prisma.voucherLine.findMany({
+            where: {
+              voucher: {
+                companyId: input.companyId,
+                voucherDate: { lte: asOfDate },
+                status: 'POSTED',
+              },
+              account: { code: { startsWith: '2' } },
+            },
+            include: { account: true },
+          })
+
+          // 權益科目 (3xxx)
+          const equityLines = await ctx.prisma.voucherLine.findMany({
+            where: {
+              voucher: {
+                companyId: input.companyId,
+                voucherDate: { lte: asOfDate },
+                status: 'POSTED',
+              },
+              account: { code: { startsWith: '3' } },
+            },
+            include: { account: true },
+          })
+
+          // 計算資產 (借方 - 貸方)
+          const assets = assetLines.reduce((sum, line) => {
+            return sum + (Number(line.debitAmount) - Number(line.creditAmount))
+          }, 0)
+
+          // 計算負債 (貸方 - 借方)
+          const liabilities = liabilityLines.reduce((sum, line) => {
+            return sum + (Number(line.creditAmount) - Number(line.debitAmount))
+          }, 0)
+
+          // 計算權益 (貸方 - 借方)
+          const equity = equityLines.reduce((sum, line) => {
+            return sum + (Number(line.creditAmount) - Number(line.debitAmount))
+          }, 0)
+
+          return {
+            year,
+            assets: Math.round(assets),
+            liabilities: Math.round(liabilities),
+            equity: Math.round(equity),
+          }
+        })
+      )
+
+      // 計算年增減
+      const comparisons = results.map((current, index) => {
+        if (index === 0) {
+          return {
+            ...current,
+            assetsChange: null,
+            assetsChangePercent: null,
+            liabilitiesChange: null,
+            liabilitiesChangePercent: null,
+            equityChange: null,
+            equityChangePercent: null,
+          }
+        }
+
+        const previous = results[index - 1]
+        return {
+          ...current,
+          assetsChange: current.assets - previous.assets,
+          assetsChangePercent: previous.assets !== 0
+            ? Math.round(((current.assets - previous.assets) / Math.abs(previous.assets)) * 1000) / 10
+            : null,
+          liabilitiesChange: current.liabilities - previous.liabilities,
+          liabilitiesChangePercent: previous.liabilities !== 0
+            ? Math.round(((current.liabilities - previous.liabilities) / Math.abs(previous.liabilities)) * 1000) / 10
+            : null,
+          equityChange: current.equity - previous.equity,
+          equityChangePercent: previous.equity !== 0
+            ? Math.round(((current.equity - previous.equity) / Math.abs(previous.equity)) * 1000) / 10
+            : null,
+        }
+      })
+
+      return {
+        years: input.years,
+        data: comparisons,
+      }
+    }),
 })

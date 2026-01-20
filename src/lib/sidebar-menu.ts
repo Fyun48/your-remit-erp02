@@ -35,7 +35,7 @@ export const defaultMenuItems: MenuItem[] = [
   { id: 'messages', name: '內部訊息', href: '/dashboard/messages', icon: MessageSquare },
   { id: 'projects', name: '專案管理', href: '/dashboard/projects', icon: FolderKanban },
   { id: 'leave', name: '請假管理', href: '/dashboard/leave', icon: Calendar },
-  { id: 'expense', name: '費用報銷', href: '/dashboard/expense', icon: Receipt },
+  { id: 'expense', name: '費用核銷', href: '/dashboard/expense', icon: Receipt },
   { id: 'approval', name: '審核中心', href: '/dashboard/approval', icon: FileText },
   { id: 'finance', name: '財務會計', href: '/dashboard/finance', icon: BookOpen, permission: 'finance.view' },
   { id: 'admin', name: '行政管理', href: '/dashboard/admin', icon: Stamp, permission: 'admin.view' },

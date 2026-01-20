@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { PendingList } from '@/components/approval/pending-list'
 import { WorkflowApprovalList } from '@/components/approval/workflow-approval-list'
+import { FlowApprovalList } from '@/components/approval/flow-approval-list'
 import { getCurrentCompany } from '@/lib/use-current-company'
 
 export default async function ApprovalPage() {
@@ -42,7 +43,10 @@ export default async function ApprovalPage() {
         )}
       </div>
 
-      {/* 工作流程待簽核 */}
+      {/* 新審核流程（FlowTemplate 系統） */}
+      <FlowApprovalList employeeId={employeeId} />
+
+      {/* 工作流程待簽核（舊系統） */}
       <WorkflowApprovalList userId={employeeId} />
 
       {/* 傳統待審核（主管審批） */}

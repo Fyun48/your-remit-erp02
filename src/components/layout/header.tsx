@@ -10,6 +10,7 @@ import { useMobileSidebar } from './mobile-sidebar-context'
 import { SearchDialog } from '@/components/search'
 import { MessageBell } from './message-bell'
 import { NotificationBell } from './notification-bell'
+import { trpc } from '@/lib/trpc'
 
 interface HeaderProps {
   companyId?: string
@@ -24,8 +25,15 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
   const menuRef = useRef<HTMLDivElement>(null)
   const { open: openSidebar } = useMobileSidebar()
 
+  // 從資料庫取得最新的頭像 (避免 JWT 快取問題)
+  const { data: profile } = trpc.employee.getProfile.useQuery(
+    { employeeId: session?.user?.id || '' },
+    { enabled: !!session?.user?.id }
+  )
+
+  // 優先使用資料庫的頭像，fallback 到 session 的頭像
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const avatarUrl = (session?.user as any)?.avatarUrl
+  const avatarUrl = profile?.avatarUrl || (session?.user as any)?.avatarUrl
   const userName = session?.user?.name || '使用者'
 
   const getInitials = (name: string) => {
@@ -59,7 +67,6 @@ export function Header({ companyId, companyName, isGroupAdmin = false }: HeaderP
         >
           <Menu className="h-5 w-5" />
         </button>
-        <h2 className="text-base md:text-lg font-semibold hidden md:block text-foreground">歡迎使用 ERP 系統</h2>
         {companyId && companyName && (
           <CompanySwitcher
             currentCompanyId={companyId}

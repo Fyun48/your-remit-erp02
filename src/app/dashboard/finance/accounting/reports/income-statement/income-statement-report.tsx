@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,18 +20,28 @@ import {
   TrendingDown,
   PieChart,
   BarChart3,
+  Lock,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import Link from 'next/link'
 
 type ChartType = 'pie' | 'bar'
 
-export function IncomeStatementReport() {
-  const { data: session } = useSession()
-  const userId = (session?.user as { id?: string })?.id || ''
+interface IncomeStatementReportProps {
+  assignments: {
+    companyId: string
+    company: {
+      id: string
+      name: string
+    }
+  }[]
+  initialCompanyId: string
+}
+
+export function IncomeStatementReport({ assignments, initialCompanyId }: IncomeStatementReportProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId)
   const [startDate, setStartDate] = useState<string>(() => {
     const now = new Date()
     return `${now.getFullYear()}-01-01`
@@ -41,12 +50,6 @@ export function IncomeStatementReport() {
     return new Date().toISOString().split('T')[0]
   })
   const [chartType, setChartType] = useState<ChartType>('bar')
-
-  // 取得公司列表
-  const { data: companies } = trpc.company.listAll.useQuery(
-    { userId },
-    { enabled: !!userId }
-  )
 
   // 取得損益表資料
   const { data: report, isLoading } = trpc.financialReport.incomeStatement.useQuery(
@@ -58,7 +61,7 @@ export function IncomeStatementReport() {
     { enabled: !!selectedCompanyId && !!startDate && !!endDate }
   )
 
-  const companyName = companies?.find(c => c.id === selectedCompanyId)?.name || ''
+  const companyName = assignments.find(a => a.companyId === selectedCompanyId)?.company.name || ''
 
   // 格式化金額
   const formatAmount = (amount: number) => {
@@ -305,18 +308,11 @@ export function IncomeStatementReport() {
           <div className="flex gap-4 flex-wrap">
             <div className="w-64">
               <label className="text-sm font-medium mb-2 block">公司</label>
-              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇公司" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies?.map(company => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted text-sm">
+                <Lock className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{companyName}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">如需變更公司請返回報表首頁</p>
             </div>
 
             <div className="w-40">

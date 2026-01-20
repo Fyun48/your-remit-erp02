@@ -2,10 +2,10 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { User, Mail, Phone, Building2, Briefcase } from 'lucide-react'
 import { ChangePasswordForm } from './change-password-form'
+import { AvatarUpload } from './avatar-upload'
 
 export default async function ProfilePage() {
   const session = await auth()
@@ -45,12 +45,11 @@ export default async function ProfilePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={employee.avatarUrl || undefined} alt={employee.name} />
-                <AvatarFallback className="text-xl">
-                  {employee.name.slice(0, 2)}
-                </AvatarFallback>
-              </Avatar>
+              <AvatarUpload
+                employeeId={employee.id}
+                employeeName={employee.name}
+                avatarUrl={employee.avatarUrl}
+              />
               <div>
                 <h2 className="text-xl font-semibold">{employee.name}</h2>
                 <p className="text-muted-foreground font-mono">{employee.employeeNo}</p>

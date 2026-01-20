@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,6 +20,7 @@ import {
   Receipt,
   Calculator,
   AlertCircle,
+  Lock,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import Link from 'next/link'
@@ -34,24 +34,30 @@ const PERIODS = [
   { value: '6', label: '11-12月 (6期)' },
 ]
 
-export function Vat401Report() {
-  const { data: session } = useSession()
-  const userId = (session?.user as { id?: string })?.id || ''
+interface Vat401ReportProps {
+  assignments: {
+    companyId: string
+    company: {
+      id: string
+      name: string
+    }
+  }[]
+  initialCompanyId: string
+}
+
+export function Vat401Report({ assignments, initialCompanyId }: Vat401ReportProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
   const currentYear = new Date().getFullYear()
   const currentMonth = new Date().getMonth() + 1
   const currentPeriod = Math.ceil(currentMonth / 2)
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId)
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear))
   const [selectedPeriod, setSelectedPeriod] = useState<string>(String(currentPeriod))
 
-  // 取得公司列表
-  const { data: companies } = trpc.company.listAll.useQuery(
-    { userId },
-    { enabled: !!userId }
-  )
+  // 取得公司名稱
+  const companyName = assignments.find(a => a.companyId === selectedCompanyId)?.company.name || ''
 
   // 取得 401 報表資料
   const { data: report, isLoading } = trpc.financialReport.vat401.useQuery(
@@ -286,18 +292,11 @@ export function Vat401Report() {
           <div className="flex gap-4 flex-wrap">
             <div className="w-64">
               <label className="text-sm font-medium mb-2 block">公司</label>
-              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇公司" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies?.map(company => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted text-sm">
+                <Lock className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{companyName}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">如需變更公司請返回報表首頁</p>
             </div>
 
             <div className="w-32">

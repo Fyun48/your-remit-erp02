@@ -128,9 +128,9 @@ export function Sidebar({ groupName = '集團' }: SidebarProps) {
   return (
     <>
       {/* 桌面版側邊欄 - 固定顯示 */}
-      <div className="hidden md:flex h-full w-64 flex-col bg-sidebar">
+      <div className="hidden md:flex h-full w-52 flex-col bg-sidebar">
         <div className="flex h-16 items-center justify-center border-b border-sidebar-border">
-          <h1 className="text-xl font-bold text-sidebar-foreground">{groupName} ERP</h1>
+          <h1 className="text-lg font-bold text-sidebar-foreground">{groupName}</h1>
         </div>
         <SidebarContent />
       </div>
@@ -144,9 +144,9 @@ export function Sidebar({ groupName = '集團' }: SidebarProps) {
             onClick={close}
           />
           {/* 側邊欄 */}
-          <div className="fixed inset-y-0 left-0 w-64 flex flex-col bg-sidebar">
+          <div className="fixed inset-y-0 left-0 w-56 flex flex-col bg-sidebar">
             <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-              <h1 className="text-xl font-bold text-sidebar-foreground">{groupName} ERP</h1>
+              <h1 className="text-lg font-bold text-sidebar-foreground">{groupName}</h1>
               <button
                 onClick={close}
                 className="text-sidebar-muted-foreground hover:text-sidebar-foreground p-1 transition-colors"

@@ -11,6 +11,9 @@ import {
   ArrowRightLeft,
   FileText,
   Network,
+  Wallet,
+  Clock,
+  UserCheck,
 } from 'lucide-react'
 
 interface HRDashboardProps {
@@ -81,6 +84,27 @@ export function HRDashboard({ companyName, stats }: HRDashboardProps) {
       icon: FileText,
       href: '/dashboard/hr/reports',
       color: 'text-indigo-500',
+    },
+    {
+      title: '薪資管理',
+      description: '薪資設定、計算與發放',
+      icon: Wallet,
+      href: '/dashboard/hr/payroll',
+      color: 'text-yellow-500',
+    },
+    {
+      title: '班別設定',
+      description: '管理上下班時間與遲到早退寬限',
+      icon: Clock,
+      href: '/dashboard/hr/shifts',
+      color: 'text-teal-500',
+    },
+    {
+      title: '職務代理',
+      description: '設定職務代理人與代理權限',
+      icon: UserCheck,
+      href: '/dashboard/hr/delegation',
+      color: 'text-pink-500',
     },
   ]
 

@@ -6,6 +6,7 @@ import { TRPCProvider } from '@/components/providers/trpc-provider'
 import { SessionProvider } from '@/components/providers/session-provider'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { PWARegister } from '@/components/pwa/pwa-register'
+import { Toaster } from 'sonner'
 import { defaultTheme, isValidTheme } from '@/lib/themes'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -56,6 +57,7 @@ export default async function RootLayout({
             <ThemeProvider>
               {children}
               <PWARegister />
+              <Toaster position="top-right" richColors />
             </ThemeProvider>
           </TRPCProvider>
         </SessionProvider>

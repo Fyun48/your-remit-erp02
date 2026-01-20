@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import { WorkflowStatus } from '@/components/workflow/workflow-status'
+import { FlowProgress } from '@/components/approval/flow-progress'
 
 interface LeaveRequest {
   id: string
@@ -346,7 +347,13 @@ export function LeaveRequestDetail({ request, currentUserId }: LeaveRequestDetai
             </CardContent>
           </Card>
 
-          {/* 簽核狀態 */}
+          {/* 新流程審核進度 */}
+          <FlowProgress
+            moduleType="LEAVE"
+            referenceId={request.id}
+          />
+
+          {/* 舊簽核狀態（相容性） */}
           <WorkflowStatus
             requestType="LEAVE"
             requestId={request.id}

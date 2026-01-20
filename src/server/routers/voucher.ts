@@ -198,4 +198,134 @@ export const voucherRouter = router({
         data: { status: 'VOID' },
       })
     }),
+
+  // 更新傳票
+  update: publicProcedure
+    .input(z.object({
+      id: z.string(),
+      voucherDate: z.date().optional(),
+      voucherType: z.enum(['RECEIPT', 'PAYMENT', 'TRANSFER']).optional(),
+      description: z.string().optional(),
+      lines: z.array(voucherLineSchema).min(2).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const voucher = await ctx.prisma.voucher.findUnique({
+        where: { id: input.id },
+        include: { period: true },
+      })
+
+      if (!voucher) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '傳票不存在' })
+      }
+      if (voucher.status !== 'DRAFT') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '只有草稿狀態的傳票可以修改' })
+      }
+      if (voucher.period.status !== 'OPEN') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '會計期間已關閉，無法修改傳票' })
+      }
+
+      // 如果有更新分錄
+      if (input.lines) {
+        // 計算借貸合計
+        let totalDebit = 0
+        let totalCredit = 0
+        input.lines.forEach((line, index) => {
+          totalDebit += line.debitAmount
+          totalCredit += line.creditAmount
+          if (line.debitAmount > 0 && line.creditAmount > 0) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: `第 ${index + 1} 行不能同時有借方和貸方金額` })
+          }
+        })
+
+        if (Math.abs(totalDebit - totalCredit) > 0.01) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: `借貸不平衡：借方 ${totalDebit}，貸方 ${totalCredit}` })
+        }
+
+        // 如果有變更日期，檢查新期間
+        let newPeriodId = voucher.periodId
+        if (input.voucherDate) {
+          const newPeriod = await ctx.prisma.accountingPeriod.findFirst({
+            where: {
+              companyId: voucher.companyId,
+              startDate: { lte: input.voucherDate },
+              endDate: { gte: input.voucherDate },
+              status: 'OPEN',
+            },
+          })
+          if (!newPeriod) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: '無有效的會計期間' })
+          }
+          newPeriodId = newPeriod.id
+        }
+
+        // 刪除舊分錄，建立新分錄
+        await ctx.prisma.voucherLine.deleteMany({
+          where: { voucherId: input.id },
+        })
+
+        return ctx.prisma.voucher.update({
+          where: { id: input.id },
+          data: {
+            voucherDate: input.voucherDate,
+            voucherType: input.voucherType,
+            description: input.description,
+            periodId: newPeriodId,
+            totalDebit,
+            totalCredit,
+            lines: {
+              create: input.lines.map((line, index) => ({
+                lineNo: index + 1,
+                accountId: line.accountId,
+                debitAmount: line.debitAmount,
+                creditAmount: line.creditAmount,
+                description: line.description,
+                customerId: line.customerId,
+                vendorId: line.vendorId,
+                departmentId: line.departmentId,
+              })),
+            },
+          },
+          include: { lines: true },
+        })
+      }
+
+      // 只更新基本欄位
+      return ctx.prisma.voucher.update({
+        where: { id: input.id },
+        data: {
+          voucherDate: input.voucherDate,
+          voucherType: input.voucherType,
+          description: input.description,
+        },
+      })
+    }),
+
+  // 刪除傳票
+  delete: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const voucher = await ctx.prisma.voucher.findUnique({
+        where: { id: input.id },
+        include: { period: true },
+      })
+
+      if (!voucher) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '傳票不存在' })
+      }
+      if (voucher.status !== 'DRAFT') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '只有草稿狀態的傳票可以刪除' })
+      }
+      if (voucher.period.status !== 'OPEN') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '會計期間已關閉，無法刪除傳票' })
+      }
+
+      // 先刪除分錄，再刪除傳票
+      await ctx.prisma.voucherLine.deleteMany({
+        where: { voucherId: input.id },
+      })
+
+      return ctx.prisma.voucher.delete({
+        where: { id: input.id },
+      })
+    }),
 })

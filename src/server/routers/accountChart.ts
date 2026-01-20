@@ -125,6 +125,181 @@ export const accountChartRouter = router({
       })
     }),
 
+  // 重置為預設科目表（刪除非系統科目，還原系統科目）
+  resetToDefaults: publicProcedure
+    .input(z.object({ companyId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // 檢查是否有傳票使用任何科目
+      const usedAccounts = await ctx.prisma.voucherLine.findMany({
+        where: {
+          account: { companyId: input.companyId },
+        },
+        select: { accountId: true },
+        distinct: ['accountId'],
+      })
+
+      if (usedAccounts.length > 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: '公司已有傳票使用科目表，無法重置。如需重置，請先刪除所有傳票。',
+        })
+      }
+
+      // 刪除所有現有科目
+      await ctx.prisma.accountChart.deleteMany({
+        where: { companyId: input.companyId },
+      })
+
+      // 重新建立預設科目
+      const defaultAccounts = [
+        // 資產
+        { code: '1', name: '資產', category: 'ASSET', accountType: 'DEBIT', level: 1, isDetail: false, isSystem: true },
+        { code: '11', name: '流動資產', category: 'ASSET', accountType: 'DEBIT', level: 2, isDetail: false, isSystem: true, parentCode: '1' },
+        { code: '1101', name: '現金及約當現金', category: 'ASSET', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '11' },
+        { code: '1102', name: '銀行存款', category: 'ASSET', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '11' },
+        { code: '1103', name: '應收帳款', category: 'ASSET', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '11', requiresAux: true },
+        { code: '1104', name: '預付款項', category: 'ASSET', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '11' },
+        // 負債
+        { code: '2', name: '負債', category: 'LIABILITY', accountType: 'CREDIT', level: 1, isDetail: false, isSystem: true },
+        { code: '21', name: '流動負債', category: 'LIABILITY', accountType: 'CREDIT', level: 2, isDetail: false, isSystem: true, parentCode: '2' },
+        { code: '2101', name: '應付帳款', category: 'LIABILITY', accountType: 'CREDIT', level: 3, isDetail: true, isSystem: true, parentCode: '21', requiresAux: true },
+        { code: '2102', name: '應付薪資', category: 'LIABILITY', accountType: 'CREDIT', level: 3, isDetail: true, isSystem: true, parentCode: '21' },
+        { code: '2103', name: '應付稅捐', category: 'LIABILITY', accountType: 'CREDIT', level: 3, isDetail: true, isSystem: true, parentCode: '21' },
+        // 權益
+        { code: '3', name: '權益', category: 'EQUITY', accountType: 'CREDIT', level: 1, isDetail: false, isSystem: true },
+        { code: '31', name: '股本', category: 'EQUITY', accountType: 'CREDIT', level: 2, isDetail: true, isSystem: true, parentCode: '3' },
+        { code: '32', name: '保留盈餘', category: 'EQUITY', accountType: 'CREDIT', level: 2, isDetail: true, isSystem: true, parentCode: '3' },
+        // 收入
+        { code: '4', name: '收入', category: 'REVENUE', accountType: 'CREDIT', level: 1, isDetail: false, isSystem: true },
+        { code: '41', name: '營業收入', category: 'REVENUE', accountType: 'CREDIT', level: 2, isDetail: false, isSystem: true, parentCode: '4' },
+        { code: '4101', name: '銷貨收入', category: 'REVENUE', accountType: 'CREDIT', level: 3, isDetail: true, isSystem: true, parentCode: '41' },
+        { code: '4102', name: '服務收入', category: 'REVENUE', accountType: 'CREDIT', level: 3, isDetail: true, isSystem: true, parentCode: '41' },
+        // 費用
+        { code: '5', name: '費用', category: 'EXPENSE', accountType: 'DEBIT', level: 1, isDetail: false, isSystem: true },
+        { code: '51', name: '營業成本', category: 'EXPENSE', accountType: 'DEBIT', level: 2, isDetail: true, isSystem: true, parentCode: '5' },
+        { code: '52', name: '營業費用', category: 'EXPENSE', accountType: 'DEBIT', level: 2, isDetail: false, isSystem: true, parentCode: '5' },
+        { code: '5201', name: '薪資支出', category: 'EXPENSE', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '52' },
+        { code: '5202', name: '租金支出', category: 'EXPENSE', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '52' },
+        { code: '5203', name: '交通費', category: 'EXPENSE', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '52' },
+        { code: '5204', name: '文具用品', category: 'EXPENSE', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '52' },
+        { code: '5205', name: '伙食費', category: 'EXPENSE', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '52' },
+        { code: '5206', name: '通訊費', category: 'EXPENSE', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '52' },
+        { code: '5299', name: '其他費用', category: 'EXPENSE', accountType: 'DEBIT', level: 3, isDetail: true, isSystem: true, parentCode: '52' },
+      ]
+
+      const createdAccounts = new Map<string, string>()
+
+      for (const acc of defaultAccounts) {
+        const created = await ctx.prisma.accountChart.create({
+          data: {
+            companyId: input.companyId,
+            code: acc.code,
+            name: acc.name,
+            category: acc.category as 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE',
+            accountType: acc.accountType as 'DEBIT' | 'CREDIT',
+            level: acc.level,
+            isDetail: acc.isDetail,
+            isSystem: acc.isSystem,
+            requiresAux: acc.requiresAux || false,
+          },
+        })
+        createdAccounts.set(acc.code, created.id)
+      }
+
+      for (const acc of defaultAccounts) {
+        if (acc.parentCode) {
+          const parentId = createdAccounts.get(acc.parentCode)
+          const accountId = createdAccounts.get(acc.code)
+          if (parentId && accountId) {
+            await ctx.prisma.accountChart.update({
+              where: { id: accountId },
+              data: { parentId },
+            })
+          }
+        }
+      }
+
+      return { count: defaultAccounts.length }
+    }),
+
+  // 複製科目表到其他公司
+  copyToCompany: publicProcedure
+    .input(z.object({
+      sourceCompanyId: z.string(),
+      targetCompanyId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.sourceCompanyId === input.targetCompanyId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '來源與目標公司不能相同' })
+      }
+
+      // 檢查目標公司是否已有科目
+      const existingCount = await ctx.prisma.accountChart.count({
+        where: { companyId: input.targetCompanyId },
+      })
+
+      if (existingCount > 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: '目標公司已有科目表。如需覆蓋，請先刪除或重置目標公司的科目表。',
+        })
+      }
+
+      // 取得來源公司的科目
+      const sourceAccounts = await ctx.prisma.accountChart.findMany({
+        where: { companyId: input.sourceCompanyId, isActive: true },
+        orderBy: { code: 'asc' },
+      })
+
+      if (sourceAccounts.length === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '來源公司沒有科目表' })
+      }
+
+      // 建立代碼到 ID 的映射（用於 parentId）
+      const oldIdToCode = new Map<string, string>()
+      sourceAccounts.forEach(acc => oldIdToCode.set(acc.id, acc.code))
+
+      const createdAccounts = new Map<string, string>()
+
+      // 先建立所有科目（不含 parentId）
+      for (const acc of sourceAccounts) {
+        const created = await ctx.prisma.accountChart.create({
+          data: {
+            companyId: input.targetCompanyId,
+            code: acc.code,
+            name: acc.name,
+            category: acc.category,
+            accountType: acc.accountType,
+            level: acc.level,
+            isDetail: acc.isDetail,
+            isSystem: acc.isSystem,
+            requiresAux: acc.requiresAux,
+            openingBalance: 0, // 新公司期初餘額為 0
+          },
+        })
+        createdAccounts.set(acc.code, created.id)
+      }
+
+      // 更新 parentId
+      for (const acc of sourceAccounts) {
+        if (acc.parentId) {
+          const parentCode = oldIdToCode.get(acc.parentId)
+          if (parentCode) {
+            const newParentId = createdAccounts.get(parentCode)
+            const newAccountId = createdAccounts.get(acc.code)
+            if (newParentId && newAccountId) {
+              await ctx.prisma.accountChart.update({
+                where: { id: newAccountId },
+                data: { parentId: newParentId },
+              })
+            }
+          }
+        }
+      }
+
+      return { count: sourceAccounts.length }
+    }),
+
   // 初始化預設科目表
   initializeDefaults: publicProcedure
     .input(z.object({ companyId: z.string() }))

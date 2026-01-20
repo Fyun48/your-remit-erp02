@@ -1,6 +1,8 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getCurrentCompany } from '@/lib/use-current-company'
+import { hasPermission as checkUserPermission } from '@/lib/permission'
 import { VendorDashboard } from './vendor-list'
 
 export default async function VendorsPage() {
@@ -10,6 +12,19 @@ export default async function VendorsPage() {
     redirect('/login')
   }
 
+  // 取得當前選擇的公司（集團管理員可切換到任何公司）
+  const currentCompany = await getCurrentCompany(session.user.id)
+
+  if (!currentCompany) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold">供應商管理</h1>
+        <p className="text-muted-foreground mt-2">您尚未被指派到任何公司</p>
+      </div>
+    )
+  }
+
+  // 取得所有可用公司列表
   const employee = await prisma.employee.findUnique({
     where: { id: session.user.id },
     include: {
@@ -24,8 +39,27 @@ export default async function VendorsPage() {
     redirect('/dashboard')
   }
 
-  const companyId = employee.assignments[0].companyId
-  const companyName = employee.assignments[0].company.name
+  // 檢查是否有供應商管理權限
+  const hasPermission = await checkUserPermission(
+    session.user.id,
+    currentCompany.id,
+    'finance.vendor'
+  )
 
-  return <VendorDashboard companyId={companyId} companyName={companyName} />
+  // 準備公司列表給前端選擇
+  const assignments = employee.assignments.map(a => ({
+    companyId: a.companyId,
+    company: {
+      id: a.company.id,
+      name: a.company.name,
+    },
+  }))
+
+  return (
+    <VendorDashboard
+      assignments={assignments}
+      initialCompanyId={currentCompany.id}
+      hasPermission={hasPermission}
+    />
+  )
 }

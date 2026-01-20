@@ -75,6 +75,8 @@ interface Employee {
   gender: string | null
   birthDate: Date | null
   phone: string | null
+  officePhone: string | null
+  extension: string | null
   personalEmail: string | null
   residentialAddress: string | null
   householdAddress: string | null
@@ -230,6 +232,8 @@ export function EmployeeDetail({
     gender: employee.gender || '',
     birthDate: employee.birthDate ? new Date(employee.birthDate).toISOString().split('T')[0] : '',
     phone: employee.phone || '',
+    officePhone: employee.officePhone || '',
+    extension: employee.extension || '',
     personalEmail: employee.personalEmail || '',
     residentialAddress: employee.residentialAddress || '',
     householdAddress: employee.householdAddress || '',
@@ -431,6 +435,8 @@ export function EmployeeDetail({
       gender: editData.gender as 'MALE' | 'FEMALE' | 'OTHER' | undefined,
       birthDate: editData.birthDate ? new Date(editData.birthDate) : null,
       phone: editData.phone || undefined,
+      officePhone: editData.officePhone || undefined,
+      extension: editData.extension || undefined,
       personalEmail: editData.personalEmail || undefined,
       residentialAddress: editData.residentialAddress || undefined,
       householdAddress: editData.householdAddress || undefined,
@@ -933,6 +939,16 @@ export function EmployeeDetail({
                       <span>{employee.personalEmail}</span>
                     </div>
                   )}
+                  {(employee.officePhone || employee.extension) && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">公司電話：</span>
+                      <span>
+                        {employee.officePhone || '-'}
+                        {employee.extension && ` 分機 ${employee.extension}`}
+                      </span>
+                    </div>
+                  )}
                   {employee.phone && (
                     <div className="flex items-center gap-2">
                       <Phone className="h-4 w-4 text-muted-foreground" />
@@ -1099,6 +1115,24 @@ export function EmployeeDetail({
                   id="edit-phone"
                   value={editData.phone}
                   onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-officePhone">公司電話</Label>
+                <Input
+                  id="edit-officePhone"
+                  value={editData.officePhone}
+                  onChange={(e) => setEditData({ ...editData, officePhone: e.target.value })}
+                  placeholder="例如: 02-12345678"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-extension">分機號碼</Label>
+                <Input
+                  id="edit-extension"
+                  value={editData.extension}
+                  onChange={(e) => setEditData({ ...editData, extension: e.target.value })}
+                  placeholder="例如: 101"
                 />
               </div>
               <div className="space-y-2">

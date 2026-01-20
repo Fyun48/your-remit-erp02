@@ -152,6 +152,16 @@ model Company {
   projectKpiSetting   ProjectKpiSetting?
   projectKpiSummaries ProjectKpiSummary[]
 
+  // 薪資
+  payrollSetting   PayrollSetting?
+  employeeSalaries EmployeeSalary[]
+  payrollPeriods   PayrollPeriod[]
+
+  // 新版流程管理
+  flowTemplates  FlowTemplate[]
+  flowExecutions FlowExecution[]
+  delegations    Delegation[]
+
   @@map("companies")
 }
 
@@ -197,6 +207,9 @@ model Position {
   company   Company              @relation(fields: [companyId], references: [id])
   employees EmployeeAssignment[]
 
+  // 新版流程管理
+  flowSteps FlowStep[]
+
   @@unique([companyId, code])
   @@map("positions")
 }
@@ -215,6 +228,8 @@ model Employee {
   gender             Gender?
   birthDate          DateTime?
   phone              String?
+  officePhone        String? // 公司電話
+  extension          String? // 分機號碼
   residentialAddress String? // 居住地地址
   householdAddress   String? // 戶籍地址
   emergencyContact   String?
@@ -296,6 +311,23 @@ model Employee {
   // 請假
   leaveRequests       LeaveRequest[]          @relation("EmployeeLeaveRequests")
   projectAuditLogs    ProjectAuditLog[]       @relation("EmployeeProjectAuditLogs")
+
+  // 薪資
+  salaries     EmployeeSalary[]
+  payrollSlips PayrollSlip[]
+
+  // 新版流程管理
+  flowTemplatesCreated      FlowTemplate[]       @relation("FlowTemplateCreator")
+  flowStepsAsApprover       FlowStep[]           @relation("FlowStepSpecificApprover")
+  flowExecutionsAsApplicant FlowExecution[]      @relation("FlowExecutionApplicant")
+  flowApprovalsAsAssignee   FlowApprovalRecord[] @relation("FlowApprovalAssignee")
+  flowApprovalsAsActual     FlowApprovalRecord[] @relation("FlowApprovalActualApprover")
+
+  // 職務代理
+  delegationsAsDelegator  Delegation[] @relation("DelegationDelegator")
+  delegationsAsDelegate   Delegation[] @relation("DelegationDelegate")
+  delegationsCancelled    Delegation[] @relation("DelegationCanceller")
+  delegationsCreated      Delegation[] @relation("DelegationCreator")
 
   @@map("employees")
 }
@@ -2511,4 +2543,445 @@ model ProjectKpiSummary {
   @@index([departmentId])
   @@index([year, month])
   @@map("project_kpi_summaries")
+}
+
+// ==================== 薪資管理 ====================
+
+// 保險類型
+enum InsuranceType {
+  LABOR // 勞保
+  HEALTH // 健保
+  PENSION // 勞退
+}
+
+// 薪資期間狀態
+enum PayrollStatus {
+  DRAFT // 草稿
+  CALCULATED // 已計算
+  APPROVED // 已核准
+  PAID // 已發放
+}
+
+// 薪資設定（公司層級）
+model PayrollSetting {
+  id        String  @id @default(cuid())
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // 勞保費率 (2026/民國115年: 12.5% 含就保1%, 員工負擔 20%, 雇主 70%)
+  laborInsuranceRate     Decimal @default(0.125) @db.Decimal(5, 4)
+  laborInsuranceEmpShare Decimal @default(0.2) @db.Decimal(5, 4)
+
+  // 健保費率 (2026/民國115年: 5.17%, 員工負擔 30%, 雇主 60%)
+  healthInsuranceRate     Decimal @default(0.0517) @db.Decimal(5, 4)
+  healthInsuranceEmpShare Decimal @default(0.3) @db.Decimal(5, 4)
+
+  // 勞退提撥率 (雇主 6%, 員工可自提 0-6%)
+  laborPensionRate Decimal @default(0.06) @db.Decimal(5, 4)
+
+  // 加班費倍率 (依勞基法第24條)
+  overtimeRate1       Decimal @default(1.34) @db.Decimal(5, 4) // 前2小時
+  overtimeRate2       Decimal @default(1.67) @db.Decimal(5, 4) // 超過2小時
+  overtimeRateHoliday Decimal @default(2.00) @db.Decimal(5, 4) // 休息日/假日
+
+  // 2026年基本工資
+  minimumWage Decimal @default(29500) @db.Decimal(15, 2)
+
+  // 扣繳起扣點 (2026年)
+  withholdingThreshold Decimal @default(88501) @db.Decimal(15, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payroll_settings")
+}
+
+// 投保級距表（可年度更新）
+model InsuranceGrade {
+  id            String        @id @default(cuid())
+  year          Int // 年度 (如 2026)
+  type          InsuranceType // LABOR / HEALTH / PENSION
+  grade         Int // 級數
+  minSalary     Decimal       @db.Decimal(15, 2) // 薪資下限
+  maxSalary     Decimal?      @db.Decimal(15, 2) // 薪資上限 (最高級為 null)
+  insuredAmount Decimal       @db.Decimal(15, 2) // 投保金額
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([year, type, grade])
+  @@index([year, type])
+  @@map("insurance_grades")
+}
+
+// 投保級距範本
+model InsuranceGradeTemplate {
+  id          String   @id @default(cuid())
+  name        String   // 範本名稱
+  description String?  // 範本說明
+  baseYear    Int      // 基準年度
+  createdBy   String?  // 建立者
+
+  items       InsuranceGradeTemplateItem[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("insurance_grade_templates")
+}
+
+// 投保級距範本項目
+model InsuranceGradeTemplateItem {
+  id            String                  @id @default(cuid())
+  templateId    String
+  template      InsuranceGradeTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  type          InsuranceType // LABOR / HEALTH / PENSION
+  grade         Int // 級數
+  minSalary     Decimal       @db.Decimal(15, 2) // 薪資下限
+  maxSalary     Decimal?      @db.Decimal(15, 2) // 薪資上限
+  insuredAmount Decimal       @db.Decimal(15, 2) // 投保金額
+
+  @@unique([templateId, type, grade])
+  @@map("insurance_grade_template_items")
+}
+
+// 員工薪資檔案
+model EmployeeSalary {
+  id         String  @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id])
+
+  baseSalary Decimal  @db.Decimal(15, 2) // 底薪
+  allowances Json? // 津貼 [{name, amount}]
+
+  // 投保級距
+  laborInsuranceGrade  Decimal @db.Decimal(15, 2)
+  healthInsuranceGrade Decimal @db.Decimal(15, 2)
+  laborPensionGrade    Decimal @db.Decimal(15, 2)
+
+  // 員工自提勞退 (0-6%)
+  employeePensionRate Decimal @default(0) @db.Decimal(5, 4)
+
+  // 扶養親屬數
+  dependents Int @default(0)
+
+  effectiveDate DateTime
+  endDate       DateTime?
+  isActive      Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, companyId, effectiveDate])
+  @@index([employeeId])
+  @@index([companyId])
+  @@index([isActive])
+  @@map("employee_salaries")
+}
+
+// 薪資期間
+model PayrollPeriod {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  year   Int
+  month  Int
+  status PayrollStatus @default(DRAFT)
+
+  calculatedAt DateTime?
+  calculatedBy String?
+  approvedAt   DateTime?
+  approvedBy   String?
+  paidAt       DateTime?
+  paidBy       String?
+
+  slips PayrollSlip[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, year, month])
+  @@index([companyId])
+  @@index([status])
+  @@map("payroll_periods")
+}
+
+// 薪資單
+model PayrollSlip {
+  id         String  @id @default(cuid())
+  periodId   String
+  period     PayrollPeriod @relation(fields: [periodId], references: [id])
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  companyId  String
+
+  // 應發
+  baseSalary  Decimal @db.Decimal(15, 2)
+  allowances  Decimal @default(0) @db.Decimal(15, 2)
+  overtimePay Decimal @default(0) @db.Decimal(15, 2)
+  bonus       Decimal @default(0) @db.Decimal(15, 2)
+  otherIncome Decimal @default(0) @db.Decimal(15, 2)
+  grossPay    Decimal @db.Decimal(15, 2)
+
+  // 扣除
+  laborInsurance  Decimal @default(0) @db.Decimal(15, 2)
+  healthInsurance Decimal @default(0) @db.Decimal(15, 2)
+  laborPension    Decimal @default(0) @db.Decimal(15, 2)
+  incomeTax       Decimal @default(0) @db.Decimal(15, 2)
+  otherDeduction  Decimal @default(0) @db.Decimal(15, 2)
+  totalDeduction  Decimal @db.Decimal(15, 2)
+
+  // 實發
+  netPay Decimal @db.Decimal(15, 2)
+
+  // 加班明細
+  overtimeDetails Json?
+  note            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId, employeeId])
+  @@index([periodId])
+  @@index([employeeId])
+  @@map("payroll_slips")
+}
+
+// ==================== 新版流程管理系統 ====================
+
+// 流程模組類型
+enum FlowModuleType {
+  LEAVE        // 請假
+  EXPENSE      // 費用核銷
+  SEAL         // 用印申請
+  CARD         // 名片申請
+  STATIONERY   // 文具申請
+  OVERTIME     // 加班申請
+  BUSINESS_TRIP // 出差申請
+}
+
+// 審核人指定方式
+enum FlowAssigneeType {
+  DIRECT_SUPERVISOR  // 申請者的直屬主管
+  POSITION           // 依職位
+  SPECIFIC_PERSON    // 指定特定人員
+}
+
+// 流程範本 - 每間公司每種申請類型一個
+model FlowTemplate {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  moduleType  FlowModuleType
+  name        String            // 範本名稱
+  description String?
+
+  isActive    Boolean  @default(true)
+  version     Int      @default(1)
+
+  steps       FlowStep[]
+  executions  FlowExecution[]
+
+  createdById String
+  createdBy   Employee @relation("FlowTemplateCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, moduleType])
+  @@index([companyId, isActive])
+  @@map("flow_templates")
+}
+
+// 流程步驟 - 定義每一層審核（最多4層）
+model FlowStep {
+  id          String   @id @default(cuid())
+  templateId  String
+  template    FlowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  stepOrder   Int               // 順序：1, 2, 3, 4
+  name        String            // 步驟名稱
+
+  // 審核人指定方式（混合模式）
+  assigneeType        FlowAssigneeType
+  positionId          String?           // 若為 POSITION
+  position            Position?         @relation(fields: [positionId], references: [id])
+  specificEmployeeId  String?           // 若為 SPECIFIC_PERSON
+  specificEmployee    Employee?         @relation("FlowStepSpecificApprover", fields: [specificEmployeeId], references: [id])
+
+  isRequired  Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([templateId, stepOrder])
+  @@index([templateId])
+  @@map("flow_steps")
+}
+
+// 流程執行狀態
+enum FlowExecutionStatus {
+  PENDING     // 審核中
+  APPROVED    // 全部通過
+  REJECTED    // 被駁回
+  CANCELLED   // 申請人取消
+}
+
+// 流程執行實例 - 每筆申請單建立一個
+model FlowExecution {
+  id          String   @id @default(cuid())
+  templateId  String
+  template    FlowTemplate @relation(fields: [templateId], references: [id])
+
+  // 關聯到具體申請單
+  moduleType  FlowModuleType
+  referenceId String            // 對應的申請單 ID
+
+  applicantId String
+  applicant   Employee @relation("FlowExecutionApplicant", fields: [applicantId], references: [id])
+
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  currentStep Int      @default(1)
+  status      FlowExecutionStatus @default(PENDING)
+
+  completedAt DateTime?
+
+  approvals   FlowApprovalRecord[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([moduleType, referenceId])
+  @@index([applicantId, status])
+  @@index([companyId])
+  @@map("flow_executions")
+}
+
+// 審核決定
+enum FlowApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
+// 審核紀錄 - 每一層審核的結果
+model FlowApprovalRecord {
+  id          String   @id @default(cuid())
+  executionId String
+  execution   FlowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  stepOrder   Int
+  stepName    String
+
+  // 原本應該審核的人
+  assigneeId  String
+  assignee    Employee @relation("FlowApprovalAssignee", fields: [assigneeId], references: [id])
+
+  // 實際審核的人（若為代理則與 assignee 不同）
+  actualApproverId  String?
+  actualApprover    Employee? @relation("FlowApprovalActualApprover", fields: [actualApproverId], references: [id])
+
+  // 若為代理審核，關聯到代理設定
+  delegationId      String?
+  delegation        Delegation? @relation(fields: [delegationId], references: [id])
+
+  decision    FlowApprovalDecision?
+  comment     String?
+  decidedAt   DateTime?
+
+  createdAt   DateTime @default(now())
+
+  @@unique([executionId, stepOrder])
+  @@index([executionId])
+  @@index([assigneeId])
+  @@map("flow_approval_records")
+}
+
+// ==================== 職務代理系統 ====================
+
+// 代理狀態
+enum DelegationStatus {
+  PENDING     // 待接受
+  ACCEPTED    // 已接受生效中
+  REJECTED    // 已拒絕
+  EXPIRED     // 已過期
+  CANCELLED   // 已取消
+}
+
+// 代理權限類型
+enum DelegationPermissionType {
+  APPROVE_LEAVE       // 代理審核請假
+  APPROVE_EXPENSE     // 代理審核費用核銷
+  APPROVE_SEAL        // 代理審核用印
+  APPROVE_CARD        // 代理審核名片
+  APPROVE_STATIONERY  // 代理審核文具
+  APPLY_LEAVE         // 代理申請請假
+  APPLY_EXPENSE       // 代理申請費用核銷
+  VIEW_REPORTS        // 代理查看報表
+}
+
+// 職務代理設定
+model Delegation {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  // 委託人（被代理的人）
+  delegatorId String
+  delegator   Employee @relation("DelegationDelegator", fields: [delegatorId], references: [id])
+
+  // 代理人
+  delegateId  String
+  delegate    Employee @relation("DelegationDelegate", fields: [delegateId], references: [id])
+
+  // 代理權限範圍
+  permissions DelegationPermission[]
+
+  // 生效期間
+  startDate   DateTime
+  endDate     DateTime?   // null = 永久
+
+  // 狀態
+  status      DelegationStatus @default(PENDING)
+
+  // 接受/拒絕
+  respondedAt   DateTime?
+  rejectReason  String?
+
+  // 取消相關
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelledBy   Employee? @relation("DelegationCanceller", fields: [cancelledById], references: [id])
+  cancelReason  String?     // 至少10字
+
+  // 建立者
+  createdById String
+  createdBy   Employee @relation("DelegationCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 關聯的審核紀錄（代理審核時記錄）
+  approvalRecords FlowApprovalRecord[]
+
+  @@index([delegatorId, status])
+  @@index([delegateId, status])
+  @@index([companyId])
+  @@map("delegations")
+}
+
+// 代理權限項目
+model DelegationPermission {
+  id            String   @id @default(cuid())
+  delegationId  String
+  delegation    Delegation @relation(fields: [delegationId], references: [id], onDelete: Cascade)
+
+  permissionType DelegationPermissionType
+
+  @@unique([delegationId, permissionType])
+  @@map("delegation_permissions")
 }

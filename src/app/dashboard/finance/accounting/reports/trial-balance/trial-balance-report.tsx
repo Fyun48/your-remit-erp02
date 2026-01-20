@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,23 +19,26 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, ArrowLeft, Printer, FileSpreadsheet, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, ArrowLeft, Printer, FileSpreadsheet, CheckCircle2, XCircle, Lock } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import Link from 'next/link'
 
-export function TrialBalanceReport() {
-  const { data: session } = useSession()
-  const userId = (session?.user as { id?: string })?.id || ''
+interface TrialBalanceReportProps {
+  assignments: {
+    companyId: string
+    company: {
+      id: string
+      name: string
+    }
+  }[]
+  initialCompanyId: string
+}
+
+export function TrialBalanceReport({ assignments, initialCompanyId }: TrialBalanceReportProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId)
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>('')
-
-  // 取得公司列表
-  const { data: companies } = trpc.company.listAll.useQuery(
-    { userId },
-    { enabled: !!userId }
-  )
 
   // 取得會計期間
   const { data: periods } = trpc.accountingPeriod.list.useQuery(
@@ -51,7 +53,7 @@ export function TrialBalanceReport() {
   )
 
   // 取得公司名稱
-  const companyName = companies?.find(c => c.id === selectedCompanyId)?.name || ''
+  const companyName = assignments.find(a => a.companyId === selectedCompanyId)?.company.name || ''
   const selectedPeriod = periods?.find(p => p.id === selectedPeriodId)
   const periodName = selectedPeriod ? `${selectedPeriod.year}年第${selectedPeriod.period}期` : ''
 
@@ -184,18 +186,11 @@ export function TrialBalanceReport() {
           <div className="flex gap-4 flex-wrap">
             <div className="w-64">
               <label className="text-sm font-medium mb-2 block">公司</label>
-              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇公司" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies?.map(company => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted text-sm">
+                <Lock className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{companyName}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">如需變更公司請返回報表首頁</p>
             </div>
 
             <div className="w-64">

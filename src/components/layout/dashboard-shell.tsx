@@ -5,6 +5,7 @@ import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { MobileSidebarProvider } from './mobile-sidebar-context'
 import { AIChatButton } from '@/components/ai'
+import { DelegationBanner } from './delegation-banner'
 
 interface DashboardShellProps {
   children: ReactNode
@@ -26,6 +27,7 @@ export function DashboardShell({
       <div className="flex h-screen">
         <Sidebar groupName={groupName} />
         <div className="flex flex-1 flex-col overflow-hidden">
+          <DelegationBanner />
           <Header
             companyId={companyId}
             companyName={companyName}
