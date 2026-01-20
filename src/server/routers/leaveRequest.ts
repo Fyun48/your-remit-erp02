@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
 import { createNotification, createNotifications } from '@/lib/notification-service'
+import { startFlow } from '@/lib/flow-engine'
 
 // 產生申請單號
 function generateRequestNo(): string {
@@ -129,57 +130,6 @@ export const leaveRequestRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: '只有草稿可以送出' })
       }
 
-      // 計算請假天數
-      const totalDays = request.totalHours / 8
-
-      // 匹配適用的審核流程
-      const flows = await ctx.prisma.approvalFlow.findMany({
-        where: {
-          module: 'leave',
-          isActive: true,
-          OR: [
-            { companyId: null },
-            { companyId: request.companyId },
-          ],
-        },
-        include: {
-          steps: { orderBy: { stepOrder: 'asc' } },
-        },
-        orderBy: [{ companyId: 'desc' }, { sortOrder: 'asc' }],
-      })
-
-      // 找到匹配的流程
-      let matchedFlow = null
-      for (const flow of flows) {
-        if (!flow.conditions) {
-          if (flow.isDefault) {
-            matchedFlow = flow
-            break
-          }
-          continue
-        }
-
-        try {
-          const conditions = JSON.parse(flow.conditions)
-          let match = true
-
-          if (conditions.minDays && totalDays < conditions.minDays) match = false
-          if (conditions.maxDays && totalDays > conditions.maxDays) match = false
-          if (conditions.leaveTypes && !conditions.leaveTypes.includes(request.leaveType.code)) match = false
-
-          if (match) {
-            matchedFlow = flow
-            break
-          }
-        } catch {
-          continue
-        }
-      }
-
-      if (!matchedFlow) {
-        matchedFlow = flows.find(f => f.isDefault) || flows[0]
-      }
-
       // 更新請假申請狀態
       const updatedRequest = await ctx.prisma.leaveRequest.update({
         where: { id: input.id },
@@ -189,71 +139,135 @@ export const leaveRequestRouter = router({
         },
       })
 
-      // 如果有審核流程，建立審核實例
-      if (matchedFlow && matchedFlow.steps.length > 0) {
-        const firstStep = matchedFlow.steps[0]
+      // 使用新的審核流程系統
+      const flowResult = await startFlow({
+        companyId: request.companyId,
+        moduleType: 'LEAVE',
+        referenceId: request.id,
+        applicantId: request.employeeId,
+      })
 
-        // 解析第一關審核者
-        const assignment = await ctx.prisma.employeeAssignment.findFirst({
-          where: { employeeId: request.employeeId, companyId: request.companyId, status: 'ACTIVE' },
-        })
+      if (!flowResult.success) {
+        // 如果新流程系統失敗，嘗試舊的審核流程（向後相容）
+        console.warn('新審核流程啟動失敗:', flowResult.error)
 
-        let approvers: string[] = []
-        if (firstStep.approverType === 'SUPERVISOR' && assignment?.supervisorId) {
-          approvers = [assignment.supervisorId]
-        }
+        // 計算請假天數
+        const totalDays = request.totalHours / 8
 
-        // 建立審核實例
-        const instance = await ctx.prisma.approvalInstance.create({
-          data: {
-            flowId: matchedFlow.id,
+        // 匹配適用的審核流程（舊系統）
+        const flows = await ctx.prisma.approvalFlow.findMany({
+          where: {
             module: 'leave',
-            referenceId: request.id,
-            applicantId: request.employeeId,
-            companyId: request.companyId,
-            status: 'IN_PROGRESS',
-            currentStep: 1,
+            isActive: true,
+            OR: [
+              { companyId: null },
+              { companyId: request.companyId },
+            ],
           },
-        })
-
-        // 建立第一個關卡實例
-        await ctx.prisma.approvalStepInstance.create({
-          data: {
-            instanceId: instance.id,
-            stepId: firstStep.id,
-            stepOrder: 1,
-            assignedTo: JSON.stringify(approvers),
-            status: 'PENDING',
+          include: {
+            steps: { orderBy: { stepOrder: 'asc' } },
           },
+          orderBy: [{ companyId: 'desc' }, { sortOrder: 'asc' }],
         })
 
-        // 更新請假申請的當前審核者
-        await ctx.prisma.leaveRequest.update({
-          where: { id: input.id },
-          data: { currentApproverId: approvers[0] || null },
-        })
-
-        // 通知審核者有新的請假申請待審核
-        if (approvers.length > 0) {
-          const employee = await ctx.prisma.employee.findUnique({
-            where: { id: request.employeeId },
-            select: { name: true },
-          })
+        // 找到匹配的流程
+        let matchedFlow = null
+        for (const flow of flows) {
+          if (!flow.conditions) {
+            if (flow.isDefault) {
+              matchedFlow = flow
+              break
+            }
+            continue
+          }
 
           try {
-            await createNotifications(
-              approvers.map(approverId => ({
-                userId: approverId,
-                type: 'APPROVAL_NEEDED' as const,
-                title: '有新的請假申請待審核',
-                message: `${employee?.name || '員工'} 提出了請假申請`,
-                link: `/dashboard/leave/${request.id}`,
-                refType: 'LeaveRequest',
-                refId: request.id,
-              }))
-            )
-          } catch (error) {
-            console.error('Failed to create notification for leave request approvers:', error)
+            const conditions = JSON.parse(flow.conditions)
+            let match = true
+
+            if (conditions.minDays && totalDays < conditions.minDays) match = false
+            if (conditions.maxDays && totalDays > conditions.maxDays) match = false
+            if (conditions.leaveTypes && !conditions.leaveTypes.includes(request.leaveType.code)) match = false
+
+            if (match) {
+              matchedFlow = flow
+              break
+            }
+          } catch {
+            continue
+          }
+        }
+
+        if (!matchedFlow) {
+          matchedFlow = flows.find(f => f.isDefault) || flows[0]
+        }
+
+        // 如果有審核流程，建立審核實例（舊系統）
+        if (matchedFlow && matchedFlow.steps.length > 0) {
+          const firstStep = matchedFlow.steps[0]
+
+          // 解析第一關審核者
+          const assignment = await ctx.prisma.employeeAssignment.findFirst({
+            where: { employeeId: request.employeeId, companyId: request.companyId, status: 'ACTIVE' },
+          })
+
+          let approvers: string[] = []
+          if (firstStep.approverType === 'SUPERVISOR' && assignment?.supervisorId) {
+            approvers = [assignment.supervisorId]
+          }
+
+          // 建立審核實例
+          const instance = await ctx.prisma.approvalInstance.create({
+            data: {
+              flowId: matchedFlow.id,
+              module: 'leave',
+              referenceId: request.id,
+              applicantId: request.employeeId,
+              companyId: request.companyId,
+              status: 'IN_PROGRESS',
+              currentStep: 1,
+            },
+          })
+
+          // 建立第一個關卡實例
+          await ctx.prisma.approvalStepInstance.create({
+            data: {
+              instanceId: instance.id,
+              stepId: firstStep.id,
+              stepOrder: 1,
+              assignedTo: JSON.stringify(approvers),
+              status: 'PENDING',
+            },
+          })
+
+          // 更新請假申請的當前審核者
+          await ctx.prisma.leaveRequest.update({
+            where: { id: input.id },
+            data: { currentApproverId: approvers[0] || null },
+          })
+
+          // 通知審核者有新的請假申請待審核
+          if (approvers.length > 0) {
+            const employee = await ctx.prisma.employee.findUnique({
+              where: { id: request.employeeId },
+              select: { name: true },
+            })
+
+            try {
+              await createNotifications(
+                approvers.map(approverId => ({
+                  userId: approverId,
+                  type: 'APPROVAL_NEEDED' as const,
+                  title: '有新的請假申請待審核',
+                  message: `${employee?.name || '員工'} 提出了請假申請`,
+                  link: `/dashboard/leave/${request.id}`,
+                  refType: 'LeaveRequest',
+                  refId: request.id,
+                }))
+              )
+            } catch (error) {
+              console.error('Failed to create notification for leave request approvers:', error)
+            }
           }
         }
       }

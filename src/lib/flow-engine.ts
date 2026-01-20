@@ -10,6 +10,135 @@ import type { FlowModuleType, FlowExecutionStatus, FlowApprovalDecision } from '
 const CC_EMPLOYEE_ID_KEY = 'FLOW_CC_EMPLOYEE_ID'
 
 /**
+ * 更新原始申請的狀態（當審核流程完成時）
+ */
+async function updateSourceRequestStatus(
+  moduleType: FlowModuleType,
+  referenceId: string,
+  newStatus: 'APPROVED' | 'REJECTED',
+  approverId?: string,
+  comment?: string
+): Promise<void> {
+  const now = new Date()
+
+  try {
+    switch (moduleType) {
+      case 'LEAVE':
+        await prisma.leaveRequest.update({
+          where: { id: referenceId },
+          data: {
+            status: newStatus,
+            processedAt: now,
+            ...(newStatus === 'APPROVED'
+              ? { approvedById: approverId }
+              : { rejectedById: approverId }),
+            approvalComment: comment,
+          },
+        })
+        // 如果核准，更新假別餘額
+        if (newStatus === 'APPROVED') {
+          const request = await prisma.leaveRequest.findUnique({
+            where: { id: referenceId },
+          })
+          if (request) {
+            const year = new Date().getFullYear()
+            await prisma.leaveBalance.upsert({
+              where: {
+                employeeId_companyId_leaveTypeId_year: {
+                  employeeId: request.employeeId,
+                  companyId: request.companyId,
+                  leaveTypeId: request.leaveTypeId,
+                  year,
+                },
+              },
+              update: {
+                usedHours: { increment: request.totalHours },
+              },
+              create: {
+                employeeId: request.employeeId,
+                companyId: request.companyId,
+                leaveTypeId: request.leaveTypeId,
+                year,
+                usedHours: request.totalHours,
+              },
+            })
+          }
+        }
+        break
+
+      case 'EXPENSE':
+        await prisma.expenseRequest.update({
+          where: { id: referenceId },
+          data: {
+            status: newStatus,
+            processedAt: now,
+            ...(newStatus === 'APPROVED'
+              ? { approvedById: approverId }
+              : { rejectedById: approverId }),
+          },
+        })
+        break
+
+      case 'SEAL':
+        // SealRequest 使用 processedById 而非 approvedById
+        await prisma.sealRequest.update({
+          where: { id: referenceId },
+          data: {
+            status: newStatus === 'APPROVED' ? 'APPROVED' : 'REJECTED',
+            processedAt: now,
+            processedById: approverId,
+          },
+        })
+        break
+
+      case 'CARD':
+        // BusinessCardRequest 只有 approvedById 和 approvedAt
+        await prisma.businessCardRequest.update({
+          where: { id: referenceId },
+          data: {
+            status: newStatus === 'APPROVED' ? 'APPROVED' : 'REJECTED',
+            ...(newStatus === 'APPROVED' ? {
+              approvedById: approverId,
+              approvedAt: now,
+            } : {}),
+          },
+        })
+        break
+
+      case 'STATIONERY':
+        // StationeryRequest 只有 approvedById 和 approvedAt
+        await prisma.stationeryRequest.update({
+          where: { id: referenceId },
+          data: {
+            status: newStatus === 'APPROVED' ? 'APPROVED' : 'REJECTED',
+            ...(newStatus === 'APPROVED' ? {
+              approvedById: approverId,
+              approvedAt: now,
+            } : {}),
+          },
+        })
+        break
+
+      case 'OVERTIME':
+        // 加班申請可能沒有這個 model，先跳過
+        console.log('OVERTIME 更新狀態尚未實作')
+        break
+
+      case 'BUSINESS_TRIP':
+        // 出差申請可能沒有這個 model，先跳過
+        console.log('BUSINESS_TRIP 更新狀態尚未實作')
+        break
+
+      default:
+        console.warn(`未知的模組類型: ${moduleType}`)
+    }
+  } catch (error) {
+    console.error(`更新 ${moduleType} 狀態失敗:`, error)
+    // 不拋出錯誤，避免影響主流程
+  }
+}
+
+/**
  * 取得審核完成抄送員工 ID
  */
 async function getCCEmployeeId(): Promise<string | null> {
@@ -343,6 +472,15 @@ export async function processDecision(params: ProcessDecisionParams): Promise<Pr
       'REJECTED',
       execution.referenceId
     )
+
+    // 更新原始申請狀態
+    await updateSourceRequestStatus(
+      execution.moduleType,
+      execution.referenceId,
+      'REJECTED',
+      approverId,
+      comment
+    )
   } else {
     // 核准 -> 檢查是否還有下一關
     const nextStep = execution.currentStep + 1
@@ -399,6 +537,15 @@ export async function processDecision(params: ProcessDecisionParams): Promise<Pr
         execution.moduleType,
         'APPROVED',
         execution.referenceId
+      )
+
+      // 更新原始申請狀態
+      await updateSourceRequestStatus(
+        execution.moduleType,
+        execution.referenceId,
+        'APPROVED',
+        approverId,
+        comment
       )
     }
   }
