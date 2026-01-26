@@ -41,15 +41,26 @@ export default async function NotificationSettingsPage() {
     orderBy: { name: 'asc' },
   })
 
-  // 取得目前設定
+  // 取得目前設定（多選員工 ID 陣列）
   const ccSetting = await prisma.systemSetting.findUnique({
-    where: { key: 'FLOW_CC_EMPLOYEE_ID' },
+    where: { key: 'FLOW_CC_EMPLOYEE_IDS' },
   })
+
+  // 解析 JSON 陣列
+  let currentCCEmployeeIds: string[] = []
+  if (ccSetting?.value) {
+    try {
+      const parsed = JSON.parse(ccSetting.value)
+      currentCCEmployeeIds = Array.isArray(parsed) ? parsed : []
+    } catch {
+      currentCCEmployeeIds = []
+    }
+  }
 
   return (
     <NotificationSettings
       employees={employees}
-      currentCCEmployeeId={ccSetting?.value || null}
+      currentCCEmployeeIds={currentCCEmployeeIds}
     />
   )
 }

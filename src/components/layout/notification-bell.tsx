@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { Bell, CheckCircle, XCircle, AlertCircle, Clock, Loader2, UserPlus, MessageSquare, ListTodo, AlertTriangle } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import {
@@ -90,6 +89,14 @@ export function NotificationBell() {
   // Mark as read mutation
   const markAsReadMutation = trpc.notification.markAsRead.useMutation()
 
+  // Mark all as read mutation
+  const markAllAsReadMutation = trpc.notification.markAllAsRead.useMutation({
+    onSuccess: () => {
+      utils.notification.getUnreadCount.invalidate({ userId: userId! })
+      utils.notification.getUnread.invalidate({ userId: userId! })
+    },
+  })
+
   const utils = trpc.useUtils()
 
   const handleNotificationClick = async (notification: Notification) => {
@@ -113,6 +120,11 @@ export function NotificationBell() {
     if (notification.link) {
       router.push(notification.link)
     }
+  }
+
+  const handleMarkAllAsRead = async () => {
+    if (!userId || unreadCount === 0) return
+    await markAllAsReadMutation.mutateAsync({ userId })
   }
 
   const unreadCount = countData?.count ?? 0
@@ -183,13 +195,25 @@ export function NotificationBell() {
           )}
         </ScrollArea>
 
-        <div className="border-t px-4 py-2">
-          <Link href="/dashboard/notifications" onClick={() => setOpen(false)}>
-            <Button variant="ghost" className="w-full text-sm">
-              查看全部
+        {unreadCount > 0 && (
+          <div className="border-t px-4 py-2">
+            <Button
+              variant="ghost"
+              className="w-full text-sm"
+              onClick={handleMarkAllAsRead}
+              disabled={markAllAsReadMutation.isPending}
+            >
+              {markAllAsReadMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  處理中...
+                </>
+              ) : (
+                '全部已讀'
+              )}
             </Button>
-          </Link>
-        </div>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   )

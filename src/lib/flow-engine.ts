@@ -7,7 +7,7 @@ import type { FlowModuleType, FlowExecutionStatus, FlowApprovalDecision } from '
  */
 
 // 系統設定 key 常數
-const CC_EMPLOYEE_ID_KEY = 'FLOW_CC_EMPLOYEE_ID'
+const CC_EMPLOYEE_IDS_KEY = 'FLOW_CC_EMPLOYEE_IDS'
 
 /**
  * 更新原始申請的狀態（當審核流程完成時）
@@ -139,48 +139,54 @@ async function updateSourceRequestStatus(
 }
 
 /**
- * 取得審核完成抄送員工 ID
+ * 取得審核完成抄送員工 IDs（支援多人）
  */
-async function getCCEmployeeId(): Promise<string | null> {
+async function getCCEmployeeIds(): Promise<string[]> {
   const setting = await prisma.systemSetting.findUnique({
-    where: { key: CC_EMPLOYEE_ID_KEY },
+    where: { key: CC_EMPLOYEE_IDS_KEY },
   })
-  return setting?.value || null
+  if (!setting?.value) return []
+
+  try {
+    const ids = JSON.parse(setting.value)
+    return Array.isArray(ids) ? ids : []
+  } catch {
+    return []
+  }
 }
 
 /**
- * 發送抄送通知給指定員工（審核完成時）
+ * 發送抄送通知給指定員工（僅在最終核准時）
  */
 async function sendCCNotification(
   executionId: string,
   applicantName: string,
   moduleType: FlowModuleType,
-  decision: 'APPROVED' | 'REJECTED',
   referenceId: string
 ): Promise<void> {
-  const ccEmployeeId = await getCCEmployeeId()
-  if (!ccEmployeeId) return
+  const ccEmployeeIds = await getCCEmployeeIds()
+  if (!ccEmployeeIds || ccEmployeeIds.length === 0) return
 
   // 確認員工存在
-  const employee = await prisma.employee.findUnique({
-    where: { id: ccEmployeeId },
+  const employees = await prisma.employee.findMany({
+    where: { id: { in: ccEmployeeIds } },
     select: { id: true },
   })
-  if (!employee) return
+  if (employees.length === 0) return
 
   const moduleTypeName = getModuleTypeName(moduleType)
-  const decisionText = decision === 'APPROVED' ? '已核准' : '已駁回'
 
-  await prisma.notification.create({
-    data: {
-      userId: ccEmployeeId,
+  // 為每位抄送員工建立通知
+  await prisma.notification.createMany({
+    data: employees.map(emp => ({
+      userId: emp.id,
       type: 'APPROVAL_CC',
       title: `審核完成通知（抄送）`,
-      message: `${applicantName} 的${moduleTypeName}申請${decisionText}`,
+      message: `${applicantName} 的${moduleTypeName}申請已核准`,
       refType: 'FlowExecution',
       refId: executionId,
       link: `/dashboard/approval`,
-    },
+    })),
   })
 }
 
@@ -287,7 +293,6 @@ export async function startFlow(params: StartFlowParams): Promise<StartFlowResul
         stepOrder: step.stepOrder,
         stepName: step.name,
         assigneeId,
-        isRequired: step.isRequired,
       })
     }
   }
@@ -464,15 +469,6 @@ export async function processDecision(params: ProcessDecisionParams): Promise<Pr
       },
     })
 
-    // 抄送通知給指定員工
-    await sendCCNotification(
-      executionId,
-      execution.applicant.name,
-      execution.moduleType,
-      'REJECTED',
-      execution.referenceId
-    )
-
     // 更新原始申請狀態
     await updateSourceRequestStatus(
       execution.moduleType,
@@ -530,12 +526,11 @@ export async function processDecision(params: ProcessDecisionParams): Promise<Pr
         },
       })
 
-      // 抄送通知給指定員工
+      // 抄送通知給指定員工（僅核准時）
       await sendCCNotification(
         executionId,
         execution.applicant.name,
         execution.moduleType,
-        'APPROVED',
         execution.referenceId
       )
 
