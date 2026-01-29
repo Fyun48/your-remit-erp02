@@ -7,6 +7,7 @@ import { defaultTheme } from '@/lib/themes'
 const sidebarConfigSchema = z.object({
   menuOrder: z.array(z.string()),
   hiddenMenus: z.array(z.string()),
+  expandedMenuId: z.string().nullable().optional(),
 })
 
 export const userPreferenceRouter = router({
@@ -24,6 +25,7 @@ export const userPreferenceRouter = router({
           sidebarConfig: {
             menuOrder: getDefaultMenuOrder(),
             hiddenMenus: [],
+            expandedMenuId: null,
           },
           themeConfig: {
             theme: defaultTheme,
@@ -31,13 +33,17 @@ export const userPreferenceRouter = router({
         }
       }
 
+      const storedConfig = preference.sidebarConfig as {
+        menuOrder: string[]
+        hiddenMenus: string[]
+        expandedMenuId?: string | null
+      } | null
+
       return {
-        sidebarConfig: preference.sidebarConfig as {
-          menuOrder: string[]
-          hiddenMenus: string[]
-        } || {
-          menuOrder: getDefaultMenuOrder(),
-          hiddenMenus: [],
+        sidebarConfig: {
+          menuOrder: storedConfig?.menuOrder || getDefaultMenuOrder(),
+          hiddenMenus: storedConfig?.hiddenMenus || [],
+          expandedMenuId: storedConfig?.expandedMenuId || null,
         },
         themeConfig: preference.themeConfig as { theme: string } || {
           theme: defaultTheme,
@@ -71,6 +77,7 @@ export const userPreferenceRouter = router({
       const defaultConfig = {
         menuOrder: getDefaultMenuOrder(),
         hiddenMenus: [],
+        expandedMenuId: null,
       }
 
       return ctx.prisma.userPreference.upsert({
@@ -81,6 +88,42 @@ export const userPreferenceRouter = router({
         create: {
           employeeId: input.employeeId,
           sidebarConfig: defaultConfig,
+        },
+      })
+    }),
+
+  // 更新展開的選單 ID（用於記住展開狀態）
+  updateExpandedMenu: publicProcedure
+    .input(z.object({
+      employeeId: z.string(),
+      expandedMenuId: z.string().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // 先取得現有設定
+      const existing = await ctx.prisma.userPreference.findUnique({
+        where: { employeeId: input.employeeId },
+      })
+
+      const currentConfig = existing?.sidebarConfig as {
+        menuOrder: string[]
+        hiddenMenus: string[]
+        expandedMenuId?: string | null
+      } | null
+
+      const updatedConfig = {
+        menuOrder: currentConfig?.menuOrder || getDefaultMenuOrder(),
+        hiddenMenus: currentConfig?.hiddenMenus || [],
+        expandedMenuId: input.expandedMenuId,
+      }
+
+      return ctx.prisma.userPreference.upsert({
+        where: { employeeId: input.employeeId },
+        update: {
+          sidebarConfig: updatedConfig,
+        },
+        create: {
+          employeeId: input.employeeId,
+          sidebarConfig: updatedConfig,
         },
       })
     }),

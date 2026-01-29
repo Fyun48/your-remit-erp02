@@ -4,6 +4,7 @@ import { getDefaultMenuOrder } from '@/lib/sidebar-menu'
 interface SidebarConfig {
   menuOrder: string[]
   hiddenMenus: string[]
+  expandedMenuId: string | null
 }
 
 interface SidebarStore {
@@ -15,6 +16,7 @@ interface SidebarStore {
   setConfig: (config: SidebarConfig) => void
   updateMenuOrder: (menuOrder: string[]) => void
   toggleMenuVisibility: (menuId: string) => void
+  setExpandedMenuId: (menuId: string | null) => void
   resetToDefault: () => void
   setLoaded: (loaded: boolean) => void
 }
@@ -22,6 +24,7 @@ interface SidebarStore {
 const defaultConfig: SidebarConfig = {
   menuOrder: getDefaultMenuOrder(),
   hiddenMenus: [],
+  expandedMenuId: null,
 }
 
 export const useSidebarStore = create<SidebarStore>((set) => ({
@@ -44,6 +47,11 @@ export const useSidebarStore = create<SidebarStore>((set) => ({
         config: { ...state.config, hiddenMenus },
       }
     }),
+
+  setExpandedMenuId: (menuId) =>
+    set((state) => ({
+      config: { ...state.config, expandedMenuId: menuId },
+    })),
 
   resetToDefault: () => set({ config: defaultConfig }),
 

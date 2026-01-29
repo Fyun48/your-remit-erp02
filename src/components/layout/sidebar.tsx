@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -21,9 +21,11 @@ interface SidebarProps {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const { data: session } = useSession()
-  const { config, isLoaded, setConfig, setLoaded } = useSidebarStore()
+  const { config, isLoaded, setConfig, setLoaded, setExpandedMenuId } = useSidebarStore()
   const [showSettings, setShowSettings] = useState(false)
-  const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null)
+
+  // 使用 store 中的 expandedMenuId
+  const expandedMenuId = config.expandedMenuId
 
   const employeeId = (session?.user as { id?: string })?.id || ''
 
@@ -46,6 +48,39 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     { enabled: !!employeeId && !!primaryCompanyId }
   )
 
+  // 更新展開選單狀態的 mutation
+  const updateExpandedMenuMutation = trpc.userPreference.updateExpandedMenu.useMutation()
+
+  // 防抖計時器 ref
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // 防抖保存展開狀態
+  const saveExpandedMenu = useCallback((menuId: string | null) => {
+    if (!employeeId) return
+
+    // 清除之前的計時器
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    // 設定新的計時器（500ms 後保存）
+    debounceTimerRef.current = setTimeout(() => {
+      updateExpandedMenuMutation.mutate({
+        employeeId,
+        expandedMenuId: menuId,
+      })
+    }, 500)
+  }, [employeeId, updateExpandedMenuMutation])
+
+  // 清理計時器
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (preference && !isLoaded) {
       setConfig(preference.sidebarConfig)
@@ -53,13 +88,25 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     }
   }, [preference, isLoaded, setConfig, setLoaded])
 
-  // 根據當前路徑自動展開對應的選單
+  // 根據當前路徑自動展開對應的選單（僅在首次載入或路徑變更時）
+  const hasInitializedRef = useRef(false)
   useEffect(() => {
+    // 如果已載入偏好設定且有保存的展開狀態，優先使用保存的狀態
+    if (isLoaded && config.expandedMenuId && !hasInitializedRef.current) {
+      hasInitializedRef.current = true
+      return
+    }
+
+    // 否則根據當前路徑自動展開
     const parentMenuId = findParentMenuByHref(pathname)
     if (parentMenuId && parentMenuId !== expandedMenuId) {
       setExpandedMenuId(parentMenuId)
+      // 如果是根據路徑自動展開，也要保存
+      if (isLoaded) {
+        saveExpandedMenu(parentMenuId)
+      }
     }
-  }, [pathname])
+  }, [pathname, isLoaded])
 
   // 根據設定和權限過濾並排序選單
   const visibleMenuItems = useMemo(() => {
@@ -82,7 +129,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     if (item.children && item.children.length > 0) {
       e.preventDefault()
       // 手風琴模式：如果已展開則收合，否則展開並收合其他
-      setExpandedMenuId(expandedMenuId === item.id ? null : item.id)
+      const newExpandedId = expandedMenuId === item.id ? null : item.id
+      setExpandedMenuId(newExpandedId)
+      // 保存到使用者偏好
+      saveExpandedMenu(newExpandedId)
     }
   }
 
