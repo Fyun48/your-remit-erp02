@@ -71,6 +71,198 @@ const entityTypeLabels: Record<string, string> = {
   ExpenseRequest: '費用報銷',
   AttendanceRecord: '出勤紀錄',
   ApprovalFlow: '審批流程',
+  EmployeeAssignment: '員工任職',
+  EmployeeChangeLog: '員工異動',
+  LeaveType: '假別',
+  LeaveBalance: '假別餘額',
+  ExpenseCategory: '費用類別',
+  SealRequest: '用印申請',
+  BusinessCardRequest: '名片申請',
+  StationeryRequest: '文具申請',
+  WorkShift: '班別',
+  Project: '專案',
+  Notification: '通知',
+  FlowTemplate: '流程範本',
+  FlowExecution: '流程執行',
+  Delegation: '職務代理',
+}
+
+// 欄位名稱中文對照表
+const fieldLabels: Record<string, string> = {
+  // 通用欄位
+  id: '編號',
+  name: '名稱',
+  code: '代碼',
+  description: '描述',
+  isActive: '啟用狀態',
+  status: '狀態',
+  createdAt: '建立時間',
+  updatedAt: '更新時間',
+  sortOrder: '排序',
+  note: '備註',
+  remark: '備註',
+
+  // 公司/集團
+  taxId: '統一編號',
+  address: '地址',
+  phone: '電話',
+  groupId: '所屬集團',
+  companyId: '所屬公司',
+  annualLeaveMethod: '特休計算制度',
+
+  // 員工
+  employeeNo: '員工編號',
+  email: '電子郵件',
+  password: '密碼',
+  avatar: '頭像',
+  hireDate: '到職日',
+  resignDate: '離職日',
+  birthDate: '生日',
+  gender: '性別',
+  idNumber: '身分證字號',
+  emergencyContact: '緊急聯絡人',
+  emergencyPhone: '緊急聯絡電話',
+  lineId: 'LINE ID',
+  lineUserId: 'LINE 用戶 ID',
+  notificationEnabled: '通知啟用',
+  notificationPreferences: '通知偏好',
+
+  // 員工任職
+  employeeId: '員工',
+  departmentId: '部門',
+  positionId: '職位',
+  roleId: '角色',
+  supervisorId: '直屬主管',
+  isPrimary: '主要任職',
+  startDate: '開始日期',
+  endDate: '結束日期',
+
+  // 部門/職位
+  parentId: '上層部門',
+  level: '職等',
+
+  // 請假
+  leaveTypeId: '假別',
+  startTime: '開始時間',
+  endTime: '結束時間',
+  hours: '時數',
+  reason: '原因',
+  approvalStatus: '審核狀態',
+  approvedById: '審核者',
+  approvedAt: '審核時間',
+  rejectReason: '駁回原因',
+
+  // 假別
+  isPaidLeave: '有薪假',
+  requiresProof: '需要證明',
+  maxDaysPerYear: '年度上限天數',
+  minHoursPerRequest: '單次最少時數',
+  maxHoursPerRequest: '單次最多時數',
+  allowHalfDay: '允許半天',
+  allowHourly: '允許按小時',
+  carryOverDays: '可結轉天數',
+  isDefault: '預設假別',
+
+  // 假別餘額
+  year: '年度',
+  entitledDays: '應有天數',
+  usedDays: '已使用天數',
+  remainingDays: '剩餘天數',
+  carryOverFromLastYear: '去年結轉',
+  expiryDate: '到期日',
+  adjustedDays: '調整天數',
+  adjustmentReason: '調整原因',
+
+  // 費用報銷
+  expenseNo: '報銷單號',
+  totalAmount: '總金額',
+  currency: '幣別',
+  paymentMethod: '付款方式',
+  paymentDate: '付款日期',
+  paymentNote: '付款備註',
+
+  // 費用類別
+  requiresReceipt: '需要收據',
+  maxAmountPerItem: '單項上限金額',
+  maxAmountPerMonth: '月度上限金額',
+  requiresPreApproval: '需要預先審核',
+
+  // 出勤
+  clockIn: '上班打卡',
+  clockOut: '下班打卡',
+  workDate: '工作日期',
+  shiftId: '班別',
+  isLate: '遲到',
+  isEarlyLeave: '早退',
+  lateMinutes: '遲到分鐘',
+  earlyLeaveMinutes: '早退分鐘',
+  overtimeHours: '加班時數',
+
+  // 傳票
+  voucherNo: '傳票編號',
+  voucherDate: '傳票日期',
+  voucherType: '傳票類型',
+  periodId: '會計期間',
+  debitTotal: '借方總額',
+  creditTotal: '貸方總額',
+  attachment: '附件',
+  postedAt: '過帳時間',
+  postedById: '過帳者',
+
+  // 會計科目
+  accountCode: '科目代碼',
+  accountName: '科目名稱',
+  accountType: '科目類型',
+  parentCode: '上層科目',
+  isCashFlow: '現金流量',
+  isBankAccount: '銀行帳戶',
+
+  // 會計期間
+  periodName: '期間名稱',
+  isClosed: '已結帳',
+  closedAt: '結帳時間',
+  closedById: '結帳者',
+
+  // 審批流程
+  module: '模組',
+  conditions: '條件',
+  steps: '步驟',
+
+  // 權限
+  permission: '權限',
+  grantedById: '授權者',
+  grantedAt: '授權時間',
+  expiresAt: '到期時間',
+
+  // 其他
+  title: '標題',
+  content: '內容',
+  type: '類型',
+  priority: '優先順序',
+  dueDate: '到期日',
+  completedAt: '完成時間',
+  assigneeId: '負責人',
+  amount: '金額',
+  quantity: '數量',
+  unitPrice: '單價',
+  unit: '單位',
+}
+
+// 將欄位名稱轉換為中文
+function translateFieldName(fieldPath: string): string {
+  if (!fieldPath) return '-'
+
+  // 處理多個欄位（以逗號分隔）
+  const fields = fieldPath.split(',').map(f => f.trim())
+
+  const translatedFields = fields.map(field => {
+    // 移除可能的前綴（如 employee.name -> name）
+    const parts = field.split('.')
+    const fieldName = parts[parts.length - 1]
+    return fieldLabels[fieldName] || field
+  })
+
+  return translatedFields.join('、')
 }
 
 export function AuditLogList({ userId }: AuditLogListProps) {
@@ -330,8 +522,8 @@ export function AuditLogList({ userId }: AuditLogListProps) {
                   <TableCell>
                     {entityTypeLabels[log.entityType] || log.entityType}
                   </TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {log.path || '-'}
+                  <TableCell className="max-w-[200px] truncate" title={log.path || undefined}>
+                    {translateFieldName(log.path || '')}
                   </TableCell>
                   <TableCell>
                     {log.company?.name || '-'}
@@ -433,8 +625,9 @@ export function AuditLogList({ userId }: AuditLogListProps) {
               {detailQuery.data.path && (
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">變更欄位</div>
-                  <div className="font-mono text-sm bg-muted p-2 rounded">
-                    {detailQuery.data.path}
+                  <div className="text-sm bg-muted p-2 rounded">
+                    <span className="font-medium">{translateFieldName(detailQuery.data.path)}</span>
+                    <span className="text-muted-foreground ml-2 font-mono text-xs">({detailQuery.data.path})</span>
                   </div>
                 </div>
               )}
