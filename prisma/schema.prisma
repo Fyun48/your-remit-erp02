@@ -165,6 +165,10 @@ model Company {
   flowExecutions FlowExecution[]
   delegations    Delegation[]
 
+  // 選單配置
+  menuConfigs    MenuConfig[]
+  subMenuConfigs SubMenuConfig[]
+
   @@map("companies")
 }
 
@@ -3067,4 +3071,54 @@ model DelegationPermission {
 
   @@unique([delegationId, permissionType])
   @@map("delegation_permissions")
+}
+
+// ==================== 選單配置 ====================
+
+// 主選單配置（公司層級）
+model MenuConfig {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  menuId    String   // 主選單 ID（對應 sidebar-menu.ts）
+  menuName  String   // 顯示名稱（可自訂）
+  sortOrder Int      @default(0)
+  isLocked  Boolean  @default(false) // 鎖定不可調整
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subMenus SubMenuConfig[]
+
+  @@unique([companyId, menuId])
+  @@index([companyId])
+  @@map("menu_configs")
+}
+
+// 子選單配置（公司層級）
+model SubMenuConfig {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  parentMenuId String?
+  parentMenu   MenuConfig? @relation(fields: [parentMenuId], references: [id], onDelete: SetNull)
+
+  subMenuId   String  // 子選單 ID（對應 sidebar-menu.ts）
+  subMenuName String  // 顯示名稱（可自訂）
+  href        String  // 連結路徑
+  sortOrder   Int     @default(0)
+
+  isIndependent Boolean @default(false) // 獨立顯示在側邊欄（不歸屬任何主選單）
+  isSystem      Boolean @default(false) // 系統自動偵測新增的功能
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, subMenuId])
+  @@index([companyId])
+  @@index([parentMenuId])
+  @@map("sub_menu_configs")
 }
