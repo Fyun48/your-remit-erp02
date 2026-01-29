@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
-import { Settings2, X } from 'lucide-react'
+import { Settings2, X, ChevronDown } from 'lucide-react'
 import { PWAInstallPrompt } from '@/components/pwa/pwa-install-prompt'
 import { useMobileSidebar } from './mobile-sidebar-context'
 import { PersonalizationModal } from '@/components/personalization'
-import { getMenuItemById } from '@/lib/sidebar-menu'
+import { getMenuItemById, findParentMenuByHref, MenuItem } from '@/lib/sidebar-menu'
 import { useSidebarStore } from '@/stores/use-sidebar-store'
 import { trpc } from '@/lib/trpc'
 import { checkMenuVisibility } from '@/hooks/use-permissions'
@@ -23,6 +23,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { data: session } = useSession()
   const { config, isLoaded, setConfig, setLoaded } = useSidebarStore()
   const [showSettings, setShowSettings] = useState(false)
+  const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null)
 
   const employeeId = (session?.user as { id?: string })?.id || ''
 
@@ -52,6 +53,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     }
   }, [preference, isLoaded, setConfig, setLoaded])
 
+  // 根據當前路徑自動展開對應的選單
+  useEffect(() => {
+    const parentMenuId = findParentMenuByHref(pathname)
+    if (parentMenuId && parentMenuId !== expandedMenuId) {
+      setExpandedMenuId(parentMenuId)
+    }
+  }, [pathname])
+
   // 根據設定和權限過濾並排序選單
   const visibleMenuItems = useMemo(() => {
     const userPermissions = permissionData?.permissions || []
@@ -68,34 +77,152 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       })
   }, [config.menuOrder, config.hiddenMenus, permissionData])
 
+  // 手風琴模式：點擊展開/收合
+  const handleMenuClick = (item: MenuItem, e: React.MouseEvent) => {
+    if (item.children && item.children.length > 0) {
+      e.preventDefault()
+      // 手風琴模式：如果已展開則收合，否則展開並收合其他
+      setExpandedMenuId(expandedMenuId === item.id ? null : item.id)
+    }
+  }
+
+  // 檢查選單是否有可見的子選單
+  const hasVisibleChildren = (item: MenuItem) => {
+    if (!item.children || item.children.length === 0) return false
+    const userPermissions = permissionData?.permissions || []
+    const isAdmin = permissionData?.isGroupAdmin || permissionData?.isCompanyManager || false
+
+    return item.children.some(child => {
+      if (!child.permission) return true
+      const { visible } = checkMenuVisibility(child.permission, userPermissions, isAdmin)
+      return visible
+    })
+  }
+
+  // 過濾可見的子選單
+  const getVisibleChildren = (item: MenuItem) => {
+    if (!item.children) return []
+    const userPermissions = permissionData?.permissions || []
+    const isAdmin = permissionData?.isGroupAdmin || permissionData?.isCompanyManager || false
+
+    return item.children.filter(child => {
+      if (!child.permission) return true
+      const { visible } = checkMenuVisibility(child.permission, userPermissions, isAdmin)
+      return visible
+    })
+  }
+
   return (
     <>
       <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">
         {visibleMenuItems.map((item) => {
-          // 儀表板只有完全匹配時才高亮，其他頁面支援子路徑匹配
-          const isActive = item.href === '/dashboard'
+          const hasChildren = hasVisibleChildren(item)
+          const isExpanded = expandedMenuId === item.id
+          const visibleChildren = getVisibleChildren(item)
+
+          // 判斷是否為當前選中的主選單
+          const isParentActive = item.href === '/dashboard'
             ? pathname === '/dashboard'
             : pathname === item.href || pathname.startsWith(item.href + '/')
+
+          // 如果有子選單，也要檢查子選單是否匹配
+          const isChildActive = visibleChildren.some(
+            child => pathname === child.href || pathname.startsWith(child.href + '/')
+          )
+
+          const isActive = isParentActive || isChildActive
+
           return (
-            <Link
-              key={item.id}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                'group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-sidebar-muted-foreground hover:bg-sidebar-muted hover:text-sidebar-foreground'
+            <div key={item.id}>
+              {/* 主選單項目 */}
+              {hasChildren ? (
+                <button
+                  onClick={(e) => handleMenuClick(item, e)}
+                  className={cn(
+                    'group flex items-center justify-between w-full rounded-md px-2 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-sidebar-muted-foreground hover:bg-sidebar-muted hover:text-sidebar-foreground'
+                  )}
+                >
+                  <div className="flex items-center">
+                    <item.icon
+                      className={cn(
+                        'mr-3 h-5 w-5 flex-shrink-0 transition-colors',
+                        isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-muted-foreground group-hover:text-sidebar-foreground'
+                      )}
+                    />
+                    {item.name}
+                  </div>
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 transition-transform duration-200',
+                      isExpanded ? 'rotate-180' : ''
+                    )}
+                  />
+                </button>
+              ) : (
+                <Link
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    'group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-sidebar-muted-foreground hover:bg-sidebar-muted hover:text-sidebar-foreground'
+                  )}
+                >
+                  <item.icon
+                    className={cn(
+                      'mr-3 h-5 w-5 flex-shrink-0 transition-colors',
+                      isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-muted-foreground group-hover:text-sidebar-foreground'
+                    )}
+                  />
+                  {item.name}
+                </Link>
               )}
-            >
-              <item.icon
-                className={cn(
-                  'mr-3 h-5 w-5 flex-shrink-0 transition-colors',
-                  isActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-muted-foreground group-hover:text-sidebar-foreground'
-                )}
-              />
-              {item.name}
-            </Link>
+
+              {/* 子選單 */}
+              {hasChildren && (
+                <div
+                  className={cn(
+                    'overflow-hidden transition-all duration-200 ease-in-out',
+                    isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'
+                  )}
+                >
+                  <div className="ml-4 mt-1 space-y-1 border-l border-sidebar-border pl-3">
+                    {visibleChildren.map((child) => {
+                      const isChildItemActive = pathname === child.href || pathname.startsWith(child.href + '/')
+                      const ChildIcon = child.icon
+
+                      return (
+                        <Link
+                          key={child.id}
+                          href={child.href}
+                          onClick={onNavigate}
+                          className={cn(
+                            'group flex items-center rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                            isChildItemActive
+                              ? 'bg-sidebar-accent/70 text-sidebar-accent-foreground'
+                              : 'text-sidebar-muted-foreground hover:bg-sidebar-muted hover:text-sidebar-foreground'
+                          )}
+                        >
+                          {ChildIcon && (
+                            <ChildIcon
+                              className={cn(
+                                'mr-2 h-4 w-4 flex-shrink-0 transition-colors',
+                                isChildItemActive ? 'text-sidebar-accent-foreground' : 'text-sidebar-muted-foreground group-hover:text-sidebar-foreground'
+                              )}
+                            />
+                          )}
+                          {child.name}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           )
         })}
       </nav>
@@ -124,13 +251,23 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export function Sidebar({ groupName = '集團' }: SidebarProps) {
   const { isOpen, close } = useMobileSidebar()
+  const router = useRouter()
+
+  const handleLogoClick = () => {
+    router.push('/dashboard')
+  }
 
   return (
     <>
       {/* 桌面版側邊欄 - 固定顯示 */}
       <div className="hidden md:flex h-full w-52 flex-col bg-sidebar">
         <div className="flex h-16 items-center justify-center border-b border-sidebar-border">
-          <h1 className="text-lg font-bold text-sidebar-foreground">{groupName}</h1>
+          <button
+            onClick={handleLogoClick}
+            className="text-lg font-bold text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors cursor-pointer"
+          >
+            {groupName}
+          </button>
         </div>
         <SidebarContent />
       </div>
@@ -146,7 +283,15 @@ export function Sidebar({ groupName = '集團' }: SidebarProps) {
           {/* 側邊欄 */}
           <div className="fixed inset-y-0 left-0 w-56 flex flex-col bg-sidebar">
             <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-              <h1 className="text-lg font-bold text-sidebar-foreground">{groupName}</h1>
+              <button
+                onClick={() => {
+                  handleLogoClick()
+                  close()
+                }}
+                className="text-lg font-bold text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors cursor-pointer"
+              >
+                {groupName}
+              </button>
               <button
                 onClick={close}
                 className="text-sidebar-muted-foreground hover:text-sidebar-foreground p-1 transition-colors"
