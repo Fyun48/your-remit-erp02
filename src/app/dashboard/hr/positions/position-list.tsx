@@ -41,10 +41,10 @@ interface PositionListProps {
 
 const levelLabels: Record<number, string> = {
   0: '基層',
-  1: '初級',
-  2: '中級',
-  3: '高級',
-  4: '資深',
+  1: '專員',
+  2: '組長',
+  3: '主任',
+  4: '副理',
   5: '主管',
   6: '經理',
   7: '協理',
