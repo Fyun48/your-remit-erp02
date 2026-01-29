@@ -53,11 +53,6 @@ const levelLabels: Record<number, string> = {
   10: '董事',
 }
 
-// 清理職位名稱中的 Lv.X 前綴
-const cleanPositionName = (name: string): string => {
-  return name.replace(/^Lv\.\d+\s*/, '')
-}
-
 export function PositionList({ companyId, companyName }: PositionListProps) {
   const utils = trpc.useUtils()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -204,46 +199,43 @@ export function PositionList({ companyId, companyName }: PositionListProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activePositions.map((pos) => {
-                  const cleanName = cleanPositionName(pos.name)
-                  return (
-                    <TableRow key={pos.id}>
-                      <TableCell className="font-mono">{pos.code}</TableCell>
-                      <TableCell className="font-medium">{cleanName}</TableCell>
-                      <TableCell>
-                        <Badge variant={pos.level >= 5 ? 'default' : 'secondary'}>
-                          Lv.{pos.level} {levelLabels[pos.level] || ''}{cleanName}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          {pos._count.employees}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openEdit(pos)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setDeletingPos(pos)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                {activePositions.map((pos) => (
+                  <TableRow key={pos.id}>
+                    <TableCell className="font-mono">{pos.code}</TableCell>
+                    <TableCell className="font-medium">{pos.name}</TableCell>
+                    <TableCell>
+                      <Badge variant={pos.level >= 5 ? 'default' : 'secondary'}>
+                        Lv.{pos.level} {levelLabels[pos.level] || ''}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        {pos._count.employees}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEdit(pos)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setDeletingPos(pos)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
