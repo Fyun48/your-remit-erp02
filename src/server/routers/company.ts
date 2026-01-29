@@ -67,13 +67,17 @@ export const companyRouter = router({
 
   // 列出所有公司 (需要跨公司檢視權限)
   listAll: publicProcedure
-    .input(z.object({ userId: z.string() }))
+    .input(z.object({
+      userId: z.string(),
+      activeOnly: z.boolean().optional().default(false),
+    }))
     .query(async ({ ctx, input }) => {
       const hasPermission = await canViewCrossCompany(input.userId)
       if (!hasPermission) {
         throw new TRPCError({ code: 'FORBIDDEN', message: '無跨公司檢視權限' })
       }
       return ctx.prisma.company.findMany({
+        where: input.activeOnly ? { isActive: true } : undefined,
         include: {
           group: true,
           _count: {
@@ -475,5 +479,231 @@ export const companyRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: '公司不存在' })
       }
       return company
+    }),
+
+  // 取得可轉移的目標公司列表（排除被刪除的公司，只取啟用的）
+  getTransferTargets: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      excludeCompanyId: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const hasPermission = await canManageCompany(input.userId)
+      if (!hasPermission) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無公司管理權限' })
+      }
+
+      return ctx.prisma.company.findMany({
+        where: {
+          isActive: true,
+          id: { not: input.excludeCompanyId },
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          departments: {
+            where: { isActive: true },
+            select: { id: true, code: true, name: true },
+            orderBy: { sortOrder: 'asc' },
+          },
+          positions: {
+            where: { isActive: true },
+            select: { id: true, code: true, name: true, level: true },
+            orderBy: { level: 'desc' },
+          },
+        },
+        orderBy: { name: 'asc' },
+      })
+    }),
+
+  // 刪除公司（停用公司並處理員工）
+  delete: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      companyId: z.string(),
+      mode: z.enum(['TRANSFER', 'DEACTIVATE']),
+      targetCompanyId: z.string().optional(),
+      targetDepartmentId: z.string().optional(),
+      targetPositionId: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const hasPermission = await canManageCompany(input.userId)
+      if (!hasPermission) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無公司管理權限' })
+      }
+
+      // 取得要刪除的公司資料
+      const company = await ctx.prisma.company.findUnique({
+        where: { id: input.companyId },
+        include: {
+          _count: { select: { employees: { where: { status: 'ACTIVE' } } } },
+        },
+      })
+
+      if (!company) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '公司不存在' })
+      }
+
+      if (!company.isActive) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '公司已停用' })
+      }
+
+      // 取得該公司所有在職的員工任職
+      const activeAssignments = await ctx.prisma.employeeAssignment.findMany({
+        where: { companyId: input.companyId, status: 'ACTIVE' },
+        include: {
+          employee: true,
+          department: true,
+          position: true,
+        },
+      })
+
+      // 如果有員工且為轉移模式，驗證目標資料
+      if (activeAssignments.length > 0 && input.mode === 'TRANSFER') {
+        if (!input.targetCompanyId || !input.targetDepartmentId || !input.targetPositionId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: '轉移模式需要指定目標公司、部門和職位',
+          })
+        }
+
+        // 驗證目標公司存在且啟用
+        const targetCompany = await ctx.prisma.company.findUnique({
+          where: { id: input.targetCompanyId },
+        })
+        if (!targetCompany || !targetCompany.isActive) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: '目標公司不存在或已停用' })
+        }
+
+        // 驗證目標部門存在且啟用
+        const targetDepartment = await ctx.prisma.department.findUnique({
+          where: { id: input.targetDepartmentId },
+        })
+        if (!targetDepartment || !targetDepartment.isActive || targetDepartment.companyId !== input.targetCompanyId) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: '目標部門不存在或已停用' })
+        }
+
+        // 驗證目標職位存在且啟用
+        const targetPosition = await ctx.prisma.position.findUnique({
+          where: { id: input.targetPositionId },
+        })
+        if (!targetPosition || !targetPosition.isActive || targetPosition.companyId !== input.targetCompanyId) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: '目標職位不存在或已停用' })
+        }
+      }
+
+      const now = new Date()
+
+      // 使用交易確保資料一致性
+      const result = await ctx.prisma.$transaction(async (tx) => {
+        // 處理每個在職的員工任職
+        for (const assignment of activeAssignments) {
+          // 結束原公司的任職
+          await tx.employeeAssignment.update({
+            where: { id: assignment.id },
+            data: {
+              status: 'RESIGNED',
+              endDate: now,
+            },
+          })
+
+          if (input.mode === 'TRANSFER') {
+            // 轉移模式：檢查員工在目標公司是否已有任職
+            const existingAssignment = await tx.employeeAssignment.findUnique({
+              where: {
+                employeeId_companyId: {
+                  employeeId: assignment.employeeId,
+                  companyId: input.targetCompanyId!,
+                },
+              },
+            })
+
+            if (!existingAssignment) {
+              // 建立新的任職紀錄
+              await tx.employeeAssignment.create({
+                data: {
+                  employeeId: assignment.employeeId,
+                  companyId: input.targetCompanyId!,
+                  departmentId: input.targetDepartmentId!,
+                  positionId: input.targetPositionId!,
+                  isPrimary: assignment.isPrimary,
+                  startDate: now,
+                  status: 'ACTIVE',
+                },
+              })
+            }
+
+            // 記錄員工異動（轉調）
+            await tx.employeeChangeLog.create({
+              data: {
+                employeeId: assignment.employeeId,
+                changeType: 'TRANSFER',
+                changeDate: now,
+                fromCompanyId: input.companyId,
+                fromDepartmentId: assignment.departmentId,
+                fromPositionId: assignment.positionId,
+                toCompanyId: input.targetCompanyId!,
+                toDepartmentId: input.targetDepartmentId!,
+                toPositionId: input.targetPositionId!,
+                reason: '公司刪除 - 員工轉移',
+                createdById: input.userId,
+              },
+            })
+          } else {
+            // 停用模式：檢查員工是否有其他 ACTIVE 任職
+            const otherActiveAssignments = await tx.employeeAssignment.count({
+              where: {
+                employeeId: assignment.employeeId,
+                status: 'ACTIVE',
+                id: { not: assignment.id },
+              },
+            })
+
+            if (otherActiveAssignments === 0) {
+              // 沒有其他任職，停用員工帳號
+              await tx.employee.update({
+                where: { id: assignment.employeeId },
+                data: {
+                  isActive: false,
+                  resignDate: now,
+                },
+              })
+            }
+
+            // 記錄員工異動（離職）
+            await tx.employeeChangeLog.create({
+              data: {
+                employeeId: assignment.employeeId,
+                changeType: 'OFFBOARD',
+                changeDate: now,
+                fromCompanyId: input.companyId,
+                fromDepartmentId: assignment.departmentId,
+                fromPositionId: assignment.positionId,
+                reason: '公司刪除 - 員工停用',
+                createdById: input.userId,
+              },
+            })
+          }
+        }
+
+        // 停用公司
+        const updatedCompany = await tx.company.update({
+          where: { id: input.companyId },
+          data: { isActive: false },
+        })
+
+        return updatedCompany
+      })
+
+      // 記錄稽核日誌
+      await auditUpdate('Company', input.companyId, company, result, input.userId)
+
+      return {
+        success: true,
+        company: result,
+        processedEmployees: activeAssignments.length,
+        mode: input.mode,
+      }
     }),
 })

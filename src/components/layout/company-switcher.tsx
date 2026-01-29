@@ -29,9 +29,9 @@ export function CompanySwitcher({
 
   const userId = session?.user?.id || ''
 
-  // 如果是集團管理員，載入所有公司
+  // 如果是集團管理員，載入所有啟用的公司
   const { data: companies = [] } = trpc.company.listAll.useQuery(
-    { userId },
+    { userId, activeOnly: true },
     { enabled: isGroupAdmin && !!userId }
   )
 

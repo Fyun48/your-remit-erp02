@@ -49,7 +49,10 @@ import {
   Power,
   ArrowLeft,
   Loader2,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { trpc } from '@/lib/trpc'
 import Link from 'next/link'
 
@@ -71,7 +74,25 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [selectedCompany, setSelectedCompany] = useState<typeof companies[0] | null>(null)
+
+  // Delete dialog states
+  const [deleteMode, setDeleteMode] = useState<'TRANSFER' | 'DEACTIVATE'>('DEACTIVATE')
+  const [targetCompanyId, setTargetCompanyId] = useState('')
+  const [targetDepartmentId, setTargetDepartmentId] = useState('')
+  const [targetPositionId, setTargetPositionId] = useState('')
+
+  // 取得可轉移的目標公司
+  const { data: transferTargets = [] } = trpc.company.getTransferTargets.useQuery(
+    { userId, excludeCompanyId: selectedCompany?.id || '' },
+    { enabled: showDeleteDialog && !!selectedCompany }
+  )
+
+  // 取得目標公司的部門和職位
+  const selectedTargetCompany = transferTargets.find(c => c.id === targetCompanyId)
+  const targetDepartments = selectedTargetCompany?.departments || []
+  const targetPositions = selectedTargetCompany?.positions || []
 
   // Form states
   const [formData, setFormData] = useState({
@@ -103,6 +124,14 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
   const deactivateMutation = trpc.company.deactivate.useMutation({
     onSuccess: () => {
       setShowDeactivateDialog(false)
+      utils.company.listAll.invalidate()
+    },
+  })
+
+  const deleteMutation = trpc.company.delete.useMutation({
+    onSuccess: () => {
+      setShowDeleteDialog(false)
+      resetDeleteDialogState()
       utils.company.listAll.invalidate()
     },
   })
@@ -152,6 +181,22 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
     setShowDeactivateDialog(true)
   }
 
+  const handleDelete = (company: typeof companies[0]) => {
+    setSelectedCompany(company)
+    setDeleteMode('DEACTIVATE')
+    setTargetCompanyId('')
+    setTargetDepartmentId('')
+    setTargetPositionId('')
+    setShowDeleteDialog(true)
+  }
+
+  const resetDeleteDialogState = () => {
+    setDeleteMode('DEACTIVATE')
+    setTargetCompanyId('')
+    setTargetDepartmentId('')
+    setTargetPositionId('')
+  }
+
   const submitCreate = () => {
     createMutation.mutate({
       userId,
@@ -185,6 +230,31 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
       userId,
       id: selectedCompany.id,
     })
+  }
+
+  const submitDelete = () => {
+    if (!selectedCompany) return
+
+    deleteMutation.mutate({
+      userId,
+      companyId: selectedCompany.id,
+      mode: deleteMode,
+      ...(deleteMode === 'TRANSFER' && {
+        targetCompanyId,
+        targetDepartmentId,
+        targetPositionId,
+      }),
+    })
+  }
+
+  const canSubmitDelete = () => {
+    if (!selectedCompany) return false
+    if (selectedCompany._count.employees === 0) return true
+    if (deleteMode === 'DEACTIVATE') return true
+    if (deleteMode === 'TRANSFER') {
+      return targetCompanyId && targetDepartmentId && targetPositionId
+    }
+    return false
   }
 
   if (isLoadingCompanies || isLoadingGroups) {
@@ -301,13 +371,24 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
                           <Edit className="h-4 w-4" />
                         </Button>
                         {company.isActive && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeactivate(company)}
-                          >
-                            <Power className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeactivate(company)}
+                              title="停用公司"
+                            >
+                              <Power className="h-4 w-4 text-destructive" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(company)}
+                              title="刪除公司"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </TableCell>
@@ -542,6 +623,172 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 刪除公司 Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+        setShowDeleteDialog(open)
+        if (!open) resetDeleteDialogState()
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              刪除公司
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3">
+              <p className="text-sm text-destructive font-medium">
+                您確定要刪除「{selectedCompany?.name}」嗎？此操作無法復原。
+              </p>
+              {selectedCompany && selectedCompany._count.employees > 0 && (
+                <p className="text-sm mt-2">
+                  此公司目前有 <strong>{selectedCompany._count.employees}</strong> 位在職員工，請選擇如何處理這些員工：
+                </p>
+              )}
+            </div>
+
+            {selectedCompany && selectedCompany._count.employees > 0 && (
+              <>
+                <div className="space-y-3">
+                  <Label>員工處理方式</Label>
+                  <RadioGroup
+                    value={deleteMode}
+                    onValueChange={(value) => {
+                      setDeleteMode(value as 'TRANSFER' | 'DEACTIVATE')
+                      if (value === 'DEACTIVATE') {
+                        setTargetCompanyId('')
+                        setTargetDepartmentId('')
+                        setTargetPositionId('')
+                      }
+                    }}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-start space-x-2 p-3 rounded-md border">
+                      <RadioGroupItem value="TRANSFER" id="transfer" className="mt-1" />
+                      <div>
+                        <Label htmlFor="transfer" className="font-medium cursor-pointer">
+                          轉移到其他公司
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          將所有員工轉移到指定的公司、部門和職位
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-2 p-3 rounded-md border">
+                      <RadioGroupItem value="DEACTIVATE" id="deactivate" className="mt-1" />
+                      <div>
+                        <Label htmlFor="deactivate" className="font-medium cursor-pointer">
+                          停用員工帳號
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          結束員工任職並停用帳號（可透過復職功能重新指派）
+                        </p>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {deleteMode === 'TRANSFER' && (
+                  <div className="space-y-4 p-4 bg-muted/50 rounded-md">
+                    <div className="space-y-2">
+                      <Label>目標公司 *</Label>
+                      <Select
+                        value={targetCompanyId}
+                        onValueChange={(value) => {
+                          setTargetCompanyId(value)
+                          setTargetDepartmentId('')
+                          setTargetPositionId('')
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="選擇目標公司" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {transferTargets.map((company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name} ({company.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {targetCompanyId && (
+                      <div className="space-y-2">
+                        <Label>目標部門 *</Label>
+                        <Select
+                          value={targetDepartmentId}
+                          onValueChange={setTargetDepartmentId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="選擇目標部門" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {targetDepartments.map((dept) => (
+                              <SelectItem key={dept.id} value={dept.id}>
+                                {dept.name} ({dept.code})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {targetCompanyId && (
+                      <div className="space-y-2">
+                        <Label>目標職位 *</Label>
+                        <Select
+                          value={targetPositionId}
+                          onValueChange={setTargetPositionId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="選擇目標職位" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {targetPositions.map((pos) => (
+                              <SelectItem key={pos.id} value={pos.id}>
+                                {pos.name} (等級 {pos.level})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {deleteMode === 'DEACTIVATE' && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="inline h-4 w-4 mr-1" />
+                      注意：選擇此選項將停用所有員工的帳號。若員工在其他公司有任職，僅會結束在此公司的任職紀錄。
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {selectedCompany && selectedCompany._count.employees === 0 && (
+              <p className="text-sm text-muted-foreground">
+                此公司沒有在職員工，可直接刪除。
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={submitDelete}
+              disabled={deleteMutation.isPending || !canSubmitDelete()}
+            >
+              {deleteMutation.isPending ? '刪除中...' : '確認刪除'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
