@@ -9,7 +9,7 @@ import { Settings2, X, ChevronDown } from 'lucide-react'
 import { PWAInstallPrompt } from '@/components/pwa/pwa-install-prompt'
 import { useMobileSidebar } from './mobile-sidebar-context'
 import { PersonalizationModal } from '@/components/personalization'
-import { getMenuItemById, findParentMenuByHref, MenuItem } from '@/lib/sidebar-menu'
+import { getMenuItemById, findParentMenuByHref, MenuItem, defaultMenuItems, SubMenuItem } from '@/lib/sidebar-menu'
 import { useSidebarStore } from '@/stores/use-sidebar-store'
 import { trpc } from '@/lib/trpc'
 import { checkMenuVisibility } from '@/hooks/use-permissions'
@@ -136,8 +136,32 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     }
   }
 
+  // 取得個人專區的子選單（從 personalMenuItems）
+  const getPersonalMenuChildren = useMemo((): SubMenuItem[] => {
+    const personalItems = config.personalMenuItems || []
+    if (personalItems.length === 0) return []
+
+    const children: SubMenuItem[] = []
+    for (const itemId of personalItems) {
+      // 在所有主選單的 children 中尋找
+      for (const menu of defaultMenuItems) {
+        const child = menu.children?.find((c) => c.id === itemId)
+        if (child) {
+          children.push(child)
+          break
+        }
+      }
+    }
+    return children
+  }, [config.personalMenuItems])
+
   // 檢查選單是否有可見的子選單
   const hasVisibleChildren = (item: MenuItem) => {
+    // 個人專區特殊處理：使用 personalMenuItems
+    if (item.id === 'dashboard') {
+      return getPersonalMenuChildren.length > 0
+    }
+
     if (!item.children || item.children.length === 0) return false
     const userPermissions = permissionData?.permissions || []
     const isAdmin = permissionData?.isGroupAdmin || permissionData?.isCompanyManager || false
@@ -150,7 +174,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   // 過濾可見的子選單
-  const getVisibleChildren = (item: MenuItem) => {
+  const getVisibleChildren = (item: MenuItem): SubMenuItem[] => {
+    // 個人專區特殊處理：使用 personalMenuItems
+    if (item.id === 'dashboard') {
+      return getPersonalMenuChildren
+    }
+
     if (!item.children) return []
     const userPermissions = permissionData?.permissions || []
     const isAdmin = permissionData?.isGroupAdmin || permissionData?.isCompanyManager || false

@@ -8,6 +8,7 @@ import { Users, Clock, Calendar, FileText, Receipt, GitBranch, AlertCircle } fro
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
+import { PersonalQuickAccess } from './personal-quick-access'
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -290,6 +291,9 @@ export default async function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* 個人快捷功能 */}
+      <PersonalQuickAccess />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>

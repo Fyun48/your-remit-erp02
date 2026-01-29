@@ -10,7 +10,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SidebarSettings } from './sidebar-settings'
 import { ThemePicker } from './theme-picker'
-import { LayoutList, Palette } from 'lucide-react'
+import { PersonalMenuSettings } from './personal-menu-settings'
+import { LayoutList, Palette, Star } from 'lucide-react'
 import { useSidebarStore } from '@/stores/use-sidebar-store'
 import { trpc } from '@/lib/trpc'
 import { defaultTheme } from '@/lib/themes'
@@ -26,7 +27,7 @@ export function PersonalizationModal({
   onOpenChange,
   employeeId,
 }: PersonalizationModalProps) {
-  const [activeTab, setActiveTab] = useState('sidebar')
+  const [activeTab, setActiveTab] = useState('personal')
   const { config } = useSidebarStore()
   const [selectedTheme, setSelectedTheme] = useState(defaultTheme)
   const [originalTheme, setOriginalTheme] = useState(defaultTheme)
@@ -36,6 +37,23 @@ export function PersonalizationModal({
     { employeeId },
     { enabled: !!employeeId && open }
   )
+
+  // 取得使用者主要公司
+  const { data: assignments } = trpc.employee.getAssignments.useQuery(
+    { employeeId },
+    { enabled: !!employeeId && open }
+  )
+  const primaryCompanyId = assignments?.find((a) => a.isPrimary)?.companyId
+
+  // 取得使用者權限
+  const { data: permissionData } = trpc.permission.getEmployeePermissions.useQuery(
+    { employeeId, companyId: primaryCompanyId! },
+    { enabled: !!employeeId && !!primaryCompanyId && open }
+  )
+
+  const userPermissions = permissionData?.permissions || []
+  const isAdmin =
+    permissionData?.isGroupAdmin || permissionData?.isCompanyManager || false
 
   // Initialize theme when preference loads
   useEffect(() => {
@@ -58,6 +76,12 @@ export function PersonalizationModal({
     },
   })
 
+  const updatePersonalMenu = trpc.userPreference.updatePersonalMenuItems.useMutation({
+    onSuccess: () => {
+      onOpenChange(false)
+    },
+  })
+
   const updateTheme = trpc.userPreference.updateTheme.useMutation({
     onSuccess: () => {
       setOriginalTheme(selectedTheme)
@@ -71,6 +95,13 @@ export function PersonalizationModal({
     updateSidebar.mutate({
       employeeId,
       sidebarConfig: config,
+    })
+  }
+
+  const handleSavePersonalMenu = () => {
+    updatePersonalMenu.mutate({
+      employeeId,
+      personalMenuItems: config.personalMenuItems,
     })
   }
 
@@ -95,7 +126,11 @@ export function PersonalizationModal({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="personal" className="flex items-center gap-2">
+              <Star className="h-4 w-4" />
+              個人專區
+            </TabsTrigger>
             <TabsTrigger value="sidebar" className="flex items-center gap-2">
               <LayoutList className="h-4 w-4" />
               側邊欄
@@ -105,6 +140,16 @@ export function PersonalizationModal({
               佈景主題
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="personal" className="mt-4">
+            <PersonalMenuSettings
+              onSave={handleSavePersonalMenu}
+              onCancel={handleCancel}
+              isSaving={updatePersonalMenu.isPending}
+              userPermissions={userPermissions}
+              isAdmin={isAdmin}
+            />
+          </TabsContent>
 
           <TabsContent value="sidebar" className="mt-4">
             <SidebarSettings
