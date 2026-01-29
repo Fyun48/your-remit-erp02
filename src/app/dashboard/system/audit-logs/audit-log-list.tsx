@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +27,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   FileText,
   ArrowLeft,
   ChevronLeft,
@@ -37,7 +43,11 @@ import {
   Trash2,
   Settings,
   Loader2,
-  AlertCircle,
+  Search,
+  Download,
+  FileSpreadsheet,
+  File,
+  RotateCcw,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc'
 import Link from 'next/link'
@@ -265,6 +275,11 @@ function translateFieldName(fieldPath: string): string {
   return translatedFields.join('、')
 }
 
+// 將操作類型轉換為中文
+function translateAction(action: string): string {
+  return actionLabels[action]?.label || action
+}
+
 export function AuditLogList({ userId }: AuditLogListProps) {
   const [page, setPage] = useState(1)
   const [entityType, setEntityType] = useState<string>('all')
@@ -273,90 +288,229 @@ export function AuditLogList({ userId }: AuditLogListProps) {
   const [endDate, setEndDate] = useState('')
   const [showDetailDialog, setShowDetailDialog] = useState(false)
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null)
+  const [hasSearched, setHasSearched] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+
+  // 查詢條件狀態（用於實際查詢）
+  const [searchParams, setSearchParams] = useState({
+    entityType: 'all',
+    action: 'all',
+    startDate: '',
+    endDate: '',
+  })
 
   const logsQuery = trpc.auditLog.list.useQuery({
     userId,
-    entityType: entityType === 'all' ? undefined : entityType,
-    action: action === 'all' ? undefined : action as 'CREATE' | 'UPDATE' | 'DELETE',
-    startDate: startDate ? new Date(startDate) : undefined,
-    endDate: endDate ? new Date(endDate + 'T23:59:59') : undefined,
+    entityType: searchParams.entityType === 'all' ? undefined : searchParams.entityType,
+    action: searchParams.action === 'all' ? undefined : searchParams.action as 'CREATE' | 'UPDATE' | 'DELETE',
+    startDate: searchParams.startDate ? new Date(searchParams.startDate) : undefined,
+    endDate: searchParams.endDate ? new Date(searchParams.endDate + 'T23:59:59') : undefined,
     page,
     pageSize: 20,
+  }, {
+    enabled: hasSearched, // 只有點擊查詢後才執行
+  })
+
+  // 匯出查詢（取得所有符合條件的資料）
+  const exportQuery = trpc.auditLog.list.useQuery({
+    userId,
+    entityType: searchParams.entityType === 'all' ? undefined : searchParams.entityType,
+    action: searchParams.action === 'all' ? undefined : searchParams.action as 'CREATE' | 'UPDATE' | 'DELETE',
+    startDate: searchParams.startDate ? new Date(searchParams.startDate) : undefined,
+    endDate: searchParams.endDate ? new Date(searchParams.endDate + 'T23:59:59') : undefined,
+    page: 1,
+    pageSize: 10000, // 匯出時取得更多資料
+  }, {
+    enabled: false, // 手動觸發
   })
 
   const entityTypesQuery = trpc.auditLog.getEntityTypes.useQuery({ userId })
-  const statsQuery = trpc.auditLog.getStats.useQuery({ userId, days: 7 })
 
   const detailQuery = trpc.auditLog.getById.useQuery(
     { userId, id: selectedLogId || '' },
     { enabled: !!selectedLogId }
   )
 
+  const handleSearch = () => {
+    setSearchParams({
+      entityType,
+      action,
+      startDate,
+      endDate,
+    })
+    setPage(1)
+    setHasSearched(true)
+  }
+
+  const handleReset = () => {
+    setEntityType('all')
+    setAction('all')
+    setStartDate('')
+    setEndDate('')
+    setSearchParams({
+      entityType: 'all',
+      action: 'all',
+      startDate: '',
+      endDate: '',
+    })
+    setPage(1)
+    setHasSearched(false)
+  }
+
   const handleViewDetail = (logId: string) => {
     setSelectedLogId(logId)
     setShowDetailDialog(true)
   }
 
-  // 載入中狀態
-  if (logsQuery.isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard/system">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold">稽核日誌</h1>
-              <p className="text-muted-foreground">查看系統操作紀錄</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </div>
-    )
-  }
+  // 匯出為 CSV
+  const exportToCsv = useCallback(async () => {
+    if (!hasSearched) return
 
-  // 錯誤狀態
-  if (logsQuery.error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard/system">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold">稽核日誌</h1>
-              <p className="text-muted-foreground">查看系統操作紀錄</p>
-            </div>
-          </div>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-              <p className="text-lg font-medium text-red-600">載入失敗</p>
-              <p className="text-sm text-muted-foreground mt-2">{logsQuery.error.message}</p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => logsQuery.refetch()}
-              >
-                重試
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+    setIsExporting(true)
+    try {
+      const result = await exportQuery.refetch()
+      const logs = result.data?.logs || []
+
+      if (logs.length === 0) {
+        alert('沒有可匯出的資料')
+        return
+      }
+
+      // 建立 CSV 內容
+      const headers = [
+        '操作時間',
+        '操作者姓名',
+        '操作者工號',
+        '操作類型',
+        '資料類型',
+        '資料 ID',
+        '變更欄位',
+        '所屬公司',
+        'IP 位址',
+      ]
+
+      const rows = logs.map(log => [
+        format(new Date(log.createdAt), 'yyyy/MM/dd HH:mm:ss'),
+        log.operator.name,
+        log.operator.employeeNo,
+        translateAction(log.action),
+        entityTypeLabels[log.entityType] || log.entityType,
+        log.entityId,
+        translateFieldName(log.path || ''),
+        log.company?.name || '',
+        log.ipAddress || '',
+      ])
+
+      // 加入 BOM 以支援 Excel 正確顯示中文
+      const BOM = '\uFEFF'
+      const csvContent = BOM + [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n')
+
+      // 下載檔案
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `稽核日誌_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('匯出失敗:', error)
+      alert('匯出失敗，請稍後再試')
+    } finally {
+      setIsExporting(false)
+    }
+  }, [hasSearched, exportQuery])
+
+  // 匯出為 Excel (使用 HTML 表格格式)
+  const exportToExcel = useCallback(async () => {
+    if (!hasSearched) return
+
+    setIsExporting(true)
+    try {
+      const result = await exportQuery.refetch()
+      const logs = result.data?.logs || []
+
+      if (logs.length === 0) {
+        alert('沒有可匯出的資料')
+        return
+      }
+
+      // 建立 HTML 表格
+      const htmlContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+            th { background-color: #4472C4; color: white; font-weight: bold; }
+            tr:nth-child(even) { background-color: #D9E2F3; }
+            .create { color: #28a745; }
+            .update { color: #007bff; }
+            .delete { color: #dc3545; }
+          </style>
+        </head>
+        <body>
+          <h2>稽核日誌報表</h2>
+          <p>匯出時間：${format(new Date(), 'yyyy/MM/dd HH:mm:ss')}</p>
+          <p>查詢條件：${searchParams.entityType !== 'all' ? `資料類型: ${entityTypeLabels[searchParams.entityType] || searchParams.entityType}` : ''}${searchParams.action !== 'all' ? ` 操作類型: ${translateAction(searchParams.action)}` : ''}${searchParams.startDate ? ` 開始日期: ${searchParams.startDate}` : ''}${searchParams.endDate ? ` 結束日期: ${searchParams.endDate}` : ''}</p>
+          <p>共 ${logs.length} 筆紀錄</p>
+          <table>
+            <thead>
+              <tr>
+                <th>操作時間</th>
+                <th>操作者姓名</th>
+                <th>操作者工號</th>
+                <th>操作類型</th>
+                <th>資料類型</th>
+                <th>資料 ID</th>
+                <th>變更欄位</th>
+                <th>所屬公司</th>
+                <th>IP 位址</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logs.map(log => `
+                <tr>
+                  <td>${format(new Date(log.createdAt), 'yyyy/MM/dd HH:mm:ss')}</td>
+                  <td>${log.operator.name}</td>
+                  <td>${log.operator.employeeNo}</td>
+                  <td class="${log.action.toLowerCase()}">${translateAction(log.action)}</td>
+                  <td>${entityTypeLabels[log.entityType] || log.entityType}</td>
+                  <td style="font-family: monospace; font-size: 11px;">${log.entityId}</td>
+                  <td>${translateFieldName(log.path || '')}</td>
+                  <td>${log.company?.name || '-'}</td>
+                  <td>${log.ipAddress || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `
+
+      // 下載檔案
+      const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `稽核日誌_${format(new Date(), 'yyyyMMdd_HHmmss')}.xls`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('匯出失敗:', error)
+      alert('匯出失敗，請稍後再試')
+    } finally {
+      setIsExporting(false)
+    }
+  }, [hasSearched, exportQuery, searchParams])
 
   return (
     <div className="space-y-6">
@@ -380,96 +534,79 @@ export function AuditLogList({ userId }: AuditLogListProps) {
         </Link>
       </div>
 
-      {/* 統計卡片 */}
-      {statsQuery.data && (
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">近 7 日操作</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{statsQuery.data.totalLogs}</div>
-              <p className="text-xs text-muted-foreground">筆紀錄</p>
-            </CardContent>
-          </Card>
-          {statsQuery.data.byAction.map((item) => (
-            <Card key={item.action}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  {actionLabels[item.action]?.icon}
-                  {item.label}操作
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{item.count}</div>
-                <p className="text-xs text-muted-foreground">筆</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* 篩選條件 */}
+      {/* 查詢條件 */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-4 flex-wrap items-center">
-            <Select value={entityType} onValueChange={(v) => { setEntityType(v); setPage(1) }}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="資料類型" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">所有類型</SelectItem>
-                {entityTypesQuery.data?.map((type) => (
-                  <SelectItem key={type.type} value={type.type}>
-                    {type.label} ({type.count})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <CardHeader>
+          <CardTitle className="text-base">查詢條件</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-4 flex-wrap items-end">
+            <div className="space-y-1">
+              <label className="text-sm text-muted-foreground">資料類型</label>
+              <Select value={entityType} onValueChange={setEntityType}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="資料類型" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">所有類型</SelectItem>
+                  {entityTypesQuery.data?.map((type) => (
+                    <SelectItem key={type.type} value={type.type}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Select value={action} onValueChange={(v) => { setAction(v); setPage(1) }}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="操作類型" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">所有操作</SelectItem>
-                <SelectItem value="CREATE">新增</SelectItem>
-                <SelectItem value="UPDATE">修改</SelectItem>
-                <SelectItem value="DELETE">刪除</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-1">
+              <label className="text-sm text-muted-foreground">操作類型</label>
+              <Select value={action} onValueChange={setAction}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="操作類型" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">所有操作</SelectItem>
+                  <SelectItem value="CREATE">新增</SelectItem>
+                  <SelectItem value="UPDATE">修改</SelectItem>
+                  <SelectItem value="DELETE">刪除</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <div className="flex items-center gap-2">
+            <div className="space-y-1">
+              <label className="text-sm text-muted-foreground">開始日期</label>
               <Input
                 type="date"
                 value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setPage(1) }}
-                className="w-[160px]"
-              />
-              <span className="text-muted-foreground">~</span>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setPage(1) }}
+                onChange={(e) => setStartDate(e.target.value)}
                 className="w-[160px]"
               />
             </div>
 
-            {(entityType !== 'all' || action !== 'all' || startDate || endDate) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setEntityType('all')
-                  setAction('all')
-                  setStartDate('')
-                  setEndDate('')
-                  setPage(1)
-                }}
-              >
-                清除篩選
+            <div className="space-y-1">
+              <label className="text-sm text-muted-foreground">結束日期</label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-[160px]"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={handleSearch} disabled={logsQuery.isFetching}>
+                {logsQuery.isFetching ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4 mr-2" />
+                )}
+                查詢
               </Button>
-            )}
+              <Button variant="outline" onClick={handleReset}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                重設
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -479,100 +616,152 @@ export function AuditLogList({ userId }: AuditLogListProps) {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>操作紀錄</span>
-            {logsQuery.data && (
-              <span className="text-sm font-normal text-muted-foreground">
-                共 {logsQuery.data.pagination.total} 筆
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {hasSearched && logsQuery.data && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  共 {logsQuery.data.pagination.total} 筆
+                </span>
+              )}
+              {hasSearched && logsQuery.data && logsQuery.data.logs.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={isExporting}>
+                      {isExporting ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      匯出
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={exportToExcel}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      匯出 Excel (.xls)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportToCsv}>
+                      <File className="h-4 w-4 mr-2" />
+                      匯出 CSV (.csv)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>時間</TableHead>
-                <TableHead>操作者</TableHead>
-                <TableHead>操作</TableHead>
-                <TableHead>資料類型</TableHead>
-                <TableHead>變更欄位</TableHead>
-                <TableHead>所屬公司</TableHead>
-                <TableHead className="text-right">詳情</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {logsQuery.data?.logs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell className="whitespace-nowrap">
-                    {format(new Date(log.createdAt), 'MM/dd HH:mm:ss', { locale: zhTW })}
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{log.operator.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {log.operator.employeeNo}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`${actionLabels[log.action]?.color} text-white`}>
-                      {actionLabels[log.action]?.icon}
-                      <span className="ml-1">{actionLabels[log.action]?.label}</span>
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {entityTypeLabels[log.entityType] || log.entityType}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate" title={log.path || undefined}>
-                    {translateFieldName(log.path || '')}
-                  </TableCell>
-                  <TableCell>
-                    {log.company?.name || '-'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewDetail(log.id)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {logsQuery.data?.logs.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-muted-foreground">沒有符合條件的紀錄</p>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-
-          {/* 分頁 */}
-          {logsQuery.data && logsQuery.data.pagination.totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-4">
+          {!hasSearched ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-lg font-medium text-muted-foreground">請設定查詢條件</p>
+              <p className="text-sm text-muted-foreground mt-2">選擇查詢條件後點擊「查詢」按鈕</p>
+            </div>
+          ) : logsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : logsQuery.error ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <p className="text-lg font-medium text-red-600">載入失敗</p>
+              <p className="text-sm text-muted-foreground mt-2">{logsQuery.error.message}</p>
               <Button
                 variant="outline"
-                size="sm"
-                disabled={page === 1}
-                onClick={() => setPage(page - 1)}
+                className="mt-4"
+                onClick={() => logsQuery.refetch()}
               >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm">
-                第 {page} / {logsQuery.data.pagination.totalPages} 頁
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= logsQuery.data.pagination.totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
+                重試
               </Button>
             </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>時間</TableHead>
+                    <TableHead>操作者</TableHead>
+                    <TableHead>操作</TableHead>
+                    <TableHead>資料類型</TableHead>
+                    <TableHead>變更欄位</TableHead>
+                    <TableHead>所屬公司</TableHead>
+                    <TableHead className="text-right">詳情</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {logsQuery.data?.logs.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {format(new Date(log.createdAt), 'MM/dd HH:mm:ss', { locale: zhTW })}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{log.operator.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {log.operator.employeeNo}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${actionLabels[log.action]?.color} text-white`}>
+                          {actionLabels[log.action]?.icon}
+                          <span className="ml-1">{actionLabels[log.action]?.label}</span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {entityTypeLabels[log.entityType] || log.entityType}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={log.path || undefined}>
+                        {translateFieldName(log.path || '')}
+                      </TableCell>
+                      <TableCell>
+                        {log.company?.name || '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewDetail(log.id)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {logsQuery.data?.logs.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-muted-foreground">沒有符合條件的紀錄</p>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+
+              {/* 分頁 */}
+              {logsQuery.data && logsQuery.data.pagination.totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === 1}
+                    onClick={() => setPage(page - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm">
+                    第 {page} / {logsQuery.data.pagination.totalPages} 頁
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= logsQuery.data.pagination.totalPages}
+                    onClick={() => setPage(page + 1)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
