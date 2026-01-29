@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -485,7 +485,7 @@ export function FlowTemplateForm({
                   </div>
                 </div>
 
-                {steps.map((step, index) => {
+                {steps.map((step) => {
                   const AssigneeIcon =
                     assigneeTypeOptions.find((o) => o.value === step.assigneeType)?.icon || Users
                   const assigneeLabel =

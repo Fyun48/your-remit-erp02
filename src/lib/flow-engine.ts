@@ -161,8 +161,7 @@ async function getCCEmployeeIds(): Promise<string[]> {
 async function sendCCNotification(
   executionId: string,
   applicantName: string,
-  moduleType: FlowModuleType,
-  referenceId: string
+  moduleType: FlowModuleType
 ): Promise<void> {
   const ccEmployeeIds = await getCCEmployeeIds()
   if (!ccEmployeeIds || ccEmployeeIds.length === 0) return
@@ -530,8 +529,7 @@ export async function processDecision(params: ProcessDecisionParams): Promise<Pr
       await sendCCNotification(
         executionId,
         execution.applicant.name,
-        execution.moduleType,
-        execution.referenceId
+        execution.moduleType
       )
 
       // 更新原始申請狀態
@@ -554,7 +552,7 @@ export async function processDecision(params: ProcessDecisionParams): Promise<Pr
 /**
  * 取消審核流程
  */
-export async function cancelFlow(executionId: string, reason?: string): Promise<{ success: boolean; error?: string }> {
+export async function cancelFlow(executionId: string): Promise<{ success: boolean; error?: string }> {
   const execution = await prisma.flowExecution.findUnique({
     where: { id: executionId },
   })

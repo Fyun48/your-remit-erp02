@@ -3,13 +3,6 @@
 import { useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -42,7 +35,7 @@ interface BalanceSheetReportProps {
 export function BalanceSheetReport({ assignments, initialCompanyId }: BalanceSheetReportProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId)
+  const [selectedCompanyId] = useState<string>(initialCompanyId)
   const [asOfDate, setAsOfDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [chartType, setChartType] = useState<ChartType>('pie')
 

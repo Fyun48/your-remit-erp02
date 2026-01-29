@@ -99,7 +99,7 @@ export function VoucherList({
   hasPermission,
 }: VoucherListProps) {
   const router = useRouter()
-  const [selectedCompanyId, setSelectedCompanyId] = useState(initialCompanyId)
+  const [selectedCompanyId] = useState(initialCompanyId)
   const [sortField, setSortField] = useState<SortField>('voucherDate')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 

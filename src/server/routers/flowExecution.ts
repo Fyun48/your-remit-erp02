@@ -61,7 +61,7 @@ export const flowExecutionRouter = router({
       reason: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
-      const result = await cancelFlow(input.executionId, input.reason)
+      const result = await cancelFlow(input.executionId)
 
       if (!result.success) {
         throw new TRPCError({

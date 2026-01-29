@@ -75,7 +75,7 @@ type ViewMode = 'card' | 'list'
 export function VendorDashboard({ assignments, initialCompanyId, hasPermission }: VendorDashboardProps) {
   const router = useRouter()
   const utils = trpc.useUtils()
-  const [selectedCompanyId, setSelectedCompanyId] = useState(initialCompanyId)
+  const [selectedCompanyId] = useState(initialCompanyId)
   const [viewMode, setViewMode] = useState<ViewMode>('card')
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingVendor, setEditingVendor] = useState<typeof vendors[0] | null>(null)

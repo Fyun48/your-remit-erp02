@@ -76,7 +76,7 @@ export function AccountingPeriods({
   hasPermission,
 }: AccountingPeriodsProps) {
   const router = useRouter()
-  const [selectedCompanyId, setSelectedCompanyId] = useState(initialCompanyId)
+  const [selectedCompanyId] = useState(initialCompanyId)
   const [periodToClose, setPeriodToClose] = useState<string | null>(null)
   const [periodToReopen, setPeriodToReopen] = useState<string | null>(null)
 
@@ -133,7 +133,7 @@ export function AccountingPeriods({
       if (response.ok) {
         window.location.reload()
       }
-    } catch (error) {
+    } catch {
       toast.error('切換公司失敗')
     }
   }
@@ -162,10 +162,6 @@ export function AccountingPeriods({
     if (periodToReopen) {
       reopenMutation.mutate({ id: periodToReopen })
     }
-  }
-
-  const getPeriodName = (period: { year: number; period: number }) => {
-    return `${period.year} 年 ${period.period} 月`
   }
 
   return (

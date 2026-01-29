@@ -74,7 +74,7 @@ type ViewMode = 'card' | 'list'
 export function CustomerDashboard({ assignments, initialCompanyId, hasPermission }: CustomerDashboardProps) {
   const router = useRouter()
   const utils = trpc.useUtils()
-  const [selectedCompanyId, setSelectedCompanyId] = useState(initialCompanyId)
+  const [selectedCompanyId] = useState(initialCompanyId)
   const [viewMode, setViewMode] = useState<ViewMode>('card')
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<typeof customers[0] | null>(null)

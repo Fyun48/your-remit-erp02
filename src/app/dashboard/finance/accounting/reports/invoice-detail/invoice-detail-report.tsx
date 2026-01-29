@@ -60,7 +60,7 @@ export default function InvoiceDetailReport({ assignments, initialCompanyId }: I
   const currentMonth = new Date().getMonth() + 1
   const currentPeriod = Math.ceil(currentMonth / 2)
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId)
+  const [selectedCompanyId] = useState<string>(initialCompanyId)
   const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString())
   const [selectedPeriod, setSelectedPeriod] = useState<string>(currentPeriod.toString())
   const [selectedType, setSelectedType] = useState<'SALES' | 'PURCHASE' | 'ALL'>('ALL')

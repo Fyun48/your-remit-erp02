@@ -164,8 +164,12 @@ export default function InsuranceGrades() {
     seedMutation.mutate({ year: parseInt(selectedYear) })
   }
 
-  const handleStartEdit = (grade: typeof grades extends (infer T)[] | undefined ? T : never) => {
-    if (!grade) return
+  const handleStartEdit = (grade: {
+    id: string
+    minSalary: number | string | { toString(): string }
+    maxSalary: number | string | { toString(): string } | null
+    insuredAmount: number | string | { toString(): string }
+  }) => {
     setEditingGrade({
       id: grade.id,
       minSalary: grade.minSalary.toString(),

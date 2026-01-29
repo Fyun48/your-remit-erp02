@@ -37,7 +37,7 @@ interface TrialBalanceReportProps {
 export function TrialBalanceReport({ assignments, initialCompanyId }: TrialBalanceReportProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId)
+  const [selectedCompanyId] = useState<string>(initialCompanyId)
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>('')
 
   // 取得會計期間

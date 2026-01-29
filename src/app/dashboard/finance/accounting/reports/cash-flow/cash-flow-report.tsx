@@ -3,13 +3,6 @@
 import { useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import {
   Loader2,
@@ -44,7 +37,7 @@ interface CashFlowReportProps {
 export function CashFlowReport({ assignments, initialCompanyId }: CashFlowReportProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId)
+  const [selectedCompanyId] = useState<string>(initialCompanyId)
   const [startDate, setStartDate] = useState<string>(() => {
     const now = new Date()
     return `${now.getFullYear()}-01-01`

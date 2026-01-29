@@ -74,7 +74,7 @@ export function ChartOfAccounts({
   hasPermission,
 }: ChartOfAccountsProps) {
   const router = useRouter()
-  const [selectedCompanyId, setSelectedCompanyId] = useState(initialCompanyId)
+  const [selectedCompanyId] = useState(initialCompanyId)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showResetDialog, setShowResetDialog] = useState(false)
   const [showCopyDialog, setShowCopyDialog] = useState(false)
@@ -163,7 +163,7 @@ export function ChartOfAccounts({
         // 重新載入頁面以套用新公司
         window.location.reload()
       }
-    } catch (error) {
+    } catch {
       toast.error('切換公司失敗')
     }
   }
@@ -405,14 +405,15 @@ export function ChartOfAccounts({
                 <Label>類別</Label>
                 <Select
                   value={newAccount.category}
-                  onValueChange={(v: AccountCategory) =>
+                  onValueChange={(v) => {
+                    const category = v as AccountCategory
                     setNewAccount({
                       ...newAccount,
-                      category: v,
-                      accountType: v === 'ASSET' || v === 'EXPENSE' ? 'DEBIT' : 'CREDIT',
+                      category,
+                      accountType: category === 'ASSET' || category === 'EXPENSE' ? 'DEBIT' : 'CREDIT',
                       parentId: '',
                     })
-                  }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -430,8 +431,8 @@ export function ChartOfAccounts({
                 <Label>性質</Label>
                 <Select
                   value={newAccount.accountType}
-                  onValueChange={(v: 'DEBIT' | 'CREDIT') =>
-                    setNewAccount({ ...newAccount, accountType: v })
+                  onValueChange={(v) =>
+                    setNewAccount({ ...newAccount, accountType: v as 'DEBIT' | 'CREDIT' })
                   }
                 >
                   <SelectTrigger>

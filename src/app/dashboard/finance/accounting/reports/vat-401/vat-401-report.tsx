@@ -52,7 +52,7 @@ export function Vat401Report({ assignments, initialCompanyId }: Vat401ReportProp
   const currentMonth = new Date().getMonth() + 1
   const currentPeriod = Math.ceil(currentMonth / 2)
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId)
+  const [selectedCompanyId] = useState<string>(initialCompanyId)
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear))
   const [selectedPeriod, setSelectedPeriod] = useState<string>(String(currentPeriod))
 

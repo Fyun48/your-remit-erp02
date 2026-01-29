@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -56,7 +55,6 @@ const permissionLabels: Record<string, string> = {
 }
 
 export function DelegationList({ companyId, companyName, currentUserId }: DelegationListProps) {
-  const router = useRouter()
   const [activeTab, setActiveTab] = useState('my')
 
   // Dialog states

@@ -5,13 +5,6 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   Table,
   TableBody,
   TableCell,
@@ -52,7 +45,7 @@ export default function YearComparisonReport({ assignments, initialCompanyId }: 
   const printRef = useRef<HTMLDivElement>(null)
   const currentYear = new Date().getFullYear()
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId)
+  const [selectedCompanyId] = useState<string>(initialCompanyId)
   const [selectedYears, setSelectedYears] = useState<number[]>([currentYear - 1, currentYear])
   const [reportType, setReportType] = useState<'income' | 'balance'>('income')
 

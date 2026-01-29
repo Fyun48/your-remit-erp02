@@ -49,7 +49,7 @@ export default function WithholdingReport({ assignments, initialCompanyId }: Wit
   const printRef = useRef<HTMLDivElement>(null)
   const currentYear = new Date().getFullYear()
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId)
+  const [selectedCompanyId] = useState<string>(initialCompanyId)
   const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString())
 
   // 取得公司名稱
