@@ -51,6 +51,7 @@ import {
   Loader2,
   Trash2,
   AlertTriangle,
+  RotateCcw,
 } from 'lucide-react'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { trpc } from '@/lib/trpc'
@@ -75,6 +76,7 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showReactivateDialog, setShowReactivateDialog] = useState(false)
   const [selectedCompany, setSelectedCompany] = useState<typeof companies[0] | null>(null)
 
   // Delete dialog states
@@ -136,6 +138,13 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
     },
   })
 
+  const reactivateMutation = trpc.company.reactivate.useMutation({
+    onSuccess: () => {
+      setShowReactivateDialog(false)
+      utils.company.listAll.invalidate()
+    },
+  })
+
   // Filter companies
   const filteredCompanies = companies.filter((company) => {
     const matchesSearch =
@@ -190,6 +199,11 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
     setShowDeleteDialog(true)
   }
 
+  const handleReactivate = (company: typeof companies[0]) => {
+    setSelectedCompany(company)
+    setShowReactivateDialog(true)
+  }
+
   const resetDeleteDialogState = () => {
     setDeleteMode('DEACTIVATE')
     setTargetCompanyId('')
@@ -227,6 +241,14 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
   const submitDeactivate = () => {
     if (!selectedCompany) return
     deactivateMutation.mutate({
+      userId,
+      id: selectedCompany.id,
+    })
+  }
+
+  const submitReactivate = () => {
+    if (!selectedCompany) return
+    reactivateMutation.mutate({
       userId,
       id: selectedCompany.id,
     })
@@ -389,6 +411,16 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </>
+                        )}
+                        {!company.isActive && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleReactivate(company)}
+                            title="重新啟用公司"
+                          >
+                            <RotateCcw className="h-4 w-4 text-green-600" />
+                          </Button>
                         )}
                       </div>
                     </TableCell>
@@ -619,6 +651,31 @@ export function CompanyList({ userId, canManage }: CompanyListProps) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deactivateMutation.isPending ? '停用中...' : '確認停用'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 重新啟用確認 Dialog */}
+      <AlertDialog open={showReactivateDialog} onOpenChange={setShowReactivateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確認重新啟用公司？</AlertDialogTitle>
+            <AlertDialogDescription>
+              您確定要重新啟用「{selectedCompany?.name}」嗎？
+              <span className="block mt-2 text-muted-foreground">
+                重新啟用後，此公司將會出現在公司選擇器中，並可指派員工。
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={submitReactivate}
+              disabled={reactivateMutation.isPending}
+              className="bg-green-600 text-white hover:bg-green-700"
+            >
+              {reactivateMutation.isPending ? '啟用中...' : '確認啟用'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

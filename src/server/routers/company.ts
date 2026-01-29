@@ -376,6 +376,37 @@ export const companyRouter = router({
       return result
     }),
 
+  // 重新啟用公司
+  reactivate: publicProcedure
+    .input(z.object({
+      userId: z.string(),
+      id: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const hasPermission = await canManageCompany(input.userId)
+      if (!hasPermission) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: '無公司管理權限' })
+      }
+
+      const company = await ctx.prisma.company.findUnique({ where: { id: input.id } })
+      if (!company) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: '公司不存在' })
+      }
+
+      if (company.isActive) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '公司已是啟用狀態' })
+      }
+
+      const result = await ctx.prisma.company.update({
+        where: { id: input.id },
+        data: { isActive: true },
+      })
+
+      await auditUpdate('Company', input.id, company, result, input.userId)
+
+      return result
+    }),
+
   // 創建集團
   createGroup: publicProcedure
     .input(z.object({
