@@ -6,6 +6,7 @@ import { isCompanyManager } from '@/lib/permission'
 import { PermissionList } from './permission-list'
 import { PermissionTemplates } from './permission-templates'
 import { BatchAuthorization } from './batch-authorization'
+import { GroupPermissionManagement } from './group-permission-management'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default async function PermissionsPage() {
@@ -28,6 +29,7 @@ export default async function PermissionsPage() {
       <Tabs defaultValue="employees">
         <TabsList>
           <TabsTrigger value="employees">員工權限</TabsTrigger>
+          {groupAdmin && <TabsTrigger value="group">集團權限</TabsTrigger>}
           {groupAdmin && <TabsTrigger value="templates">權限範本</TabsTrigger>}
           {canManage && <TabsTrigger value="batch">批次授權</TabsTrigger>}
         </TabsList>
@@ -40,6 +42,12 @@ export default async function PermissionsPage() {
             canManage={canManage}
           />
         </TabsContent>
+
+        {groupAdmin && (
+          <TabsContent value="group" className="mt-6">
+            <GroupPermissionManagement userId={userId} />
+          </TabsContent>
+        )}
 
         {groupAdmin && (
           <TabsContent value="templates" className="mt-6">
